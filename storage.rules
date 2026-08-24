@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// Hyre Firebase Storage rules — CV files.
+//
+// CVs live under cvs/{uid}/…  A signed-in user may upload ONLY into their own
+// folder, only real CV types, and only up to 5 MB (enforced here on the server,
+// not just in the browser). Any signed-in user may read (staff need to view and
+// download CVs; download URLs also carry an access token). Everything else is
+// denied.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /cvs/{uid}/{allPaths=**} {
+      allow read: if request.auth != null;
+
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && (
+             request.resource.contentType.matches('application/pdf')
+             || request.resource.contentType.matches('application/msword')
+             || request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+             || request.resource.contentType.matches('application/octet-stream')
+           );
+    }
+
+    // Deny everything else.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

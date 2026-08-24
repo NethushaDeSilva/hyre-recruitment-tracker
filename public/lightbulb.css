@@ -1,0 +1,186 @@
+/* ============================================================================
+   Hiree — homepage dark-mode light bulb on a FLEXIBLE rope.
+   The cord is a real simulated rope (a chain of points solved with Verlet
+   integration in LightbulbIntro.jsx) drawn as an SVG path, so it bends,
+   stretches and swings naturally. Grab the bulb to drag/fling it; let go and it
+   settles under gravity. Only the bulb captures pointer events, so the page is
+   never blocked. Dark-mode + homepage only. Honours prefers-reduced-motion.
+   ========================================================================== */
+
+.bulb-scene {
+  position: fixed;
+  inset: 0; /* full-viewport overlay … */
+  z-index: 45;
+  pointer-events: none; /* … that never blocks the page */
+  user-select: none;
+}
+
+/* the little hook the rope hangs from (the fixed pivot) */
+.bulb-hook {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 11px;
+  height: 11px;
+  border: 2px solid #9a9a9a;
+  border-radius: 50%;
+  background: transparent;
+  z-index: 2;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+/* the second hook — the "parking" hook you can hang the bulb on to tuck it away */
+.bulb-hook.park {
+  left: calc(50% + 42px);
+}
+/* highlight the parking hook while the bulb is near it (drop-here affordance) */
+.bulb-hook.near {
+  border-color: #f5c518;
+  box-shadow: 0 0 9px rgba(245, 197, 24, 0.75);
+}
+/* the parking hook while it's holding the bulb */
+.bulb-hook.holding {
+  border-color: #f5c518;
+  background: rgba(245, 197, 24, 0.28);
+}
+
+/* the flexible rope, drawn through the simulated points */
+.bulb-rope {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.bulb-rope path {
+  fill: none;
+  stroke: #6b6b6b;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* while dragging, show the grabbing cursor everywhere */
+body.bulb-grabbing,
+body.bulb-grabbing * {
+  cursor: grabbing !important;
+}
+
+/* --- the bulb (the one grabbable element) — positioned by JS --- */
+.bulb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  transform-origin: 24px 0; /* pivot at the rope attachment (top-centre) */
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.bulb:active { cursor: grabbing; }
+
+.bulb-cap {
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 15px;
+  height: 12px;
+  border-radius: 3px 3px 2px 2px;
+  background: linear-gradient(#8a8a8a, #4c4c4c);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+}
+
+.bulb-glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 50% 50% 48% 48%;
+  background: radial-gradient(circle at 35% 30%, #4a4a4a, #262626 70%);
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.bulb-light {
+  position: absolute;
+  inset: 0;
+  border-radius: 50% 50% 48% 48%;
+  background: radial-gradient(circle at 40% 32%, #fff6cf, #ffd84d 45%, #f5c518 78%);
+  box-shadow: 0 0 10px #f5c518, 0 0 22px rgba(245, 197, 24, 0.7);
+  opacity: 0;
+  animation: bulb-turn-on 1.7s steps(1, end) 1.6s forwards,
+             bulb-flicker 4s ease-in-out 3.4s infinite;
+}
+.bulb-light::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(180, 120, 0, 0.7);
+  border-radius: 40%;
+}
+
+.bulb-glow {
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  width: 320px;
+  height: 320px;
+  transform: translate(-50%, -50%);
+  pointer-events: none; /* the big halo must never block the page */
+  background: radial-gradient(closest-side, rgba(245, 197, 24, 0.42), rgba(245, 197, 24, 0.12) 45%, transparent 72%);
+  opacity: 0;
+  animation: bulb-turn-on 1.7s steps(1, end) 1.6s forwards,
+             bulb-flicker 4s ease-in-out 3.4s infinite;
+}
+
+/* --- keyframes --- */
+@keyframes bulb-turn-on {
+  0%   { opacity: 0; }
+  6%   { opacity: 0.7; }
+  9%   { opacity: 0; }
+  14%  { opacity: 0.9; }
+  17%  { opacity: 0.1; }
+  23%  { opacity: 1; }
+  27%  { opacity: 0.35; }
+  32%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+@keyframes bulb-flicker {
+  0%   { opacity: 1; }
+  6%   { opacity: 0.72; }
+  8%   { opacity: 1; }
+  9%   { opacity: 0.9; }
+  11%  { opacity: 1; }
+  23%  { opacity: 1; }
+  25%  { opacity: 0.5; }
+  27%  { opacity: 1; }
+  44%  { opacity: 1; }
+  47%  { opacity: 0.35; }
+  48%  { opacity: 0.9; }
+  49%  { opacity: 0.4; }
+  51%  { opacity: 1; }
+  70%  { opacity: 1; }
+  73%  { opacity: 0.66; }
+  75%  { opacity: 1; }
+  90%  { opacity: 1; }
+  92%  { opacity: 0.55; }
+  94%  { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* Accessibility: no motion — bulb simply lit and steady. */
+@media (prefers-reduced-motion: reduce) {
+  .bulb-light,
+  .bulb-glow { opacity: 1; animation: none; }
+}
+
+/* On phones the fixed centred bulb would sit over the content, so hide it —
+   it's a desktop/tablet delight. (Tablets ≥ 768px keep it.) */
+@media (max-width: 767px) {
+  .bulb-scene { display: none; }
+}

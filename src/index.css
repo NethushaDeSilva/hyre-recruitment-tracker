@@ -1,0 +1,159 @@
+/* Global styles + design tokens for Hyre.
+   The CSS variables below feed the shadcn/ui semantic colours in tailwind.config.js.
+   Values are HSL (space-separated) so Tailwind can wrap them in hsl(var(--token)). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Hyre theme — light-yellow surfaces, pure black text, a golden-yellow
+       accent (`gold`), and black primary actions for contrast. */
+
+    /* Surfaces & text */
+    --background: 48 64% 96%; /* #FBF7EA gentle warm-yellow app bg (easy on the eyes) */
+    --foreground: 0 0% 0%; /* pure black */
+
+    --card: 0 0% 100%; /* #FFFFFF cards sit crisp on the yellow bg */
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+
+    /* Primary action — black (black-on-yellow is the signature look) */
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Subtle surfaces (menu hovers, quiet chips) — a warm pale-yellow tint. */
+    --secondary: 48 85% 91%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 48 70% 91%;
+    --muted-foreground: 40 6% 30%; /* dark warm grey for secondary text */
+    --accent: 48 85% 91%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 72% 51%; /* #DC2626 */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Lines & focus */
+    --border: 47 40% 85%; /* warm hairline */
+    --input: 47 40% 85%;
+    --ring: 0 0% 0%;
+
+    --radius: 0.875rem; /* 14px — cards; buttons/inputs derive slightly tighter */
+  }
+
+  /* Dark mode — near-black surfaces, white text, yellow primary/accent.
+     Applied by toggling the `dark` class on <html> (see index.html + theme.js). */
+  .dark {
+    --background: 0 0% 7%; /* #121212 */
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 11%; /* #1C1C1C */
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Primary flips to brand yellow so buttons pop on black (with black text) */
+    --primary: 47 92% 53%;
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 0 0% 66%;
+    --accent: 0 0% 17%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 22%;
+    --input: 0 0% 22%;
+    --ring: 47 92% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Smooth light ⇄ dark switch. theme.js adds `.theme-anim` to <html> for the
+   duration of the toggle, so every surface, line and text colour eases across
+   together — then the class is removed so it never slows down hovers or other
+   component transitions. Honour reduced-motion by skipping the fade. */
+@media (prefers-reduced-motion: no-preference) {
+  .theme-anim,
+  .theme-anim *,
+  .theme-anim *::before,
+  .theme-anim *::after {
+    transition:
+      background-color 0.55s ease,
+      border-color 0.55s ease,
+      color 0.45s ease,
+      fill 0.55s ease,
+      stroke 0.55s ease,
+      box-shadow 0.55s ease,
+      opacity 0.6s ease !important;
+  }
+}
+
+/* Stage / status pills carry hardcoded LIGHT backgrounds (set inline so Tailwind
+   never purges them). Against dark surfaces those near-white pills glare, so here
+   we re-tint them from the pill's own accent colour (exposed inline as --pill):
+   a soft translucent fill with a brightened-accent label — easy on the eyes while
+   keeping each stage's identity. Progressive enhancement: a browser without
+   color-mix simply ignores these and keeps the (still legible) light inline style. */
+.dark .stage-pill {
+  background: color-mix(in srgb, var(--pill, #64748b) 22%, transparent) !important;
+  color: color-mix(in srgb, var(--pill, #64748b) 58%, white) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Auto-fading scrollbars — for BOTH axes and every scroll area (page, pipeline
+   board, tables, modals, menus). Idle: a faint low-opacity thumb you can still
+   locate. Hovering the scroll area or actively scrolling (`.is-scrolling`,
+   toggled in src/lib/scroll-affordance.js) brightens it; hovering the bar itself
+   is strongest. Restricted to fine pointers so touch devices keep their native
+   overlay scrollbars. Colour is derived from --foreground, so it works in both
+   light and dark themes. -------------------------------------------------------*/
+@media (pointer: fine) {
+  * {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: hsl(var(--foreground) / 0.14) transparent;
+  }
+  *:hover,
+  .is-scrolling {
+    scrollbar-color: hsl(var(--foreground) / 0.34) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--foreground) / 0.14); /* faint when idle */
+    border: 3px solid transparent; /* inset via padding-box → a slim rounded pill */
+    background-clip: padding-box;
+    border-radius: 9999px;
+    transition: background-color 0.18s ease;
+  }
+  /* brighten while the pointer is over the scroll area, or while scrolling */
+  *:hover::-webkit-scrollbar-thumb,
+  .is-scrolling::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--foreground) / 0.34);
+  }
+  /* strongest when the pointer is right on the bar */
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--foreground) / 0.55);
+  }
+}

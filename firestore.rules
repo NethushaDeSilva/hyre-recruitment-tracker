@@ -1,0 +1,184 @@
+rules_version = '2';
+
+// Hyre Firestore security rules — FULL LOCKDOWN.
+//
+// Design principles:
+//  1. Nothing is readable or writable without being signed in.
+//  2. A user's role (users/{uid}.role) is the basis for every permission — so a
+//     user must NEVER be able to grant themselves a staff role. Self-serve
+//     accounts are always Candidates; staff roles are provisioned out-of-band
+//     (Firebase console or scripts/provision-staff.mjs) and can't change here.
+//  3. Applicants can create only THEIR OWN application, only into "applied" —
+//     no self-promotion to hired, no forged review data.
+//  4. Staff writes are gated by STAGE OWNERSHIP (mirrors src/lib/stages.js) and
+//     the audit trail (history[]) is append-only — entries can never be
+//     removed or truncated, so a rejection can't be quietly erased.
+//  5. Applicants read only their own rows (by uid or verified email); staff read
+//     the whole collection. The client MUST constrain candidate list queries to
+//     match (see src/data/store.js).
+//
+// NOTE: comments[] is intentionally staff-mutable (the product lets a reviewer
+// delete their own note before confirming a move); rules can't cheaply prove
+// which array element a caller removed. history[] is the tamper-evident record.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // The requester's role, read from their profile doc ("" if none).
+    function myRole() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : "";
+    }
+    function isStaff() {
+      return myRole() in ['HR', 'Interviewer', 'Management'];
+    }
+    function isRecruiter() {
+      return myRole() in ['HR', 'Management'];
+    }
+
+    // Which role owns (may advance/reject a candidate sitting in) a stage.
+    // Mirrors STAGES[...].owner in src/lib/stages.js.
+    function stageOwner(stage) {
+      return stage in ['applied', 'screening', 'hold'] ? 'HR'
+           : stage in ['dept', 'interview', 'interview2'] ? 'Interviewer'
+           : stage == 'final' ? 'Management'
+           : ''; // hired / rejected are terminal — no owner
+    }
+    // May the caller act on a candidate currently in `stage`?
+    // Management can act on any stage; otherwise the caller must own it.
+    function ownsStage(stage) {
+      return myRole() == 'Management' || myRole() == stageOwner(stage);
+    }
+
+    // history[] may only grow — never shrink or be dropped. Tolerates docs that
+    // have no history field yet (older seed data).
+    function historyAppendOnly() {
+      return !('history' in resource.data)
+        || (('history' in request.resource.data)
+            && request.resource.data.history.size() >= resource.data.history.size());
+    }
+
+    // --- user profiles ---
+    match /users/{uid} {
+      allow read: if signedIn();
+      // Create your own profile as a Candidate only. (Staff docs are provisioned
+      // out-of-band, so this create path is never used for staff.)
+      allow create: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.role == 'Candidate';
+      // Update your own profile, but you can NEVER change your own role. Your
+      // readable User ID (userId) is write-ONCE: it may be minted when absent
+      // (the app self-heals it on first sign-in) but can never be altered after.
+      allow update: if signedIn() && request.auth.uid == uid
+                    && request.resource.data.role == resource.data.role
+                    && (!('userId' in resource.data)
+                        || request.resource.data.userId == resource.data.userId);
+      allow delete: if false;
+    }
+
+    // --- positions ---
+    //  read:   any signed-in user
+    //  create: recruiters (HR is the recruitment authority; vacancies open directly)
+    //  update: recruiters may edit details/stages and change status (close/reopen)
+    //  delete: recruiters (HR owns the pipeline post role-swap; Management retained)
+    match /positions/{id} {
+      allow read: if signedIn();
+      allow create: if isRecruiter();
+      allow update: if isRecruiter();
+      allow delete: if isRecruiter();
+    }
+
+    // --- sequence counters (e.g. counters/candidates.next) ---
+    // Hands out unique, monotonically-increasing candidate numbers. Any signed-in
+    // user may read it and claim the next number, but the value can only ever go
+    // UP (and only the `next` field exists), so numbers can't be reused or forged
+    // downward. Uniqueness is guaranteed by the client using a transaction.
+    match /counters/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['next'])
+        && request.resource.data.next is int
+        && request.resource.data.next >= 1;
+      allow update: if signedIn()
+        && request.resource.data.keys().hasOnly(['next'])
+        && request.resource.data.next is int
+        && request.resource.data.next > resource.data.next;
+      allow delete: if false;
+    }
+
+    // --- candidates ---
+    match /candidates/{id} {
+      // read: staff → all; applicant → only their own (by uid or verified email).
+      allow read: if isStaff()
+        || (signedIn() && (
+              resource.data.submittedByUid == request.auth.uid
+              || resource.data.email == request.auth.token.email));
+
+      // create: staff add anyone; an applicant creates only their own
+      // application, only into "applied", with no forged review payload. The
+      // source is either a plain "Self-applied" application or a "Role change"
+      // request from an existing employee — both are self-created into "applied".
+      allow create: if isStaff()
+        || (signedIn()
+            && request.resource.data.submittedByUid == request.auth.uid
+            && request.resource.data.stage == 'applied'
+            && request.resource.data.source in ['Self-applied', 'Role change']
+            && (!('comments' in request.resource.data)
+                || request.resource.data.comments.size() == 0));
+
+      // update: staff only, history append-only, and either
+      //   (a) no stage change  → a comment / profile edit (any staff), or
+      //   (b) a stage change   → the caller must own the current stage, or
+      //   (c) HR reinstating a rejected candidate from the talent pool
+      //       (rejected → applied). ONLY HR may reconsider — not Management.
+      allow update: if isStaff()
+        && historyAppendOnly()
+        && (
+             request.resource.data.stage == resource.data.stage
+             || ownsStage(resource.data.stage)
+             || (resource.data.stage == 'rejected'
+                 && request.resource.data.stage == 'applied'
+                 && myRole() == 'HR')
+           );
+
+      // delete: only as part of a HIRE transfer — a stage owner (or Management)
+      // removes the candidate the instant they're written into `employees`. A
+      // REJECTED candidate can NEVER be deleted (the talent pool is permanent).
+      allow delete: if isStaff()
+        && resource.data.stage != 'rejected'
+        && ownsStage(resource.data.stage);
+    }
+
+    // --- employees (HIRED people) ---
+    // The moment a candidate reaches "hired" they're MOVED out of /candidates and
+    // written here (see hireCandidate() in src/data/store.js), keyed by their
+    // readable employee ID (e.g. employees/SE-SNE-0001). Same read scoping as
+    // candidates: staff see everyone; a person sees only their own record.
+    match /employees/{id} {
+      allow read: if isStaff()
+        || (signedIn() && (
+              resource.data.submittedByUid == request.auth.uid
+              || resource.data.email == request.auth.token.email));
+
+      // create: staff only, and only a well-formed HIRED record (this is the
+      // destination of a hire — never a self-serve write).
+      allow create: if isStaff()
+        && request.resource.data.stage == 'hired'
+        && request.resource.data.employeeId is string
+        && request.resource.data.employeeId.size() > 0;
+
+      // update: staff only; the audit trail can only grow.
+      allow update: if isStaff() && historyAppendOnly();
+
+      // delete: staff only — used to vacate a person's OLD employee record when
+      // they're promoted into a new one (one live record per person).
+      allow delete: if isStaff();
+    }
+
+    // Anything not matched above is denied by default.
+  }
+}

@@ -53,11 +53,16 @@ export default function AiFilter({ candidates = [], onOpen }) {
     setLoading(true);
     setError("");
     setResults(null);
+
+    // Abort if the worker takes too long, so the button never hangs forever.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
     try {
       const res = await fetch(AI_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ criteria: q, candidates: pool.map(toPayload) }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !Array.isArray(data.ranked)) {
@@ -65,8 +70,22 @@ export default function AiFilter({ candidates = [], onOpen }) {
       }
       setResults({ summary: data.summary || "", ranked: data.ranked });
     } catch (e) {
-      setError(e.message || "Couldn't reach the AI screening service. Try again in a moment.");
+      // A raw "Failed to fetch" / AbortError / TypeError means the request never
+      // reached the worker — the service itself is fine. On the user's end this is
+      // almost always an ad blocker or privacy shield, or a school/work/Wi-Fi
+      // network or DNS blocking the *.workers.dev host. Show something they can
+      // act on instead of the browser's scary raw message.
+      const blocked =
+        e.name === "AbortError" ||
+        e.name === "TypeError" ||
+        /failed to fetch|networkerror|load failed|network request failed/i.test(e.message || "");
+      setError(
+        blocked
+          ? "Couldn't reach the AI screening service — the request was blocked before it left your device. This is usually an ad blocker or browser privacy shield, or a school/work Wi‑Fi or DNS blocking the host it runs on. Try pausing ad blockers for this site, or switch to another network or device. (Everything else in Hyre still works normally.)"
+          : e.message || "The AI screening service had a problem. Please try again in a moment."
+      );
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   };

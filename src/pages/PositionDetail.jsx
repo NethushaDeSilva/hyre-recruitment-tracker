@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
 import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
+import AiFilter from "@/components/AiFilter";
 import { QUALIFICATIONS, EXPERIENCE_RANGES } from "@/lib/application";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/Button";
@@ -231,6 +232,9 @@ export default function PositionDetail() {
           )}
         </div>
       )}
+
+      {/* AI candidate screening — HR only */}
+      {isHR && <AiFilter candidates={cands} onOpen={setDetail} />}
 
       {/* board — fills the remaining height and is the ONE scroll region: its
           left–right scrollbar stays pinned at the bottom of the screen and its

@@ -18,6 +18,9 @@ serviceAccountKey.json
 # Firebase CLI cache
 .firebase/
 
+# Cloudflare Wrangler cache
+.wrangler/
+
 # Coursework Word documents (kept out of the repo)
 *.docx
 

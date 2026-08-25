@@ -1,0 +1,15 @@
+# Cloudflare Worker for Hyre's "Filter with AI" candidate screening.
+#
+# It runs Cloudflare Workers AI (Meta's Llama) — there is NO API key to manage or
+# leak: the AI is bound to your Cloudflare account and billed against the free
+# daily allowance. The React app POSTs the HR criteria + the candidate list here;
+# the worker asks Llama to rank them and returns JSON.
+#
+# Deploy:  cd worker  &&  npx wrangler deploy
+name = "hyre-ai-filter"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+
+# Exposes Cloudflare Workers AI to the code as `env.AI`.
+[ai]
+binding = "AI"

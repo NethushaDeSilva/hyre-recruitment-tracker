@@ -1,19 +1,20 @@
-// "Filter with AI" — HR types the skills / criteria / rules they want, and a
-// Cloudflare Worker (Meta Llama via Workers AI) REASONS over every active
-// candidate in this position: it infers must-haves vs nice-to-haves, honours
-// flexible instructions (e.g. "skills over qualifications", "open to strong
-// juniors"), and returns a ranked shortlist with an overall summary, a verdict and
-// a reason each. It ranks and explains only — a human still makes every decision,
-// judging solely on skills / experience / qualifications (no personal attributes).
+// "AI Mode" screening panel — opened from the ✨ AI Mode button on the board
+// search bar (see PositionDetail). HR types the skills / criteria / rules they
+// want, and a Cloudflare Pages Function (Meta Llama via Workers AI) REASONS over
+// every active candidate: it infers must-haves vs nice-to-haves, honours flexible
+// instructions (e.g. "skills over qualifications", "open to strong juniors"), and
+// returns a ranked shortlist with an overall summary, a verdict and a reason each.
+// It ranks and explains only — a human still makes every decision, judging solely
+// on skills / experience / qualifications (no personal attributes).
+//
+// Rendered inside a popover, so it takes NO permanent space on the page.
 import { useState } from "react";
 import { Sparkles, Search, Loader2, AlertCircle, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 
-// Same-origin by default: the AI screening call goes to /api/screen on this very
-// domain (a Cloudflare Pages Function), so no separate host can be blocked by an
-// ad blocker or network DNS, and it satisfies the app's CSP (`connect-src 'self'`).
-// An env override is still honoured if you ever want to point elsewhere.
+// Same-origin by default (Cloudflare Pages Function at /api/screen); an env
+// override is honoured if you ever want to point elsewhere.
 const AI_URL = import.meta.env.VITE_AI_FILTER_URL || "/api/screen";
 
 // Example "smart commands" — click to drop one into the box.
@@ -38,13 +39,11 @@ const toPayload = (c) => ({
   coverNote: c.coverNote,
 });
 
-export default function AiFilter({ candidates = [], onOpen }) {
+export default function AiFilter({ candidates = [], onOpen, onClose }) {
   const [criteria, setCriteria] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState(null); // { summary, ranked: [{id, score, verdict, reason}] }
-
-  if (!AI_URL) return null; // feature not configured → hide entirely
 
   // Screen only people still in play — skip rejected and already-hired.
   const pool = candidates.filter((c) => c.stage !== "rejected" && c.stage !== "hired");
@@ -58,7 +57,7 @@ export default function AiFilter({ candidates = [], onOpen }) {
     setError("");
     setResults(null);
 
-    // Abort if the worker takes too long, so the button never hangs forever.
+    // Abort if the endpoint takes too long, so the button never hangs forever.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 45000);
     try {
@@ -74,18 +73,13 @@ export default function AiFilter({ candidates = [], onOpen }) {
       }
       setResults({ summary: data.summary || "", ranked: data.ranked });
     } catch (e) {
-      // A raw "Failed to fetch" / AbortError / TypeError means the request never
-      // reached the worker — the service itself is fine. On the user's end this is
-      // almost always an ad blocker or privacy shield, or a school/work/Wi-Fi
-      // network or DNS blocking the *.workers.dev host. Show something they can
-      // act on instead of the browser's scary raw message.
       const blocked =
         e.name === "AbortError" ||
         e.name === "TypeError" ||
         /failed to fetch|networkerror|load failed|network request failed/i.test(e.message || "");
       setError(
         blocked
-          ? "Couldn't reach the AI screening service — the request was blocked before it left your device. This is usually an ad blocker or browser privacy shield, or a school/work Wi‑Fi or DNS blocking the host it runs on. Try pausing ad blockers for this site, or switch to another network or device. (Everything else in Hyre still works normally.)"
+          ? "Couldn't reach the AI screening service. If this keeps happening, try pausing ad blockers for this site or switching network."
           : e.message || "The AI screening service had a problem. Please try again in a moment."
       );
     } finally {
@@ -108,17 +102,25 @@ export default function AiFilter({ candidates = [], onOpen }) {
       : "text-[#DC2626] dark:text-[#F87171]";
 
   return (
-    <div className="mt-4 rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 dark:bg-white/[0.03]">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold text-foreground">
-        <Sparkles size={16} className="text-primary" /> Filter with AI
-        <span className="font-medium text-muted-foreground">— describe your ideal candidate or the rules to apply; AI reasons over everyone and ranks the best.</span>
+    <div className="max-h-[70vh] w-full overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-pop">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold text-foreground">
+          <Sparkles size={16} className="text-primary" /> AI screening
+          <span className="font-medium text-muted-foreground">— describe your ideal candidate or the rules to apply; AI reasons over everyone and ranks the best.</span>
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="Close AI screening">
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+        <div className="flex flex-1 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
           <Search size={15} className="shrink-0 text-muted-foreground" />
           <input
             value={criteria}
+            autoFocus
             onChange={(e) => { setCriteria(e.target.value); setError(""); }}
             onKeyDown={(e) => e.key === "Enter" && !loading && run()}
             placeholder='e.g. "5+ yrs React & TypeScript, led a team — but skills matter more than the degree"'
@@ -126,7 +128,7 @@ export default function AiFilter({ candidates = [], onOpen }) {
           />
         </div>
         <Button onClick={() => run()} disabled={loading} className="shrink-0">
-          {loading ? <><Loader2 size={16} className="animate-spin" /> Screening…</> : <><Sparkles size={16} /> Filter with AI</>}
+          {loading ? <><Loader2 size={16} className="animate-spin" /> Screening…</> : <><Sparkles size={16} /> Screen</>}
         </Button>
       </div>
 
@@ -136,7 +138,7 @@ export default function AiFilter({ candidates = [], onOpen }) {
           <button
             key={ex}
             onClick={() => { setCriteria(ex); setError(""); }}
-            className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+            className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
           >
             {ex}
           </button>
@@ -176,7 +178,7 @@ export default function AiFilter({ candidates = [], onOpen }) {
                   <button
                     key={r.id}
                     onClick={() => onOpen?.(c)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-card p-2.5 text-left transition-colors hover:border-primary/50 hover:bg-secondary"
+                    className="flex w-full items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left transition-colors hover:border-primary/50 hover:bg-secondary"
                   >
                     <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">{i + 1}</span>
                     <Avatar name={c.name} color={c.avatarColor} size={34} />

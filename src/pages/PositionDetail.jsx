@@ -2,9 +2,9 @@
 // stages. Recruitment is a multi-stage filter: each stage is owned by a role
 // (HR screening → Department review → interviews → Final interview), and only the
 // owning role (or Management) can advance/reject a candidate in that stage.
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronRight, Plus, Settings2, Check, ArrowLeft, X, Search, SlidersHorizontal, GitCompare } from "lucide-react";
+import { ChevronRight, Plus, Settings2, Check, ArrowLeft, X, Search, SlidersHorizontal, GitCompare, Sparkles } from "lucide-react";
 import { useHyreData, advanceStage, rejectCandidate, bulkReject } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
@@ -49,6 +49,24 @@ export default function PositionDetail() {
   const [expDraft, setExpDraft] = useState([]);
   const [qualActive, setQualActive] = useState([]);
   const [expActive, setExpActive] = useState([]);
+  // UI chrome: the header shrinks as you scroll the board (reclaims space), and
+  // the AI screening panel lives in a popover opened by the "AI Mode" button.
+  const [collapsed, setCollapsed] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiWrapRef = useRef(null);
+  useEffect(() => {
+    if (!aiOpen) return;
+    const onDown = (e) => { if (aiWrapRef.current && !aiWrapRef.current.contains(e.target)) setAiOpen(false); };
+    const onKey = (e) => { if (e.key === "Escape") setAiOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
+  }, [aiOpen]);
+  // Collapse past 44px of board scroll, expand back under 16px (hysteresis stops flicker).
+  const onBoardScroll = (e) => {
+    const y = e.currentTarget.scrollTop;
+    setCollapsed((c) => (c ? y > 16 : y > 44));
+  };
 
   const canConfigure = can(user?.role, "managePositions");
   const isHR = user?.role === ROLES.HR; // board filter + Applied bulk-move are HR-only
@@ -164,47 +182,65 @@ export default function PositionDetail() {
   const compareAtCap = compareSet.size >= MAX_COMPARE;
 
   return (
-    <div className="flex h-full flex-col p-4 sm:p-7">
-      {/* header */}
+    <div className={`flex h-full flex-col px-4 pb-4 transition-[padding] duration-200 sm:px-7 sm:pb-7 ${collapsed ? "pt-3 sm:pt-4" : "pt-4 sm:pt-7"}`}>
+      {/* header — collapses as you scroll the board so the board gets more room */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <Link to="/positions" className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground">
-            <ArrowLeft size={14} /> Positions
-          </Link>
+        <div className="min-w-0 space-y-2">
+          <div className={`overflow-hidden transition-all duration-200 ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
+            <Link to="/positions" className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground">
+              <ArrowLeft size={14} /> Positions
+            </Link>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-[27px]">{position.title}</h1>
+            <h1 className={`font-extrabold tracking-tight text-foreground transition-all duration-200 ${collapsed ? "text-lg sm:text-xl" : "text-2xl sm:text-[27px]"}`}>{position.title}</h1>
             <StatusPill status={effectiveStatus(position)} />
           </div>
-          <div className="text-sm font-medium text-muted-foreground">
+          <div className={`overflow-hidden text-sm font-medium text-muted-foreground transition-all duration-200 ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
             {position.department} · {anyFilter ? `${filtered.length} of ${cands.length}` : cands.length} candidates · Opened {formatDate(position.createdAt)}
           </div>
         </div>
-        {canConfigure && (
-          <div className="flex flex-wrap items-center gap-3">
-            {/* No manual open/close/reopen — positions close only on their
-                auto-close date and can never be reopened. */}
-            <Button variant="ghost" onClick={() => setConfigOpen(true)}>
-              <Settings2 size={16} /> Configure stages
-            </Button>
-            <Button onClick={() => setAddOpen(true)}>
-              <Plus size={16} /> Add candidate
-            </Button>
+        {(canCompare || canConfigure) && (
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Compare lives up here now; no manual open/close/reopen — positions
+                close only on their auto-close date and can never be reopened. */}
+            {canCompare && (
+              <Button variant={compareMode ? "primary" : "ghost"} onClick={toggleCompareMode}>
+                <GitCompare size={16} /> {compareMode ? "Exit compare" : "Compare candidates"}
+              </Button>
+            )}
+            {canConfigure && (
+              <>
+                <Button variant="ghost" onClick={() => setConfigOpen(true)}>
+                  <Settings2 size={16} /> Configure stages
+                </Button>
+                <Button onClick={() => setAddOpen(true)}>
+                  <Plus size={16} /> Add candidate
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
 
-      {/* filter bar — HR only. Search is live; tick one or more qualifications /
-          experience ranges, then press Apply. Great for triaging the Applied pile. */}
+      {/* search + filters — HR only. The search bar is long; the ✨ AI Mode button
+          on it opens the AI screening panel in a popover (no permanent big box). */}
       {isHR && (
-        <div className="mt-5 flex flex-wrap items-center gap-2.5">
-          <div className="flex min-w-[190px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm sm:max-w-xs sm:flex-none">
-            <Search size={15} className="text-muted-foreground" />
+        <div ref={aiWrapRef} className={`relative z-30 flex flex-wrap items-center gap-2.5 transition-all duration-200 ${collapsed ? "mt-2" : "mt-5"}`}>
+          <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
+            <Search size={15} className="shrink-0 text-muted-foreground" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search name, skills…"
               className="w-full bg-transparent text-foreground placeholder:text-[#94A3B8] focus:outline-none"
             />
+            <button
+              onClick={() => setAiOpen((o) => !o)}
+              title="Screen candidates with AI"
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${aiOpen ? "border-primary bg-primary text-primary-foreground" : "border-primary/40 bg-primary/[0.06] text-primary hover:bg-primary/10"}`}
+            >
+              <Sparkles size={13} /> AI Mode
+            </button>
           </div>
           <CheckDropdown label="Qualifications" options={QUALIFICATIONS} value={qualDraft} onChange={setQualDraft} className="min-w-[170px]" />
           <CheckDropdown label="Experience" options={EXPERIENCE_RANGES} value={expDraft} onChange={setExpDraft} className="min-w-[150px]" />
@@ -216,31 +252,27 @@ export default function PositionDetail() {
               <SlidersHorizontal size={14} /> Clear
             </button>
           )}
-        </div>
-      )}
 
-      {/* compare toolbar — HR & Interviewer only (not Management) */}
-      {canCompare && (
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button variant={compareMode ? "primary" : "ghost"} onClick={toggleCompareMode}>
-            <GitCompare size={16} /> {compareMode ? "Exit compare" : "Compare candidates"}
-          </Button>
-          {compareMode && (
-            <span className="text-[13px] font-medium text-muted-foreground">
-              Tick 2–{MAX_COMPARE} candidates{compareAtCap ? ` (max ${MAX_COMPARE} reached)` : ""}, then open the comparison.
-            </span>
+          {/* AI screening popover — drops under the search bar on AI Mode */}
+          {aiOpen && (
+            <div className="absolute left-0 top-full z-40 mt-2 w-full sm:max-w-[680px]">
+              <AiFilter candidates={cands} onOpen={(c) => { setAiOpen(false); setDetail(c); }} onClose={() => setAiOpen(false)} />
+            </div>
           )}
         </div>
       )}
 
-      {/* AI candidate screening — HR only */}
-      {isHR && <AiFilter candidates={cands} onOpen={setDetail} />}
+      {/* compare hint — shown while compare mode is on */}
+      {compareMode && (
+        <div className={`text-[13px] font-medium text-muted-foreground transition-all duration-200 ${collapsed ? "mt-2" : "mt-3"}`}>
+          Tick 2–{MAX_COMPARE} candidates{compareAtCap ? ` (max ${MAX_COMPARE} reached)` : ""}, then open the comparison.
+        </div>
+      )}
 
-      {/* board — fills the remaining height and is the ONE scroll region: its
-          left–right scrollbar stays pinned at the bottom of the screen and its
-          up–down scrollbar on the right scrolls ALL columns together (no per-column
-          scrollbars). Scrolling down reveals more candidates in the taller columns. */}
-      <div className="mt-4 flex min-h-0 flex-1 items-start gap-4 overflow-auto pb-2">
+      {/* board — the ONE scroll region. Its up–down scroll drives the header
+          collapse above (more room for candidates), while its left–right scrollbar
+          stays pinned at the bottom and scrolls ALL columns together. */}
+      <div onScroll={onBoardScroll} className={`flex min-h-0 flex-1 items-start gap-4 overflow-auto pb-2 transition-[margin] duration-200 ${collapsed ? "mt-2" : "mt-4"}`}>
         {columns.map((stageId) => {
           const stage = resolveStage(position, stageId);
           const inStage = filtered.filter((c) => c.stage === stageId);

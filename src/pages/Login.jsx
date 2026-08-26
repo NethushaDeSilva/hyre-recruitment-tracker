@@ -3,7 +3,7 @@
 // The account you sign in with determines your role; new sign-ups are Candidates.
 import { useState, useEffect } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Check, AlertCircle, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { DEMO_LOGINS, DEMO_PASSWORD } from "@/context/auth-config";
@@ -18,12 +18,12 @@ const BULLETS = [
 ];
 
 export default function Login() {
-  const { user, loading, login, register } = useAuth();
+  const { user, loading, login, register, forgotPassword } = useAuth();
   const toast = useToast();
   const nav = useNavigate();
   const [params] = useSearchParams();
   // ?mode=register (from "Create a candidate account") opens the sign-up form directly
-  const [mode, setMode] = useState(params.get("mode") === "register" ? "register" : "signin"); // "signin" | "register"
+  const [mode, setMode] = useState(params.get("mode") === "register" ? "register" : "signin"); // "signin" | "register" | "reset"
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,8 +32,13 @@ export default function Login() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState(false); // waiting for auth to complete
+  // "Forgot password?" — a separate mini-flow, not signed in yet.
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState(null); // { ok, text }
 
   const isRegister = mode === "register";
+  const isReset = mode === "reset";
 
   // Navigate only once the user is actually authenticated — auth state is set
   // asynchronously (Firebase), so redirecting immediately after login() raced the
@@ -70,6 +75,20 @@ export default function Login() {
     setMode(next);
     setError("");
     setPassword("");
+    setResetMsg(null);
+  };
+
+  const submitReset = async (e) => {
+    e.preventDefault();
+    setResetBusy(true);
+    setResetMsg(null);
+    const res = await forgotPassword(resetEmail);
+    setResetBusy(false);
+    setResetMsg(
+      res.ok
+        ? { ok: true, text: `If an account exists for ${resetEmail.trim()}, we've emailed a link to reset the password.` }
+        : { ok: false, text: res.error }
+    );
   };
 
   // Already signed in (session remembered, or just authenticated) → into the app.
@@ -117,6 +136,44 @@ export default function Login() {
         </Link>
 
         <div className="flex flex-1 items-center justify-center">
+        {isReset ? (
+        <form onSubmit={submitReset} className="w-full max-w-[400px] space-y-6">
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => switchMode("signin")}
+              className="mb-1 inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft size={14} /> Back to sign in
+            </button>
+            <div className="text-xs font-bold tracking-[0.18em] text-gold">RESET PASSWORD</div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Forgot your password?</h2>
+            <p className="text-muted-foreground">Enter your email and we’ll send you a link to reset it.</p>
+          </div>
+
+          <Field label="Email">
+            <Input
+              type="email"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              placeholder="you@company.com"
+              autoComplete="username"
+              autoFocus
+            />
+          </Field>
+
+          {resetMsg && (
+            <p className={`flex items-start gap-1.5 text-sm font-medium ${resetMsg.ok ? "text-[#16A34A]" : "text-[#DC2626]"}`}>
+              {resetMsg.ok ? <Check size={15} className="mt-0.5 shrink-0" /> : <AlertCircle size={15} className="mt-0.5 shrink-0" />}
+              <span>{resetMsg.text}</span>
+            </p>
+          )}
+
+          <Button type="submit" disabled={resetBusy} className="w-full py-3.5 text-base">
+            {resetBusy ? "Sending…" : "Send reset link"}
+          </Button>
+        </form>
+        ) : (
         <form onSubmit={submit} className="w-full max-w-[400px] space-y-6">
           <div className="space-y-2">
             <div className="text-xs font-bold tracking-[0.18em] text-gold">
@@ -174,6 +231,17 @@ export default function Login() {
                 </button>
               </div>
             </Field>
+            {!isRegister && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => switchMode("reset")}
+                  className="text-sm font-semibold text-primary hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
             {error && <p className="text-sm font-medium text-[#DC2626]">{error}</p>}
           </div>
@@ -214,7 +282,7 @@ export default function Login() {
           </p>
 
           {/* Demo accounts — remove for the final build. Click to fill the form. */}
-          {!isRegister && (
+          {mode === "signin" && (
             <div className="rounded-lg border border-border bg-background p-3">
               <div className="text-xs font-semibold text-muted-foreground">
                 Demo accounts · password <span className="font-mono text-foreground">{DEMO_PASSWORD}</span>
@@ -235,6 +303,7 @@ export default function Login() {
             </div>
           )}
         </form>
+        )}
         </div>
       </div>
     </div>

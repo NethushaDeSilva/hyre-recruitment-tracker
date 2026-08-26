@@ -237,6 +237,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // "Forgot password?" on the Login page — for someone who ISN'T signed in (that's
+  // the whole point: they're locked out). Unlike sendPasswordReset above this takes
+  // an arbitrary email and never requires `user`. Mirrors friendlyError()'s existing
+  // posture on login (never reveal whether an email is registered): a made-up email
+  // reports the same success as a real one, so this can't be used to probe accounts.
+  const forgotPassword = async (email) => {
+    const clean = String(email || "").trim();
+    if (!clean) return { ok: false, error: "Enter your email first." };
+    if (!firebaseReady) return { ok: false, error: "Password reset isn't available in demo mode." };
+    try {
+      await sendPasswordResetEmail(auth, clean);
+      return { ok: true };
+    } catch (e) {
+      if (e.code === "auth/invalid-email") return { ok: false, error: "That doesn't look like a valid email." };
+      if (e.code === "auth/too-many-requests") return { ok: false, error: "Too many attempts — please wait a moment and try again." };
+      // Any other failure (including auth/user-not-found) still reports success.
+      return { ok: true };
+    }
+  };
+
   const logout = async () => {
     clearActive();
     if (firebaseReady) {
@@ -271,7 +291,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  return <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, sendPasswordReset }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, sendPasswordReset, forgotPassword }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

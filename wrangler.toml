@@ -1,0 +1,13 @@
+# Cloudflare Pages config for the Hyre app (static site + /functions).
+# The standalone Worker in /worker has its own wrangler.toml and is separate.
+#
+# `wrangler pages deploy` reads this file, uploads the built `dist/` folder,
+# compiles the `functions/` directory, and attaches the Workers AI binding so
+# /api/screen can call env.AI (Meta Llama) with no API key.
+name = "hyre-hiring"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-11-01"
+
+# Workers AI binding used by functions/api/screen.js
+[ai]
+binding = "AI"

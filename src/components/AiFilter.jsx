@@ -10,7 +10,11 @@ import { Sparkles, Search, Loader2, AlertCircle, X, ChevronRight } from "lucide-
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 
-const AI_URL = import.meta.env.VITE_AI_FILTER_URL;
+// Same-origin by default: the AI screening call goes to /api/screen on this very
+// domain (a Cloudflare Pages Function), so no separate host can be blocked by an
+// ad blocker or network DNS, and it satisfies the app's CSP (`connect-src 'self'`).
+// An env override is still honoured if you ever want to point elsewhere.
+const AI_URL = import.meta.env.VITE_AI_FILTER_URL || "/api/screen";
 
 // Example "smart commands" — click to drop one into the box.
 const EXAMPLES = [

@@ -1,0 +1,4 @@
+# SPA fallback: any route that isn't a real file or an /api/* Function is
+# served index.html (200), so React Router deep links work on refresh.
+# Functions (/api/*) and real static files take precedence over this rule.
+/*    /index.html   200

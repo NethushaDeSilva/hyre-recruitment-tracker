@@ -57,35 +57,45 @@ export default function AiFilter({ candidates = [], onOpen, onClose }) {
     setError("");
     setResults(null);
 
-    // Abort if the endpoint takes too long, so the button never hangs forever.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45000);
-    try {
-      const res = await fetch(AI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ criteria: q, candidates: pool.map(toPayload) }),
-        signal: controller.signal,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !Array.isArray(data.ranked)) {
-        throw new Error(data.error || "The AI screening service didn't return a result. Please try again.");
+    const payload = JSON.stringify({ criteria: q, candidates: pool.map(toPayload) });
+    let lastErr;
+    // Try twice — a transient blip on the first call self-heals on the retry.
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60000);
+      try {
+        const res = await fetch(AI_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+          signal: controller.signal,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !Array.isArray(data.ranked)) {
+          throw new Error(data.error || "The AI screening service didn't return a result. Please try again.");
+        }
+        setResults({ summary: data.summary || "", ranked: data.ranked });
+        clearTimeout(timer);
+        setLoading(false);
+        return;
+      } catch (e) {
+        lastErr = e;
+        clearTimeout(timer);
+        if (attempt < 2) await new Promise((r) => setTimeout(r, 800)); // brief pause, then retry
       }
-      setResults({ summary: data.summary || "", ranked: data.ranked });
-    } catch (e) {
-      const blocked =
-        e.name === "AbortError" ||
-        e.name === "TypeError" ||
-        /failed to fetch|networkerror|load failed|network request failed/i.test(e.message || "");
-      setError(
-        blocked
-          ? "Couldn't reach the AI screening service. If this keeps happening, try pausing ad blockers for this site or switching network."
-          : e.message || "The AI screening service had a problem. Please try again in a moment."
-      );
-    } finally {
-      clearTimeout(timer);
-      setLoading(false);
     }
+    // Both attempts failed — show a friendly, actionable message (never a raw crash).
+    const e = lastErr || {};
+    const blocked =
+      e.name === "AbortError" ||
+      e.name === "TypeError" ||
+      /failed to fetch|networkerror|load failed|network request failed/i.test(e.message || "");
+    setError(
+      blocked
+        ? "Couldn't reach the AI screening service. If this keeps happening, try pausing ad blockers for this site or switching network."
+        : e.message || "The AI screening service had a problem. Please try again in a moment."
+    );
+    setLoading(false);
   };
 
   const scorePill = (s) =>

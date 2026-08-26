@@ -77,6 +77,14 @@ export default {
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      transitionTimingFunction: {
+        // easeOutQuart — starts fast, decelerates smoothly to a stop. Used for
+        // layout-driven motion (drawer slide, collapsing header) instead of the
+        // mechanical default `ease`. A named token (not an inline arbitrary
+        // value) because Tailwind's arbitrary-value parser can't disambiguate
+        // the commas inside `ease-[cubic-bezier(...)]` and silently drops it.
+        natural: "cubic-bezier(0.25, 1, 0.5, 1)",
+      },
       boxShadow: {
         // Soft, subtle elevations — never harsh.
         card: "0 1px 2px rgba(22, 35, 58, 0.04), 0 8px 24px rgba(22, 35, 58, 0.06)",

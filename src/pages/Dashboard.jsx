@@ -122,13 +122,15 @@ function Funnel({ data, mounted }) {
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.dot }} />
               <span className="text-[13px] font-semibold text-foreground">{s.label}</span>
             </div>
+            {/* GPU-composited fill: always full width, animated via transform:scaleX
+                (not `width`, which would force a layout recalc every frame). The
+                count used to sit inside the bar too, but scaling a box distorts any
+                text inside it — the count to the right is the single source now. */}
             <div className="h-8 flex-1 overflow-hidden rounded-lg bg-[#F1F5FA]">
               <div
-                className="flex h-full items-center justify-end rounded-lg px-2.5 text-xs font-bold text-white transition-[width] duration-700 ease-out"
-                style={{ width: mounted ? `${Math.max(pct, d.count ? 8 : 0)}%` : "0%", background: s.dot }}
-              >
-                {d.count > 0 && d.count}
-              </div>
+                className="h-full w-full origin-left rounded-lg transition-transform duration-700 ease-natural"
+                style={{ transform: `scaleX(${mounted ? Math.max(pct, d.count ? 8 : 0) / 100 : 0})`, background: s.dot }}
+              />
             </div>
             <span className="w-8 shrink-0 text-right text-sm font-bold text-foreground">{d.count}</span>
           </div>
@@ -254,8 +256,8 @@ function Departments({ data, mounted }) {
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-[#F1F5FA]">
             <div
-              className="h-full rounded-full transition-[width] duration-700 ease-out"
-              style={{ width: mounted ? `${(d.count / max) * 100}%` : "0%", background: TONES[i % TONES.length] }}
+              className="h-full w-full origin-left rounded-full transition-transform duration-700 ease-natural"
+              style={{ transform: `scaleX(${mounted ? d.count / max : 0})`, background: TONES[i % TONES.length] }}
             />
           </div>
         </div>

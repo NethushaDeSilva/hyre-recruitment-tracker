@@ -17,7 +17,7 @@ export default function AppLayout() {
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Topbar onMenu={() => setMenuOpen(true)} />
-        <main className="min-h-0 flex-1 overflow-auto">
+        <main className="min-h-0 flex-1 overflow-auto overscroll-contain">
           <Outlet />
         </main>
       </div>

@@ -8,8 +8,10 @@
 // on skills / experience / qualifications (no personal attributes).
 //
 // Rendered inside a popover, so it takes NO permanent space on the page.
-import { useState } from "react";
+import { useState, useLayoutEffect, useRef } from "react";
 import { Sparkles, Search, Loader2, AlertCircle, X, ChevronRight } from "lucide-react";
+import { animate, utils, spring } from "animejs";
+import { prefersReduced, SPRING_POP } from "@/lib/motion";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 
@@ -44,6 +46,23 @@ export default function AiFilter({ candidates = [], onOpen, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState(null); // { summary, ranked: [{id, score, verdict, reason}] }
+  const panelRef = useRef(null);
+
+  // Springs in on mount (opacity/scale/translateY only — GPU-composited, matches
+  // the Modal's entrance so every popover in the app feels like one system).
+  useLayoutEffect(() => {
+    if (prefersReduced() || !panelRef.current) return;
+    try {
+      utils.set(panelRef.current, { opacity: 0, scale: 0.97, translateY: -6 });
+      animate(panelRef.current, {
+        opacity: { to: 1, duration: 160, ease: "out(2)" },
+        scale: { to: 1, ease: spring(SPRING_POP) },
+        translateY: { to: 0, ease: spring(SPRING_POP) },
+      });
+    } catch {
+      utils.set?.(panelRef.current, { opacity: 1, scale: 1, translateY: 0 });
+    }
+  }, []);
 
   // Screen only people still in play — skip rejected and already-hired.
   const pool = candidates.filter((c) => c.stage !== "rejected" && c.stage !== "hired");
@@ -112,7 +131,7 @@ export default function AiFilter({ candidates = [], onOpen, onClose }) {
       : "text-[#DC2626] dark:text-[#F87171]";
 
   return (
-    <div className="max-h-[70vh] w-full overflow-y-auto rounded-2xl border border-border bg-card p-4 shadow-pop">
+    <div ref={panelRef} className="max-h-[70vh] w-full origin-top overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-4 shadow-pop will-change-transform">
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold text-foreground">
           <Sparkles size={16} className="text-primary" /> AI screening

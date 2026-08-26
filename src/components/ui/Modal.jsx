@@ -35,7 +35,7 @@ export function Modal({ open, onClose, title, subtitle, children, footer, width 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div ref={backdropRef} className="absolute inset-0 bg-ink/50" onClick={onClose} />
-      <div ref={panelRef} className="relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-card p-4 sm:p-7 shadow-pop" style={{ maxWidth: width }}>
+      <div ref={panelRef} className="relative z-10 max-h-[90vh] w-full overflow-y-auto overscroll-contain rounded-2xl bg-card p-4 sm:p-7 shadow-pop" style={{ maxWidth: width }}>
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h3 className="text-xl font-extrabold text-foreground">{title}</h3>

@@ -157,3 +157,18 @@
     background-color: hsl(var(--foreground) / 0.55);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Touch feel — every tap on a real control (button, link, tab…) fires without
+   the browser's ~300ms wait to see if it's actually a double-tap-to-zoom, and a
+   fast double-tap never selects the button's own label text instead of
+   activating it. Inputs/text areas are untouched so typing & selecting text
+   inside them still works normally. --------------------------------------- */
+button,
+a,
+[role="button"],
+[role="tab"],
+[role="menuitem"] {
+  touch-action: manipulation;
+  user-select: none;
+}

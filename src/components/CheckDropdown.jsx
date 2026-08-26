@@ -27,7 +27,7 @@ export default function CheckDropdown({ label, options, value = [], onChange, cl
         <>
           {/* click-away backdrop */}
           <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute z-30 mt-1 max-h-64 w-56 overflow-auto rounded-lg border border-border bg-card p-1 shadow-lg">
+          <div className="absolute z-30 mt-1 max-h-64 w-56 origin-top animate-in fade-in-0 zoom-in-95 duration-150 overflow-auto overscroll-contain rounded-lg border border-border bg-card p-1 shadow-lg">
             {options.map((opt) => {
               const on = value.includes(opt);
               return (

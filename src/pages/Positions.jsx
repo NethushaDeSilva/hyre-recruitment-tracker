@@ -116,7 +116,9 @@ export default function Positions() {
             : "No positions match this filter."}
         </div>
       ) : (
-        <div ref={gridRef} className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        /* Fluid grid: cards reflow to however many fit at 260px+ each — no hard
+           jump at a fixed breakpoint, and it never overflows on narrow screens. */
+        <div ref={gridRef} className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
         {shown.map((pos) => {
           const cands = candidates.filter((c) => c.positionId === pos.id);
           const pct = Math.round(progressOf(pos, cands) * 100);

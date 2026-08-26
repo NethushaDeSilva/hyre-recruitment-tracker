@@ -103,7 +103,7 @@ export default function Jobs() {
       ) : displayPositions.length === 0 ? (
         <div className="mt-16 text-center text-sm text-muted-foreground">There are no open roles right now — check back soon.</div>
       ) : (
-        <div ref={gridRef} className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div ref={gridRef} className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
           {displayPositions.map((pos) => {
             const hiredHere = hiredApp && hiredApp.positionId === pos.id;         // GREEN
             const appliedHere = activeApp && activeApp.positionId === pos.id;     // YELLOW

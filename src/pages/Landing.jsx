@@ -108,7 +108,9 @@ export default function Landing() {
               <Lightbulb className="hero-bulb" size={34} strokeWidth={2.25} aria-hidden="true" />
             </div>
 
-            <h1 className="text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-5xl lg:text-6xl">
+            {/* Fluid type: scales continuously with viewport width (clamp) instead of
+                jumping at fixed breakpoints — smooth at every window size in between. */}
+            <h1 className="text-[clamp(2.25rem,1.5rem+3.5vw,3.75rem)] font-extrabold leading-[1.06] tracking-tight">
               Your next role,
               <br />
               <span className="relative whitespace-nowrap">
@@ -177,7 +179,7 @@ export default function Landing() {
       {/* CLOSING CTA BAND — the whole band fades + rises in as it scrolls into view */}
       <section ref={ctaRef} className="mx-auto max-w-6xl px-5 py-12 sm:px-6 sm:py-16">
         <div className="flex flex-col items-center gap-6 rounded-3xl bg-black px-6 py-12 text-center text-white sm:px-8 sm:py-14">
-          <h2 className="max-w-2xl text-2xl font-extrabold tracking-tight sm:text-4xl">
+          <h2 className="max-w-2xl text-[clamp(1.5rem,1.25rem+1.5vw,2.25rem)] font-extrabold tracking-tight">
             Ready to hire — or get hired?
           </h2>
           <p className="max-w-md text-white/70">

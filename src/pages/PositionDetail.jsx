@@ -182,20 +182,23 @@ export default function PositionDetail() {
   const compareAtCap = compareSet.size >= MAX_COMPARE;
 
   return (
-    <div className={`flex h-full flex-col px-4 pb-4 transition-[padding] duration-200 sm:px-7 sm:pb-7 ${collapsed ? "pt-3 sm:pt-4" : "pt-4 sm:pt-7"}`}>
-      {/* header — collapses as you scroll the board so the board gets more room */}
+    <div className={`flex h-full flex-col px-4 pb-4 transition-[padding] duration-200 ease-natural sm:px-7 sm:pb-7 ${collapsed ? "pt-3 sm:pt-4" : "pt-4 sm:pt-7"}`}>
+      {/* header — collapses as you scroll the board so the board gets more room.
+          Each piece names only the properties it actually changes (never `transition-all`,
+          which would make the browser watch every property for changes) and eases with a
+          natural decelerating curve rather than the mechanical default. */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
-          <div className={`overflow-hidden transition-all duration-200 ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
+          <div className={`overflow-hidden transition-[max-height,opacity] duration-200 ease-natural ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
             <Link to="/positions" className="inline-flex items-center gap-1 text-[13px] font-medium text-muted-foreground hover:text-foreground">
               <ArrowLeft size={14} /> Positions
             </Link>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className={`font-extrabold tracking-tight text-foreground transition-all duration-200 ${collapsed ? "text-lg sm:text-xl" : "text-2xl sm:text-[27px]"}`}>{position.title}</h1>
+            <h1 className={`font-extrabold tracking-tight text-foreground transition-[font-size] duration-200 ease-natural ${collapsed ? "text-lg sm:text-xl" : "text-2xl sm:text-[27px]"}`}>{position.title}</h1>
             <StatusPill status={effectiveStatus(position)} />
           </div>
-          <div className={`overflow-hidden text-sm font-medium text-muted-foreground transition-all duration-200 ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
+          <div className={`overflow-hidden text-sm font-medium text-muted-foreground transition-[max-height,opacity] duration-200 ease-natural ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
             {position.department} · {anyFilter ? `${filtered.length} of ${cands.length}` : cands.length} candidates · Opened {formatDate(position.createdAt)}
           </div>
         </div>
@@ -225,7 +228,7 @@ export default function PositionDetail() {
       {/* search + filters — HR only. The search bar is long; the ✨ AI Mode button
           on it opens the AI screening panel in a popover (no permanent big box). */}
       {isHR && (
-        <div ref={aiWrapRef} className={`relative z-30 flex flex-wrap items-center gap-2.5 transition-all duration-200 ${collapsed ? "mt-2" : "mt-5"}`}>
+        <div ref={aiWrapRef} className={`relative z-30 flex flex-wrap items-center gap-2.5 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
           <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
             <Search size={15} className="shrink-0 text-muted-foreground" />
             <input
@@ -264,7 +267,7 @@ export default function PositionDetail() {
 
       {/* compare hint — shown while compare mode is on */}
       {compareMode && (
-        <div className={`text-[13px] font-medium text-muted-foreground transition-all duration-200 ${collapsed ? "mt-2" : "mt-3"}`}>
+        <div className={`text-[13px] font-medium text-muted-foreground transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-3"}`}>
           Tick 2–{MAX_COMPARE} candidates{compareAtCap ? ` (max ${MAX_COMPARE} reached)` : ""}, then open the comparison.
         </div>
       )}
@@ -272,7 +275,7 @@ export default function PositionDetail() {
       {/* board — the ONE scroll region. Its up–down scroll drives the header
           collapse above (more room for candidates), while its left–right scrollbar
           stays pinned at the bottom and scrolls ALL columns together. */}
-      <div onScroll={onBoardScroll} className={`flex min-h-0 flex-1 items-start gap-4 overflow-auto pb-2 transition-[margin] duration-200 ${collapsed ? "mt-2" : "mt-4"}`}>
+      <div onScroll={onBoardScroll} className={`flex min-h-0 flex-1 items-start gap-4 overflow-auto overscroll-contain pb-2 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-4"}`}>
         {columns.map((stageId) => {
           const stage = resolveStage(position, stageId);
           const inStage = filtered.filter((c) => c.stage === stageId);

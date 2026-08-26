@@ -50,7 +50,10 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col justify-between overflow-y-auto border-r border-border bg-card px-4 py-5 transition-transform duration-200 ease-out",
+          // transform-only slide (GPU-composited, never triggers layout) with a
+          // natural decelerating curve; overscroll-contain stops a long nav list
+          // from bounce-chaining into the page behind it on mobile.
+          "fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col justify-between overflow-y-auto overscroll-contain border-r border-border bg-card px-4 py-5 transition-transform duration-300 ease-natural will-change-transform",
           "lg:static lg:z-auto lg:translate-x-0", // static column on desktop
           open ? "translate-x-0" : "-translate-x-full"
         )}

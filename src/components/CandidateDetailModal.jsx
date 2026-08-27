@@ -9,11 +9,12 @@ import { Textarea, Input } from "@/components/ui/Field";
 import { StageBadge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/ToastProvider";
 import { can } from "@/lib/permissions";
-import { stageLabelOf } from "@/lib/stages";
+import { stageLabelOf, canActOnStageFor, nextStage, resolveStage } from "@/lib/stages";
 import { formatDate } from "@/lib/format";
 import { downloadDataUrl, openDataUrl, humanSize } from "@/lib/file";
-import { reconsiderCandidate, addComment, deleteComment } from "@/data/store";
+import { reconsiderCandidate, addComment, deleteComment, advanceStage } from "@/data/store";
 
 function Row({ label, value }) {
   if (!value) return null;
@@ -39,11 +40,13 @@ function describe(e) {
   }
 }
 
-export default function CandidateDetailModal({ open, onClose, candidate, positionTitle, mustReview = false }) {
+export default function CandidateDetailModal({ open, onClose, candidate, position, positionTitle, mustReview = false }) {
   const { user } = useAuth();
+  const toast = useToast();
   const [draft, setDraft] = useState("");
   const [score, setScore] = useState("");
   const [posting, setPosting] = useState(false);
+  const [moving, setMoving] = useState(false);
   if (!candidate) return null;
   const c = candidate;
   const rej = c.rejection;
@@ -64,6 +67,16 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const scoreOk = !scoreRequired || (score !== "" && Number(score) >= 0 && Number(score) <= 100);
   const canPost = canComment && !isTerminal && !myComment;
 
+  // Move to next stage — right here in the pop-out, so reviewing and advancing a
+  // candidate (e.g. one clicked from an AI-filtered shortlist) never needs closing
+  // this modal and finding them again elsewhere. Only shown when the caller passed
+  // a `position` (PositionDetail does; the cross-position CandidatesTable/Employees
+  // views don't, so this stays hidden there) and this user may act on this stage.
+  const mayMove = !!position && !isTerminal && canActOnStageFor(user, position, c.stage);
+  const moveBlocked = scoreRequired && !myComment; // needs their review posted first
+  const nextId = position ? nextStage(position.stages, c.stage) : null;
+  const nextLabel = nextId ? resolveStage(position, nextId)?.label : null;
+
   const reconsider = async () => {
     await reconsiderCandidate(c.id, actor);
     onClose();
@@ -81,6 +94,17 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const removeMyComment = async () => {
     if (!myComment) return;
     await deleteComment(c.id, { at: myComment.at, byUid: myId });
+  };
+
+  const moveNext = async () => {
+    setMoving(true);
+    const res = await advanceStage(c.id, actor);
+    setMoving(false);
+    if (res && res.ok === false) return; // e.g. review-required — button stays put
+    if (res?.hired) {
+      toast.success(res.employeeId ? `${c.name} hired — employee ID ${res.employeeId} issued.` : `${c.name} hired.`);
+    }
+    onClose(); // done — back to whatever list this was opened from (board or AI results)
   };
 
   return (
@@ -251,6 +275,24 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
             )
           )}
         </div>
+
+        {/* move to next stage — right here, no need to leave the pop-out */}
+        {mayMove && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/[0.04] p-4">
+            <p className="text-[13px]">
+              {moveBlocked ? (
+                <span className="font-semibold text-[#B91C1C]">Add your comment and a score above before moving {c.name} on.</span>
+              ) : (
+                <span className="text-foreground">
+                  Ready to move <span className="font-semibold">{c.name}</span> to <span className="font-semibold">{nextLabel || "the next stage"}</span>?
+                </span>
+              )}
+            </p>
+            <Button onClick={moveNext} disabled={moveBlocked || moving} className="shrink-0">
+              {moving ? "Moving…" : <>Move to {nextLabel || "next stage"} <ArrowRight size={14} /></>}
+            </Button>
+          </div>
+        )}
 
         {/* structured fields */}
         <div className="grid grid-cols-2 gap-4">

@@ -56,12 +56,16 @@ export default function PositionDetail() {
   const aiWrapRef = useRef(null);
   useEffect(() => {
     if (!aiOpen) return;
-    const onDown = (e) => { if (aiWrapRef.current && !aiWrapRef.current.contains(e.target)) setAiOpen(false); };
-    const onKey = (e) => { if (e.key === "Escape") setAiOpen(false); };
+    // While a candidate's pop-out is open on top, clicks inside it (or Escape,
+    // which nothing else here handles) must NOT dismiss the AI popover behind
+    // it — the whole point is that the AI-filtered shortlist survives underneath
+    // and reappears, still intact, once that pop-out closes.
+    const onDown = (e) => { if (detail) return; if (aiWrapRef.current && !aiWrapRef.current.contains(e.target)) setAiOpen(false); };
+    const onKey = (e) => { if (detail) return; if (e.key === "Escape") setAiOpen(false); };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
-  }, [aiOpen]);
+  }, [aiOpen, detail]);
   // Collapse past 44px of board scroll, expand back under 16px (hysteresis stops flicker).
   const onBoardScroll = (e) => {
     const y = e.currentTarget.scrollTop;
@@ -256,10 +260,14 @@ export default function PositionDetail() {
             </button>
           )}
 
-          {/* AI screening popover — drops under the search bar on AI Mode */}
+          {/* AI screening popover — drops under the search bar on AI Mode. Opening a
+              candidate from the ranked list does NOT close this (no setAiOpen(false)
+              here) — it stays mounted with its results intact underneath the pop-out
+              (which renders at a higher z-index), so closing the pop-out reveals the
+              same shortlist again instead of forcing a re-search. */}
           {aiOpen && (
             <div className="absolute left-0 top-full z-40 mt-2 w-full sm:max-w-[680px]">
-              <AiFilter candidates={cands} onOpen={(c) => { setAiOpen(false); setDetail(c); }} onClose={() => setAiOpen(false)} />
+              <AiFilter candidates={cands} onOpen={setDetail} onClose={() => setAiOpen(false)} />
             </div>
           )}
         </div>
@@ -454,6 +462,7 @@ export default function PositionDetail() {
       <CandidateDetailModal
         open={!!detail}
         candidate={detail && (candidates.find((x) => x.id === detail.id) || detail)}
+        position={position}
         positionTitle={position.title}
         mustReview={mustReview}
         onClose={() => { setDetail(null); setMustReview(false); setReviewFor(null); }}

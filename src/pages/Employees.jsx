@@ -189,6 +189,7 @@ export default function Employees() {
         open={!!selected}
         onClose={() => setSelected(null)}
         candidate={selected}
+        position={selected ? posById.get(selected.positionId) || null : null}
         positionTitle={selected ? posById.get(selected.positionId)?.title || "" : ""}
       />
     </div>

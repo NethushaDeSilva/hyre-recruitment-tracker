@@ -52,6 +52,7 @@ export default function CandidatesTable() {
   const [checked, setChecked] = useState(() => new Set()); // ticked candidate ids for bulk actions
 
   const titleFor = (id) => positions.find((p) => p.id === id)?.title || "—";
+  const positionFor = (id) => positions.find((p) => p.id === id) || null; // for the detail modal's Move-to-next-stage
   const minQualFor = (id) => positions.find((p) => p.id === id)?.minQualification || "";
   const stagesPresent = useMemo(
     () => STAGE_ORDER.filter((s) => candidates.some((c) => c.stage === s)),
@@ -412,6 +413,7 @@ export default function CandidatesTable() {
         open={!!selected}
         onClose={() => setSelected(null)}
         candidate={selected && (candidates.find((x) => x.id === selected.id) || selected)}
+        position={selected ? positionFor(selected.positionId) : null}
         positionTitle={selected ? titleFor(selected.positionId) : ""}
       />
     </div>

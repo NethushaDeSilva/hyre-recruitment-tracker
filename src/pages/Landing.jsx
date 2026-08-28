@@ -94,6 +94,7 @@ export default function Landing() {
         </div>
       </header>
 
+      <main>
       {/* HERO */}
       <section className="relative overflow-hidden">
         <AmbientShapes />
@@ -143,14 +144,20 @@ export default function Landing() {
             <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-gold/25 blur-2xl" />
             <div className="hero-photo border border-border shadow-[0_20px_60px_rgba(0,0,0,0.2)]">
               <img
-                src="/home/hero.png?v=4"
+                src="/home/hero.webp?v=5"
                 alt="A hiring team congratulating a new hire in Hyre"
+                width="1100"
+                height="1100"
+                fetchpriority="high"
                 className="hero-photo-day"
               />
               <img
-                src="/home/hero-night.png?v=4"
+                src="/home/hero-night.webp?v=5"
                 alt=""
                 aria-hidden="true"
+                width="1100"
+                height="1100"
+                loading="lazy"
                 className="hero-photo-night"
               />
             </div>
@@ -168,7 +175,7 @@ export default function Landing() {
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gold/20 text-foreground transition-transform duration-300 group-hover:scale-110">
                   <Icon size={22} />
                 </div>
-                <h3 className="mt-4 text-lg font-extrabold">{title}</h3>
+                <h2 className="mt-4 text-lg font-extrabold">{title}</h2>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
               </div>
             </div>
@@ -198,6 +205,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </main>
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-6 text-sm text-muted-foreground sm:flex-row sm:px-6">

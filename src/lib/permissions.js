@@ -38,7 +38,6 @@ const MATRIX = {
   viewEmployees: [ROLES.HR, ROLES.MANAGEMENT], // the hired roster — HR & Management
   downloadCv: [ROLES.HR, ROLES.MANAGEMENT],
   submitFeedback: [ROLES.INTERVIEWER, ROLES.HR, ROLES.MANAGEMENT], // Sprint 2
-  compareCandidates: [ROLES.HR, ROLES.INTERVIEWER], // side-by-side compare — HR & Interviewer only, NOT Management
   exportReports: [ROLES.HR, ROLES.MANAGEMENT], // Sprint 2
 
   // candidate side

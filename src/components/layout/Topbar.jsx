@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { Menu } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import UserMenu from "@/components/layout/UserMenu";
+import NotificationBell from "@/components/layout/NotificationBell";
 
 export default function Topbar({ onMenu = () => {} }) {
   const { pathname } = useLocation();
@@ -32,6 +33,7 @@ export default function Topbar({ onMenu = () => {} }) {
       </div>
       <div className="flex items-center gap-3 sm:gap-4">
         <ThemeToggle />
+        <NotificationBell />
         <UserMenu />
       </div>
     </header>

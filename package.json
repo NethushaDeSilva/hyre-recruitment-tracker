@@ -7,7 +7,8 @@
     "dev": "vite",
     "dev:functions": "wrangler pages dev public --port 8788",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "animejs": "^4.5.0",
@@ -30,6 +31,7 @@
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "vite": "^5.4.10",
+    "vitest": "^2.1.9",
     "wrangler": "^4.130.0"
   }
 }

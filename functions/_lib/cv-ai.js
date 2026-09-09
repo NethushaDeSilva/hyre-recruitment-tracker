@@ -82,14 +82,13 @@ const PARSE_SCHEMA = {
           required: ["title", "company", "startDate", "endDate", "summary"],
         },
       },
-      totalYearsExperience: { type: "number" },
       skills: { type: "array", items: { type: "string" } },
       certifications: { type: "array", items: { type: "string" } },
       languages: { type: "array", items: { type: "string" } },
     },
     required: [
       "fullName", "email", "phone", "location", "education", "experience",
-      "totalYearsExperience", "skills", "certifications", "languages",
+      "skills", "certifications", "languages",
     ],
   },
 };
@@ -137,9 +136,9 @@ export async function parseCvProfile(env, text) {
   const user =
     `CV text:\n"""\n${text}\n"""\n\n` +
     "Extract: fullName, email, phone, location, education (degree/institution/year per entry), " +
-    "experience (title/company/startDate/endDate/summary per entry, most recent first), " +
-    "totalYearsExperience (a number, your best estimate from the experience dates), " +
-    "skills, certifications, languages.";
+    "experience (title/company/startDate/endDate/summary per entry, most recent first — " +
+    "startDate/endDate as written, e.g. \"2019-03\", \"March 2019\", or \"Present\" if ongoing; " +
+    "do not calculate durations yourself), skills, certifications, languages.";
   const messages = [{ role: "system", content: system }, { role: "user", content: user }];
 
   let result = await tryModel(env, messages, PARSE_SCHEMA, 1400, normalizeParse);
@@ -191,7 +190,6 @@ function normalizeParse(obj) {
       title: str(e?.title), company: str(e?.company),
       startDate: nullableStr(e?.startDate), endDate: nullableStr(e?.endDate), summary: str(e?.summary),
     })).filter((e) => e.title || e.company),
-    totalYearsExperience: Math.max(0, Number(obj.totalYearsExperience) || 0),
     skills: Array.isArray(obj.skills) ? obj.skills.filter((s) => typeof s === "string" && s.trim()).slice(0, 40) : [],
     certifications: Array.isArray(obj.certifications) ? obj.certifications.filter((s) => typeof s === "string" && s.trim()).slice(0, 20) : [],
     languages: Array.isArray(obj.languages) ? obj.languages.filter((s) => typeof s === "string" && s.trim()).slice(0, 20) : [],

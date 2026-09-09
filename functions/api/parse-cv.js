@@ -13,6 +13,13 @@
 // caller gets ok:false and the candidate's profile simply stays unparsed —
 // never a guess passed off as fact.
 //
+// 5.10: the model extracts experience[] date ranges only — it never computes
+// totalYearsExperience itself (arithmetic over dates, overlaps and gaps is
+// exactly where small models fail quietly). This route computes it in JS via
+// the pure function in _lib/filtration/, and is the one place under this
+// route allowed to read the clock — computeTotalYearsExperience() itself
+// never does.
+//
 // Contract:
 //   POST { text: string }
 //   -> { ok: true, profile: { fullName, email, phone, location, education[],
@@ -21,6 +28,7 @@
 //   -> { ok: false } on repeated model failure
 
 import { parseCvProfile, MODEL } from "../_lib/cv-ai.js";
+import { computeTotalYearsExperience } from "../_lib/filtration/computeExperience.js";
 
 const MAX_TEXT_CHARS = 6000;
 
@@ -71,7 +79,9 @@ export async function onRequestPost({ request, env }) {
   const profile = await parseCvProfile(env, text);
   if (!profile) return json({ ok: false }, 200, cors); // caller leaves the profile unparsed — never a guess
 
-  return json({ ok: true, profile }, 200, cors);
+  const totalYearsExperience = computeTotalYearsExperience(profile.experience, new Date());
+
+  return json({ ok: true, profile: { ...profile, totalYearsExperience } }, 200, cors);
 }
 
 function json(obj, status, cors) {

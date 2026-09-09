@@ -1,75 +1,64 @@
-// The standard CV application form. A candidate fills structured fields (so HR
-// can filter/sort later) and attaches their CV file. No demographic fields.
-// Every field is required (except the cover note) AND a CV must be attached —
-// pressing Submit with anything missing scrolls to the top, shows a red summary
-// naming what's missing, and outlines each empty field in red.
+// The standard CV application form. A candidate provides just enough to get
+// started — email, phone, and their CV — and the system is responsible for
+// getting everything else (qualifications, experience, skills…) out of the
+// CV itself (WS4). No degree dropdown, no experience picker: whatever's on
+// the CV is read from the CV, not typed twice.
+//
+// WS3: the moment a CV is selected, it's scanned (extraction + cheap checks +
+// AI classification) before the candidate can submit at all. Submit is only
+// ever enabled once that scan has actually PASSED — every other state (idle,
+// scanning, failed, an infrastructure error) leaves it disabled, on purpose.
 import { useRef, useState, useEffect, useMemo } from "react";
-import { UploadCloud, FileText, CheckCircle2, X, AlertCircle, Wand2 } from "lucide-react";
+import { UploadCloud, FileText, CheckCircle2, X, AlertCircle, Wand2, Loader2, RotateCcw } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import { Field, Input, Select, Textarea } from "@/components/ui/Field";
+import { Field, Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { QUALIFICATIONS, EXPERIENCE_RANGES } from "@/lib/application";
-import { fileToDataUrl, validateCvFile, humanSize, MAX_CV_BYTES, ACCEPTED_CV_TYPES } from "@/lib/file";
-import { applyToPosition, useHyreData } from "@/data/store";
+import { uploadCv, fileToDataUrl, validateCvFile, humanSize, MAX_CV_BYTES, ACCEPTED_CV_TYPES } from "@/lib/file";
+import { validateCvContent, parseCvContent, healthCheckCvValidator, joinNicely } from "@/lib/cv-extract";
+import { profileToCandidateFields } from "@/lib/cv-profile";
+import { applyToPosition, logCvRejection, useHyreData } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
+import { firebaseReady } from "@/firebase/config";
+import { cn } from "@/lib/utils";
 
-const EMPTY = {
-  name: "",
-  email: "",
-  phone: "",
-  location: "",
-  highestQualification: "",
-  fieldOfStudy: "",
-  experience: "",
-  currentRole: "",
-  currentCompany: "",
-  skills: "",
-  linkedIn: "",
-  coverNote: "",
-};
+const EMPTY = { email: "", phone: "" };
 
-// Every field here is required. Order = the order we list missing fields in the
-// red summary. `coverNote` is deliberately NOT here — it stays optional.
+// Every field here is required. Order = the order we list missing fields in
+// the red summary.
 const REQUIRED = [
-  ["name", "Full name"],
   ["email", "Email"],
   ["phone", "Phone number"],
-  ["location", "Location"],
-  ["highestQualification", "Highest qualification"],
-  ["fieldOfStudy", "Field of study"],
-  ["experience", "Years of experience"],
-  ["currentRole", "Current / most recent role"],
-  ["currentCompany", "Current / most recent company"],
-  ["skills", "Key skills"],
 ];
 
 const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+// Light phone check: starts with a digit or "+", then at least 6 more digits/
+// spaces/parens/hyphens — enough to catch empty or obviously-wrong input
+// without policing exact international formats.
+const isPhone = (v) => /^[+\d][\d\s().-]{6,}$/.test(v.trim());
 
 // Build the form values from a previous application (or the auth user if none).
-// The cover note is DELIBERATELY never carried over — it's role-specific and
-// changes from application to application.
 const prefillFrom = (app, user) => ({
-  name: app?.name || user?.name || "",
   email: app?.email || user?.email || "",
   phone: app?.phone || "",
-  location: app?.location || "",
-  highestQualification: app?.highestQualification || "",
-  fieldOfStudy: app?.fieldOfStudy || "",
-  experience: app?.experience || "",
-  currentRole: app?.currentRole || "",
-  currentCompany: app?.currentCompany || "",
-  skills: app?.skills || "",
-  linkedIn: app?.linkedIn || "",
-  coverNote: "", // never autofilled
 });
 
 export default function ApplyModal({ open, onClose, position, onApplied }) {
   const { user } = useAuth();
   const { candidates } = useHyreData();
-  const [form, setForm] = useState({ ...EMPTY, name: user?.name || "", email: user?.email || "" });
+  const [form, setForm] = useState({ ...EMPTY, email: user?.email || "" });
   const [cvFile, setCvFile] = useState(null); // a NEWLY chosen File (uploaded on submit)
   const [existingCv, setExistingCv] = useState(null); // { dataUrl, name, size } carried from a previous application
   const [cvError, setCvError] = useState("");
+  // WS3 scan state for a NEWLY chosen file only — a carried-over CV from a
+  // previous application is treated as already-known-good, never re-scanned.
+  const [scanState, setScanState] = useState("idle"); // idle | scanning | passed | failed | error
+  const [scanResult, setScanResult] = useState(null);
+  const scanTokenRef = useRef(0); // guards against a stale scan overwriting a newer one
+  // WS4 — fills in automatically once the scan passes. Never blocks submission:
+  // a failed parse just leaves the profile empty, same as before WS4 existed.
+  const [parseState, setParseState] = useState("idle"); // idle | parsing | parsed | failed
+  const [parsedProfile, setParsedProfile] = useState(null);
+  const [nameOverride, setNameOverride] = useState(""); // the one field the candidate can correct
   const [errors, setErrors] = useState({}); // per-field messages
   const [summary, setSummary] = useState(""); // red banner at the top
   const [busy, setBusy] = useState(false);
@@ -86,17 +75,22 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
       .sort((a, b) => (b.appliedAt || 0) - (a.appliedAt || 0))[0] || null;
   }, [candidates, user?.uid, user?.email]);
 
-  // On open, autofill every field (except the cover note) + the CV from the last
-  // application. Keyed on `open` only, so a background data refresh can't wipe
-  // the candidate's in-progress edits.
+  // On open, autofill email/phone + the CV from the last application. Keyed on
+  // `open` only, so a background data refresh can't wipe in-progress edits.
   useEffect(() => {
     if (!open) return;
     setForm(prefillFrom(lastApp, user));
     setExistingCv(lastApp?.cvDataUrl ? { dataUrl: lastApp.cvDataUrl, name: lastApp.cvFileName || "CV", size: lastApp.cvSize || 0 } : null);
     setCvFile(null);
+    setScanState("idle");
+    setScanResult(null);
+    setParseState("idle");
+    setParsedProfile(null);
+    setNameOverride("");
     setErrors({});
     setSummary("");
     setCvError("");
+    healthCheckCvValidator(); // console-only diagnostic — never affects the UI, just surfaces a misconfigured/undeployed Worker immediately
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -114,13 +108,60 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
   };
 
   const close = () => {
-    setForm({ ...EMPTY, name: user?.name || "", email: user?.email || "" });
+    setForm({ ...EMPTY, email: user?.email || "" });
     setCvFile(null);
     setExistingCv(null);
     setCvError("");
+    setScanState("idle");
+    setScanResult(null);
+    setParseState("idle");
+    setParsedProfile(null);
+    setNameOverride("");
     setErrors({});
     setSummary("");
     onClose();
+  };
+
+  // Runs the WS3 pipeline on a freshly chosen file. Never throws — see
+  // cv-extract.js's contract. A token guards against a scan for a file the
+  // candidate has since replaced from overwriting the newer one's result.
+  const runScan = async (file) => {
+    const token = ++scanTokenRef.current;
+    setScanState("scanning");
+    setScanResult(null);
+    setParseState("idle");
+    setParsedProfile(null);
+    const result = await validateCvContent(file);
+    if (scanTokenRef.current !== token) return; // superseded by a newer file
+    setScanResult(result);
+    setScanState(result.outcome === "passed" ? "passed" : result.outcome === "blocked" ? "failed" : "error");
+    if (result.outcome === "blocked") {
+      logCvRejection({
+        reason: result.reason,
+        stage: result.stage,
+        confidence: result.confidence,
+        missingSections: result.missingSections,
+        fileName: file.name,
+        fileSize: file.size,
+        positionId: position?.id,
+        submittedByUid: user?.uid || "",
+      }).catch((err) => console.error("logCvRejection:", err)); // demo evidence only — never blocks the UI
+    }
+    // WS4 — fill the profile in from the SAME extracted text, once validation has
+    // passed. A parse failure never blocks or un-passes the scan above; the
+    // candidate can still submit, they just won't have a filled-in profile yet.
+    if (result.outcome === "passed") {
+      setParseState("parsing");
+      const profile = await parseCvContent(result.text);
+      if (scanTokenRef.current !== token) return;
+      if (profile) {
+        setParsedProfile(profile);
+        setNameOverride(profile.fullName || "");
+        setParseState("parsed");
+      } else {
+        setParseState("failed");
+      }
+    }
   };
 
   const onFile = (e) => {
@@ -130,18 +171,32 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     setCvError("");
     setSummary("");
     try {
-      validateCvFile(file); // check type + size up front; the actual upload is on submit
+      validateCvFile(file); // check type + size up front — content scan only runs after this passes
       setCvFile(file);
       setExistingCv(null); // a fresh upload replaces the carried-over CV
+      runScan(file); // fire-and-forget — scanState/scanResult drive the UI
     } catch (err) {
       setCvFile(null);
       setCvError(err.message);
+      // Not currently reachable as a submit-gating bug (cvReady already falls
+      // to !!existingCv when cvFile is null), but leaving a stale "passed"
+      // sitting unused in state is exactly the kind of thing that turns into
+      // a real bug the next time this logic changes — clear it here too.
+      setScanState("idle");
+      setScanResult(null);
+      setParseState("idle");
+      setParsedProfile(null);
     }
   };
 
   const removeCv = () => {
     setCvFile(null);
     setExistingCv(null);
+    setScanState("idle");
+    setScanResult(null);
+    setParseState("idle");
+    setParsedProfile(null);
+    setNameOverride("");
   };
   // What CV is currently attached (a new upload OR the one carried from last time).
   const attachedCv = cvFile
@@ -150,17 +205,25 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     ? { name: existingCv.name, size: existingCv.size, carried: true }
     : null;
 
+  // Submit is ready ONLY when: a freshly chosen file has actually PASSED its
+  // scan, OR there's no new file and a carried-over CV is in use. Idle,
+  // scanning, failed and errored all fall through to "not ready" — the
+  // default is blocked, never allowed.
+  const cvReady = cvFile ? scanState === "passed" : !!existingCv;
+
   // Returns { fieldErrors, cvMessage } — empty when the form is valid.
   const validate = () => {
     const fieldErrors = {};
     for (const [key, label] of REQUIRED) {
       if (!String(form[key]).trim()) fieldErrors[key] = `${label} is required.`;
     }
-    // Email must also be a real address, not just non-empty.
     if (!fieldErrors.email && !isEmail(form.email.trim())) {
       fieldErrors.email = "Enter a valid email address.";
     }
-    const cvMessage = cvFile || existingCv ? "" : "Please attach your CV (PDF, DOC or DOCX) to continue.";
+    if (!fieldErrors.phone && !isPhone(form.phone)) {
+      fieldErrors.phone = "Enter a valid phone number.";
+    }
+    const cvMessage = cvReady ? "" : "Please attach a CV that passes the scan above before continuing.";
     return { fieldErrors, cvMessage };
   };
 
@@ -173,8 +236,7 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
       setCvError(cvMessage);
       // Build a plain-language red summary naming exactly what's missing.
       const names = REQUIRED.filter(([k]) => fieldErrors[k]).map(([, label]) => label);
-      if (fieldErrors.email === "Enter a valid email address." && !names.includes("Email")) names.push("Email");
-      if (cvMessage) names.push("CV upload");
+      if (cvMessage) names.push("a validated CV");
       setSummary(
         names.length === 1
           ? `${names[0]} is required before you can submit.`
@@ -188,45 +250,70 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     setBusy(true);
     setSummary("");
     try {
-      // Use a freshly chosen file if there is one; otherwise reuse the CV carried
-      // over from the candidate's previous application (already a stored data URL).
+      // Use a freshly chosen file if there is one; otherwise reuse the CV
+      // carried over from the candidate's previous application (already a
+      // stored URL — no re-upload needed). A fresh file goes to real Firebase
+      // Storage when it's configured; in mock/demo mode (no Firebase) there's
+      // no Storage to upload to, so it falls back to a local base64 data URL.
+      // Either way, this only ever runs once the scan above has passed — a
+      // rejected file is never uploaded, so nothing is ever left orphaned.
       let cvUrl, cvName, cvSize;
       if (cvFile) {
-        const d = await fileToDataUrl(cvFile);
-        cvUrl = d.dataUrl;
-        cvName = d.name;
-        cvSize = d.size;
+        if (firebaseReady) {
+          const uploaded = await uploadCv(cvFile, { uid: user?.uid });
+          cvUrl = uploaded.url;
+          cvName = uploaded.name;
+          cvSize = uploaded.size;
+        } else {
+          const d = await fileToDataUrl(cvFile);
+          cvUrl = d.dataUrl;
+          cvName = d.name;
+          cvSize = d.size;
+        }
       } else {
         cvUrl = existingCv.dataUrl;
         cvName = existingCv.name;
         cvSize = existingCv.size;
       }
 
+      // WS4 — the profile parsed from this CV, if parsing succeeded this session.
+      // A failed/skipped parse just contributes nothing here; the candidate's
+      // profile stays empty rather than ever being guessed at.
+      const typedEmail = form.email.trim().toLowerCase();
+      const cvEmail = (parsedProfile?.email || "").trim().toLowerCase();
+      const emailMismatch = !!(cvEmail && cvEmail !== typedEmail);
+
       await applyToPosition({
-        name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        location: form.location.trim(),
         positionId: position.id,
-        highestQualification: form.highestQualification,
-        fieldOfStudy: form.fieldOfStudy.trim(),
-        experience: form.experience,
-        currentRole: form.currentRole.trim(),
-        currentCompany: form.currentCompany.trim(),
-        skills: form.skills.trim(),
-        linkedIn: form.linkedIn.trim(),
-        coverNote: form.coverNote.trim(),
         cvFileName: cvName,
-        cvDataUrl: cvUrl, // Storage download URL (or a data URL in demo mode)
+        cvDataUrl: cvUrl, // Storage download URL (or a carried-over legacy data URL)
         cvSize,
         submittedByUid: user?.uid || "",
+        // Only set when a fresh file was actually scanned this session — a
+        // carried-over CV isn't re-flagged one way or the other.
+        ...(cvFile && scanResult
+          ? {
+              needsReview: !!scanResult.needsReview,
+              cvValidation: { confidence: scanResult.confidence ?? null, reason: scanResult.reason || "", checkedAt: Date.now() },
+            }
+          : {}),
+        ...(cvFile && parsedProfile
+          ? {
+              ...profileToCandidateFields(parsedProfile),
+              name: nameOverride.trim(), // the one field the candidate could correct in the confirmation step
+              cvExtractedText: scanResult?.text || "",
+              ...(emailMismatch ? { emailFromCv: parsedProfile.email, emailMismatch: true } : {}),
+            }
+          : {}),
       });
       close();
       onApplied?.(position);
     } catch (err) {
       console.error(err);
       setSummary(
-        ["already-hired", "rejected-here", "has-active-application", "position-closed"].includes(err?.code)
+        ["already-hired", "rejected-here", "already-applied-here", "position-closed"].includes(err?.code)
           ? err.message
           : "We couldn't upload your CV or submit the application. Please check your connection and try again."
       );
@@ -235,21 +322,21 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     }
   };
 
-  // Red outline for an invalid input/select.
+  // Red outline for an invalid input.
   const errCls = (k) =>
-    errors[k] ? "border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20" : "";
+    errors[k] ? "border-destructive focus:border-destructive focus:ring-destructive/20" : "";
 
   return (
     <Modal
       open={open}
       onClose={close}
-      width={620}
+      width={480}
       title={position ? `Apply — ${position.title}` : "Apply"}
-      subtitle={position ? `${position.department} · complete the standard application below.` : ""}
+      subtitle={position ? `${position.department} · just your contact details and your CV.` : ""}
       footer={
         <>
           <Button variant="ghost" onClick={close}>Cancel</Button>
-          <Button onClick={submit} disabled={busy}>
+          <Button onClick={submit} disabled={busy || !cvReady}>
             {busy ? "Submitting…" : "Submit application"}
           </Button>
         </>
@@ -260,93 +347,62 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
 
         {/* Red summary banner — appears at the top when something's missing */}
         {summary && (
-          <div className="flex items-start gap-2 rounded-md border border-[#DC2626]/40 bg-[#FBE9E9] px-3.5 py-3 text-sm font-semibold text-[#B23A2E]">
+          <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3.5 py-3 text-sm font-semibold text-destructive">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             <span>{summary}</span>
           </div>
         )}
 
-        {/* Autofilled from the candidate's last application (cover note stays fresh). */}
+        {/* Autofilled from the candidate's last application. */}
         {lastApp && (
           <div className="flex items-start gap-2 rounded-md border border-primary/25 bg-primary/5 px-3.5 py-3 text-[13px] font-medium text-foreground">
             <Wand2 size={16} className="mt-0.5 shrink-0 text-primary" />
-            <span>We filled this in from your last application — just review it, update anything that changed, and add a fresh cover note.</span>
+            <span>We filled this in from your last application — just review it and update anything that changed.</span>
           </div>
         )}
 
         <p className="text-xs text-muted-foreground">
-          Fields marked <span className="font-semibold text-[#DC2626]">*</span> are required. LinkedIn and the cover note are optional.
+          We read your qualifications, experience and skills from your CV — you don't need to type them.
         </p>
 
         {/* Contact */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Full name" required error={errors.name}>
-            <Input value={form.name} onChange={set("name")} placeholder="e.g. Amara Jayasuriya" className={errCls("name")} />
-          </Field>
           <Field label="Email" required error={errors.email}>
             <Input type="email" value={form.email} onChange={set("email")} placeholder="name@email.com" className={errCls("email")} />
           </Field>
           <Field label="Phone" required error={errors.phone}>
             <Input value={form.phone} onChange={set("phone")} placeholder="+94 7X XXX XXXX" className={errCls("phone")} />
           </Field>
-          <Field label="Location" required error={errors.location}>
-            <Input value={form.location} onChange={set("location")} placeholder="e.g. Colombo, Sri Lanka" className={errCls("location")} />
-          </Field>
         </div>
 
-        {/* Qualifications & experience */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Highest qualification" required error={errors.highestQualification}>
-            <Select value={form.highestQualification} onChange={set("highestQualification")} className={errCls("highestQualification")}>
-              <option value="">Select…</option>
-              {QUALIFICATIONS.map((q) => (
-                <option key={q} value={q}>{q}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Field of study" required error={errors.fieldOfStudy}>
-            <Input value={form.fieldOfStudy} onChange={set("fieldOfStudy")} placeholder="e.g. Computer Science" className={errCls("fieldOfStudy")} />
-          </Field>
-          <Field label="Years of experience" required error={errors.experience}>
-            <Select value={form.experience} onChange={set("experience")} className={errCls("experience")}>
-              <option value="">Select…</option>
-              {EXPERIENCE_RANGES.map((x) => (
-                <option key={x} value={x}>{x}</option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Current / most recent role" required error={errors.currentRole}>
-            <Input value={form.currentRole} onChange={set("currentRole")} placeholder="e.g. Frontend Developer" className={errCls("currentRole")} />
-          </Field>
-          <Field label="Current / most recent company" required error={errors.currentCompany}>
-            <Input value={form.currentCompany} onChange={set("currentCompany")} placeholder="e.g. your current company" className={errCls("currentCompany")} />
-          </Field>
-          <Field label={<>LinkedIn / portfolio <span className="font-normal text-muted-foreground/60">(optional)</span></>}>
-            <Input value={form.linkedIn} onChange={set("linkedIn")} placeholder="https://…" />
-          </Field>
-        </div>
-
-        <Field label="Key skills" required error={errors.skills}>
-          <Input value={form.skills} onChange={set("skills")} placeholder="e.g. React, TypeScript, Figma (comma separated)" className={errCls("skills")} />
-        </Field>
-
-        <Field label={<>Cover note <span className="font-normal text-muted-foreground/60">(optional)</span></>}>
-          <Textarea rows={3} value={form.coverNote} onChange={set("coverNote")} placeholder="A short note on why you're a good fit." />
-        </Field>
-
-        {/* CV upload — mandatory */}
+        {/* CV upload — mandatory, gated behind an automatic content scan */}
         <div className="space-y-1.5">
           <span className="text-[13px] font-semibold text-foreground">
-            Attach your CV <span className="text-[#DC2626]">*</span>
+            Attach your CV <span className="text-destructive">*</span>
           </span>
-          {attachedCv ? (
+
+          {!cvFile && !existingCv ? (
+            // IDLE — nothing selected yet.
+            <label
+              className={cn(
+                "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed bg-background px-4 py-6 text-center transition-colors hover:border-primary hover:bg-secondary",
+                cvError ? "border-destructive" : "border-[#C7D2E0]"
+              )}
+            >
+              <UploadCloud size={22} className="text-primary" />
+              <span className="text-sm font-medium text-foreground">Click to upload your CV</span>
+              <span className="text-xs text-muted-foreground">PDF, DOC or DOCX · up to {humanSize(MAX_CV_BYTES)}</span>
+              <input type="file" accept={ACCEPTED_CV_TYPES} className="hidden" onChange={onFile} />
+            </label>
+          ) : existingCv && !cvFile ? (
+            // Carried over from a previous application — already known-good, not re-scanned.
             <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3.5 py-2.5">
               <div className="flex min-w-0 items-center gap-2.5">
                 <FileText size={18} className="shrink-0 text-primary" />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">{attachedCv.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {attachedCv.size ? humanSize(attachedCv.size) : ""}{attachedCv.carried ? `${attachedCv.size ? " · " : ""}from your last application` : ""}
+                    {attachedCv.size ? `${humanSize(attachedCv.size)} · ` : ""}from your last application
                   </div>
                 </div>
               </div>
@@ -355,19 +411,116 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
               </button>
             </div>
           ) : (
-            <label
-              className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-md border border-dashed bg-background px-4 py-6 text-center transition-colors hover:border-primary hover:bg-secondary ${
-                cvError ? "border-[#DC2626]" : "border-[#C7D2E0]"
-              }`}
-            >
-              <UploadCloud size={22} className="text-primary" />
-              <span className="text-sm font-medium text-foreground">Click to upload your CV</span>
-              <span className="text-xs text-muted-foreground">PDF, DOC or DOCX · up to {humanSize(MAX_CV_BYTES)}</span>
-              <input type="file" accept={ACCEPTED_CV_TYPES} className="hidden" onChange={onFile} />
-            </label>
+            // A freshly chosen file — its box border/status reflect scanState.
+            <div aria-busy={scanState === "scanning"} className={cn("rounded-md", scanState === "scanning" && "cv-scan-border")}>
+              <div
+                className={cn(
+                  "space-y-2 rounded-md border bg-background px-3.5 py-2.5",
+                  scanState === "passed" && "border-stage-hired",
+                  scanState === "failed" && "border-destructive",
+                  scanState === "scanning" && "border-transparent"
+                  // "error" keeps the plain default border — deliberately not red or green
+                )}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <FileText size={18} className="shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-foreground">{cvFile.name}</div>
+                      <div className="text-xs text-muted-foreground">{humanSize(cvFile.size)}</div>
+                    </div>
+                  </div>
+                  <label className="shrink-0 cursor-pointer text-xs font-semibold text-primary hover:underline">
+                    Replace
+                    <input type="file" accept={ACCEPTED_CV_TYPES} className="hidden" onChange={onFile} />
+                  </label>
+                </div>
+
+                {/* aria-live so a screen reader announces every state change */}
+                <div aria-live="polite">
+                  {scanState === "scanning" && (
+                    <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground">
+                      <Loader2 size={14} className="animate-spin" /> Scanning your CV…
+                    </span>
+                  )}
+                  {scanState === "passed" && (
+                    <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-stage-hired">
+                      <CheckCircle2 size={14} />
+                      {scanResult?.needsReview
+                        ? "We've flagged this for a quick recruiter review, but you're all set."
+                        : "Looks good — this reads like a CV."}
+                    </span>
+                  )}
+                  {scanState === "failed" && scanResult && (
+                    <div className="space-y-1 text-[13px]">
+                      <p className="font-semibold text-destructive">
+                        {scanResult.missingSections?.length
+                          ? `We couldn't find: ${joinNicely(scanResult.missingSections)}.`
+                          : scanResult.reason}
+                      </p>
+                      <p className="text-muted-foreground">Please upload your CV as a PDF or Word document, then replace the file above.</p>
+                    </div>
+                  )}
+                  {scanState === "error" && (
+                    <div className="space-y-1.5 text-[13px]">
+                      <p className="font-medium text-foreground">We couldn't check your CV right now — this is on our end, not your file.</p>
+                      <button
+                        type="button"
+                        onClick={() => runScan(cvFile)}
+                        className="inline-flex items-center gap-1.5 font-semibold text-primary hover:underline"
+                      >
+                        <RotateCcw size={13} /> Try again
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
-          {cvError && <p className="text-sm font-medium text-[#DC2626]">{cvError}</p>}
+          {cvError && <p className="text-sm font-medium text-destructive">{cvError}</p>}
         </div>
+
+        {/* WS4 — filled in automatically once the scan above passes. Never blocks
+            submission: a parse failure just leaves the profile empty, same as
+            before this existed. */}
+        {cvFile && parseState !== "idle" && (
+          <div className="space-y-2.5 rounded-md border border-border bg-background px-3.5 py-3">
+            <div className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
+              <Wand2 size={14} className="text-primary" /> Here's what we read from your CV
+            </div>
+            {parseState === "parsing" && (
+              <span className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground">
+                <Loader2 size={14} className="animate-spin" /> Reading your qualifications and experience…
+              </span>
+            )}
+            {parseState === "failed" && (
+              <p className="text-[13px] text-muted-foreground">
+                We couldn't automatically read your details this time — no problem, you can still submit and a recruiter can fill these in.
+              </p>
+            )}
+            {parseState === "parsed" && parsedProfile && (
+              <div className="space-y-2.5">
+                <Field label="Full name">
+                  <Input value={nameOverride} onChange={(e) => setNameOverride(e.target.value)} placeholder="Your full name" />
+                </Field>
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  {parsedProfile.education?.[0]?.degree && (
+                    <span className="rounded-full bg-secondary px-2.5 py-1 font-medium text-foreground">{parsedProfile.education[0].degree}</span>
+                  )}
+                  {parsedProfile.totalYearsExperience > 0 && (
+                    <span className="rounded-full bg-secondary px-2.5 py-1 font-medium text-foreground">{parsedProfile.totalYearsExperience} yrs experience</span>
+                  )}
+                  {parsedProfile.skills?.length > 0 && (
+                    <span className="rounded-full bg-secondary px-2.5 py-1 font-medium text-foreground">
+                      {parsedProfile.skills.slice(0, 4).join(", ")}{parsedProfile.skills.length > 4 ? "…" : ""}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">This is a review, not a form — fix your name above if we got it wrong, then submit.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-start gap-2 rounded-md bg-[#EEF1F5] px-3 py-2.5 text-xs font-medium text-[#64748B] dark:bg-white/[0.05] dark:text-[#94A3B8]">
           <CheckCircle2 size={15} className="mt-0.5 shrink-0" />

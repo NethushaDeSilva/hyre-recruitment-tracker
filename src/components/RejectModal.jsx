@@ -7,6 +7,7 @@ import { Field, Select, Textarea } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { stageLabelOf } from "@/lib/stages";
 import { REJECTION_REASONS } from "@/lib/rejection";
+import { displayName } from "@/lib/format";
 
 export default function RejectModal({ open, candidate, count = 0, onClose, onConfirm }) {
   const [reason, setReason] = useState("");
@@ -35,7 +36,7 @@ export default function RejectModal({ open, candidate, count = 0, onClose, onCon
   const subtitle = bulk
     ? `${count} applicants selected — the same reason will be recorded for each`
     : candidate
-    ? `${candidate.name} · currently at ${stageLabel}`
+    ? `${displayName(candidate)} · currently at ${stageLabel}`
     : "";
   const button = busy
     ? "Rejecting…"

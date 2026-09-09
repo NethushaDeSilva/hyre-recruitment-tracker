@@ -9,7 +9,7 @@ import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { can } from "@/lib/permissions";
 import { visiblePositions } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
-import { formatDate } from "@/lib/format";
+import { formatDate, displayName } from "@/lib/format";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CountUp } from "@/components/ui/CountUp";
@@ -18,7 +18,9 @@ import { Avatar } from "@/components/ui/Avatar";
 import OpenPositionModal from "@/components/OpenPositionModal";
 import { cn } from "@/lib/utils";
 
-const FILTERS = ["All", "Open", "Pending", "Closed"];
+// No "Pending" filter — positions publish immediately (no approval step, see
+// CLAUDE.md WS1) and only ever move Open -> Closed.
+const FILTERS = ["All", "Open", "Closed"];
 
 // How far along the pipeline this position's candidates are, on average (0–1).
 function progressOf(pos, cands) {
@@ -82,9 +84,11 @@ export default function Positions() {
           </p>
         </div>
         {canManage && (
-          <Button onClick={() => setOpenModal(true)}>
-            <Plus size={16} /> Open position
-          </Button>
+          <div className="flex items-center gap-2.5">
+            <Button onClick={() => setOpenModal(true)}>
+              <Plus size={16} /> Open position
+            </Button>
+          </div>
         )}
       </div>
 
@@ -166,7 +170,7 @@ export default function Positions() {
                     {stack.map((c) => (
                       <div key={c.id} className="-ml-2 first:ml-0">
                         <div className="rounded-full ring-2 ring-card">
-                          <Avatar name={c.name} color={c.avatarColor} size={26} />
+                          <Avatar name={displayName(c)} color={c.avatarColor} size={26} />
                         </div>
                       </div>
                     ))}

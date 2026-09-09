@@ -14,6 +14,7 @@ import { animate, utils, spring } from "animejs";
 import { prefersReduced, SPRING_POP } from "@/lib/motion";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
+import { displayName } from "@/lib/format";
 
 // Same-origin by default (Cloudflare Pages Function at /api/screen); an env
 // override is honoured if you ever want to point elsewhere.
@@ -30,7 +31,7 @@ const EXAMPLES = [
 // Only job-relevant fields are ever sent — no demographic data exists to leak.
 const toPayload = (c) => ({
   id: c.id,
-  name: c.name,
+  name: displayName(c),
   appliedRole: c.appliedRole,
   highestQualification: c.highestQualification,
   fieldOfStudy: c.fieldOfStudy,
@@ -210,10 +211,10 @@ export default function AiFilter({ candidates = [], onOpen, onClose }) {
                     className="flex w-full items-center gap-3 rounded-xl border border-border bg-background p-2.5 text-left transition-colors hover:border-primary/50 hover:bg-secondary"
                   >
                     <span className="w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">{i + 1}</span>
-                    <Avatar name={c.name} color={c.avatarColor} size={34} />
+                    <Avatar name={displayName(c)} color={c.avatarColor} size={34} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold text-foreground">{c.name}</span>
+                        <span className="truncate text-sm font-semibold text-foreground">{displayName(c)}</span>
                         <span className={`shrink-0 text-[11px] font-bold ${verdictText(r.verdict)}`}>{r.verdict}</span>
                       </div>
                       <div className="truncate text-xs text-muted-foreground">{r.reason}</div>

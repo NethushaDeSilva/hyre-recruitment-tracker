@@ -3,7 +3,12 @@
 #
 # `wrangler pages deploy` reads this file, uploads the built `dist/` folder,
 # compiles the `functions/` directory, and attaches the Workers AI binding so
-# /api/screen can call env.AI (Meta Llama) with no API key.
+# /api/screen, /api/validate-cv (WS3 CV gate) and /api/parse-cv (WS4 CV
+# extraction) can all call env.AI with no API key — the binding below is
+# global to the whole functions/ directory, so no per-function config is
+# needed. The shared AI logic those two CV-related endpoints call lives in
+# functions/_lib/cv-ai.js (the leading underscore keeps it out of Pages'
+# automatic routing).
 name = "hyre-hiring"
 pages_build_output_dir = "dist"
 compatibility_date = "2024-11-01"

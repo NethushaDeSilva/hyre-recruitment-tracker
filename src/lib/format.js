@@ -13,3 +13,15 @@ export function initials(name = "") {
     .join("")
     .toUpperCase();
 }
+
+// A candidate's display name: their own name if set, otherwise the local part
+// of their email (e.g. "sam.wilson@x.com" -> "sam.wilson"). Purely a display
+// stand-in for candidates who applied before CV parsing (WS4) could fill in a
+// real name — never written back to the candidate record.
+export function displayName(c) {
+  const name = (c?.name || "").trim();
+  if (name) return name;
+  const email = c?.email || "";
+  const at = email.indexOf("@");
+  return at > 0 ? email.slice(0, at) : email || "Unnamed applicant";
+}

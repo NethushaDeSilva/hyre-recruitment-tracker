@@ -1,7 +1,11 @@
 # Cloudflare Pages response headers — mirrors the hardening the app had on
 # Firebase Hosting (see firebase.json). The AI screening call now goes to the
-# SAME origin (/api/screen), so `connect-src 'self'` already permits it — no
-# extra host needs to be whitelisted.
+# SAME origin (/api/screen and /api/validate-cv), so `connect-src 'self'`
+# already permits it — no extra host needs to be whitelisted.
+# `worker-src 'self' blob:` is for pdfjs-dist (WS3 CV parsing), which loads a
+# same-origin worker script — without this it falls back to script-src, which
+# does cover 'self' already, but pdfjs can fall back to a blob: worker in some
+# environments, so it's listed explicitly rather than left to chance.
 
 /*
   X-Content-Type-Options: nosniff
@@ -9,7 +13,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebasestorage.app https://*.firebaseio.com wss://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; frame-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://*.googleapis.com https://*.firebasestorage.app https://*.firebaseio.com wss://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; worker-src 'self' blob:; frame-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   Cache-Control: no-cache
 
 # Hashed build assets are content-addressed — cache them hard for speed.

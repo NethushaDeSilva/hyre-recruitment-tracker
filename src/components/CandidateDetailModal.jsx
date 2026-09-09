@@ -2,7 +2,7 @@
 // table and the board. Shows every structured field, the attached CV, the
 // rejection record (if any) and the full audit history of pipeline decisions.
 import { useState } from "react";
-import { Download, ExternalLink, FileText, Mail, Phone, MapPin, Linkedin, RotateCcw, Ban, LogIn, ArrowRight, ArrowRightLeft, Check, UserPlus, MessageSquare, Send, Trash2, AlertTriangle, Star } from "lucide-react";
+import { Download, ExternalLink, FileText, Mail, Phone, MapPin, Linkedin, RotateCcw, Ban, LogIn, ArrowRight, ArrowRightLeft, Check, UserPlus, MessageSquare, Send, Trash2, AlertTriangle, Star, Briefcase } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Textarea, Input } from "@/components/ui/Field";
@@ -12,9 +12,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { can } from "@/lib/permissions";
 import { stageLabelOf, canActOnStageFor, nextStage, resolveStage } from "@/lib/stages";
-import { formatDate } from "@/lib/format";
+import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl, openDataUrl, humanSize } from "@/lib/file";
-import { reconsiderCandidate, addComment, deleteComment, advanceStage } from "@/data/store";
+import { reconsiderCandidate, addComment, deleteComment, advanceStage, sendOffer, respondToOffer } from "@/data/store";
+
+const OFFER_STATUS_TONE = { sent: "#2563EB", accepted: "#16A34A", declined: "#DC2626", negotiating: "#A9781A" };
+const OFFER_STATUS_LABEL = { sent: "Sent — awaiting response", accepted: "Accepted", declined: "Declined", negotiating: "Negotiating" };
 
 function Row({ label, value }) {
   if (!value) return null;
@@ -28,6 +31,13 @@ function Row({ label, value }) {
 
 const stageLabel = (id) => stageLabelOf(id);
 
+const RECOMMENDATIONS = [
+  { id: "advance", label: "Advance", tone: "#16A34A" },
+  { id: "hold", label: "Hold", tone: "#A9781A" },
+  { id: "reject", label: "Reject", tone: "#DC2626" },
+];
+const recommendationOf = (id) => RECOMMENDATIONS.find((r) => r.id === id) || null;
+
 // Turn a history entry into an icon + human sentence.
 function describe(e) {
   switch (e.type) {
@@ -36,6 +46,7 @@ function describe(e) {
     case "hire": return { icon: Check, tone: "#16A34A", text: `Hired (from ${stageLabel(e.from)})` };
     case "reject": return { icon: Ban, tone: "#DC2626", text: `Rejected at ${stageLabel(e.from)}${e.reason ? ` — ${e.reason}` : ""}` };
     case "reconsider": return { icon: RotateCcw, tone: "#7C3AED", text: "Moved back into review" };
+    case "offer": return { icon: Briefcase, tone: OFFER_STATUS_TONE[e.status] || "#2563EB", text: `Offer ${e.status === "sent" ? "sent" : OFFER_STATUS_LABEL[e.status]?.toLowerCase() || e.status}` };
     default: return { icon: LogIn, tone: "#64748B", text: e.type };
   }
 }
@@ -45,8 +56,12 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const toast = useToast();
   const [draft, setDraft] = useState("");
   const [score, setScore] = useState("");
+  const [recommendation, setRecommendation] = useState("");
   const [posting, setPosting] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [offerSalary, setOfferSalary] = useState("");
+  const [offerStartDate, setOfferStartDate] = useState("");
+  const [offerBusy, setOfferBusy] = useState(false);
   if (!candidate) return null;
   const c = candidate;
   const rej = c.rejection;
@@ -65,6 +80,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const scoreRequired = !isTerminal && c.stage !== "applied";
   const myComment = comments.find((cm) => (cm.byUid || cm.by) === myId && cm.stage === c.stage);
   const scoreOk = !scoreRequired || (score !== "" && Number(score) >= 0 && Number(score) <= 100);
+  const recommendationOk = !scoreRequired || !!recommendation;
   const canPost = canComment && !isTerminal && !myComment;
 
   // Move to next stage — right here in the pop-out, so reviewing and advancing a
@@ -73,21 +89,43 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   // a `position` (PositionDetail does; the cross-position CandidatesTable/Employees
   // views don't, so this stays hidden there) and this user may act on this stage.
   const mayMove = !!position && !isTerminal && canActOnStageFor(user, position, c.stage);
-  const moveBlocked = scoreRequired && !myComment; // needs their review posted first
   const nextId = position ? nextStage(position.stages, c.stage) : null;
   const nextLabel = nextId ? resolveStage(position, nextId)?.label : null;
+  const offerRequired = nextId === "hired" && c.offer?.status !== "accepted"; // ties the loop closed
+  const moveBlocked = (scoreRequired && !myComment) || offerRequired;
 
   const reconsider = async () => {
     await reconsiderCandidate(c.id, actor);
     onClose();
   };
 
+  const submitOffer = async () => {
+    if (!offerSalary.trim() || !offerStartDate) return;
+    setOfferBusy(true);
+    await sendOffer(c.id, { salary: offerSalary, startDate: offerStartDate, actor });
+    setOfferSalary("");
+    setOfferStartDate("");
+    setOfferBusy(false);
+  };
+
+  const setOfferStatus = async (status) => {
+    setOfferBusy(true);
+    await respondToOffer(c.id, { status, actor });
+    setOfferBusy(false);
+  };
+
   const postComment = async () => {
-    if (!draft.trim() || !scoreOk) return;
+    if (!draft.trim() || !scoreOk || !recommendationOk) return;
     setPosting(true);
-    await addComment(c.id, { text: draft, score: scoreRequired ? Number(score) : null, actor });
+    await addComment(c.id, {
+      text: draft,
+      score: scoreRequired ? Number(score) : null,
+      recommendation: scoreRequired ? recommendation : null,
+      actor,
+    });
     setDraft("");
     setScore("");
+    setRecommendation("");
     setPosting(false);
   };
 
@@ -102,7 +140,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
     setMoving(false);
     if (res && res.ok === false) return; // e.g. review-required — button stays put
     if (res?.hired) {
-      toast.success(res.employeeId ? `${c.name} hired — employee ID ${res.employeeId} issued.` : `${c.name} hired.`);
+      toast.success(res.employeeId ? `${displayName(c)} hired — employee ID ${res.employeeId} issued.` : `${displayName(c)} hired.`);
     }
     onClose(); // done — back to whatever list this was opened from (board or AI results)
   };
@@ -112,10 +150,10 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
       <div className="space-y-6">
         {/* header */}
         <div className="flex items-center gap-3">
-          <Avatar name={c.name} color={c.avatarColor} size={52} />
+          <Avatar name={displayName(c)} color={c.avatarColor} size={52} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-lg font-extrabold text-foreground">{c.name}</span>
+              <span className="text-lg font-extrabold text-foreground">{displayName(c)}</span>
               {c.candidateId && (
                 <span className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide text-muted-foreground" title="Candidate ID">
                   {c.candidateId}
@@ -124,6 +162,11 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
               {c.employeeId && (
                 <span className="rounded-md bg-[#16A34A]/12 px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wide text-[#15803D]" title="Employee ID (issued on hire)">
                   {c.employeeId}
+                </span>
+              )}
+              {c.needsReview && (
+                <span className="rounded-md bg-[#FBF1DC] px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]" title={c.cvValidation?.reason || "CV validation was borderline — worth a second look"}>
+                  Needs review
                 </span>
               )}
             </div>
@@ -224,6 +267,14 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                           <Star size={10} strokeWidth={2.5} /> {cm.score}/100
                         </span>
                       )}
+                      {cm.recommendation && recommendationOf(cm.recommendation) && (
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                          style={{ background: `${recommendationOf(cm.recommendation).tone}18`, color: recommendationOf(cm.recommendation).tone }}
+                        >
+                          {recommendationOf(cm.recommendation).label}
+                        </span>
+                      )}
                       <span className="ml-auto text-xs text-muted-foreground">{stageLabel(cm.stage)} · {formatDate(cm.at)}</span>
                       {deletable && (
                         <button onClick={removeMyComment} title="Delete your comment" className="text-muted-foreground hover:text-[#DC2626]">
@@ -263,8 +314,29 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                   <span className="text-xs text-muted-foreground">out of 100 (required to move on)</span>
                 </div>
               )}
+              {scoreRequired && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="text-[13px] font-semibold text-foreground">Recommendation</label>
+                  <div className="flex gap-1.5">
+                    {RECOMMENDATIONS.map((r) => {
+                      const active = recommendation === r.id;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => setRecommendation(r.id)}
+                          className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${active ? "text-white" : "border-border text-foreground hover:bg-secondary"}`}
+                          style={active ? { background: r.tone, borderColor: r.tone } : undefined}
+                        >
+                          {r.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="flex justify-end">
-                <Button onClick={postComment} disabled={!draft.trim() || !scoreOk || posting}>
+                <Button onClick={postComment} disabled={!draft.trim() || !scoreOk || !recommendationOk || posting}>
                   <Send size={14} /> {posting ? "Posting…" : "Post review"}
                 </Button>
               </div>
@@ -276,15 +348,74 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           )}
         </div>
 
+        {/* offer — required before this candidate can be hired */}
+        {!isTerminal && (canManage || c.offer) && (
+          <div className="rounded-lg border border-border bg-background p-4">
+            <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
+              <Briefcase size={13} /> Offer
+            </div>
+            {c.offer ? (
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                    style={{ background: `${OFFER_STATUS_TONE[c.offer.status]}18`, color: OFFER_STATUS_TONE[c.offer.status] }}
+                  >
+                    {OFFER_STATUS_LABEL[c.offer.status] || c.offer.status}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Sent {formatDate(c.offer.sentAt)}{c.offer.respondedAt ? ` · updated ${formatDate(c.offer.respondedAt)}` : ""}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <Row label="Salary" value={c.offer.salary} />
+                  <Row label="Start date" value={c.offer.startDate} />
+                </div>
+                {canManage && c.offer.status !== "accepted" && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {["accepted", "negotiating", "declined"]
+                      .filter((s) => s !== c.offer.status)
+                      .map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          disabled={offerBusy}
+                          onClick={() => setOfferStatus(s)}
+                          className="rounded-full border border-border px-3 py-1 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
+                        >
+                          Mark {OFFER_STATUS_LABEL[s]}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            ) : canManage ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <Input value={offerSalary} onChange={(e) => setOfferSalary(e.target.value)} placeholder="Salary, e.g. £45,000" />
+                  <Input type="date" value={offerStartDate} onChange={(e) => setOfferStartDate(e.target.value)} />
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={submitOffer} disabled={!offerSalary.trim() || !offerStartDate || offerBusy}>
+                    <Send size={14} /> {offerBusy ? "Sending…" : "Send offer"}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
         {/* move to next stage — right here, no need to leave the pop-out */}
         {mayMove && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/[0.04] p-4">
             <p className="text-[13px]">
-              {moveBlocked ? (
-                <span className="font-semibold text-[#B91C1C]">Add your comment and a score above before moving {c.name} on.</span>
+              {offerRequired ? (
+                <span className="font-semibold text-[#B91C1C]">{displayName(c)} needs an accepted offer before they can be hired.</span>
+              ) : moveBlocked ? (
+                <span className="font-semibold text-[#B91C1C]">Add your comment and a score above before moving {displayName(c)} on.</span>
               ) : (
                 <span className="text-foreground">
-                  Ready to move <span className="font-semibold">{c.name}</span> to <span className="font-semibold">{nextLabel || "the next stage"}</span>?
+                  Ready to move <span className="font-semibold">{displayName(c)}</span> to <span className="font-semibold">{nextLabel || "the next stage"}</span>?
                 </span>
               )}
             </p>
@@ -307,6 +438,50 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
         </div>
 
         <Row label="Key skills" value={c.skills} />
+
+        {c.emailMismatch && c.emailFromCv && (
+          <div className="flex items-start gap-2 rounded-lg border border-[#F0DFA6] bg-[#FBF1DC] p-3 text-[13px] text-[#8A6314] dark:border-[#5a4a1a] dark:bg-[#3a2f0f] dark:text-[#F5D77E]">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            <span>The email on file in their CV ({c.emailFromCv}) differs from the one they typed ({c.email}). The typed email is used as primary.</span>
+          </div>
+        )}
+
+        {/* WS4 — full structured CV extraction, alongside the derived summary above */}
+        {c.education?.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Education</div>
+            <ul className="space-y-1">
+              {c.education.map((e, i) => (
+                <li key={i} className="text-sm text-foreground">
+                  {e.degree}{e.institution ? ` — ${e.institution}` : ""}{e.year ? ` (${e.year})` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {c.experienceEntries?.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Work history</div>
+            <ul className="space-y-2">
+              {c.experienceEntries.map((e, i) => (
+                <li key={i} className="text-sm text-foreground">
+                  <span className="font-medium">{e.title}</span>{e.company ? ` at ${e.company}` : ""}
+                  {(e.startDate || e.endDate) && (
+                    <span className="text-muted-foreground"> · {e.startDate || "?"} – {e.endDate || "present"}</span>
+                  )}
+                  {e.summary && <div className="text-xs text-muted-foreground">{e.summary}</div>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {(c.certifications?.length > 0 || c.languages?.length > 0) && (
+          <div className="grid grid-cols-2 gap-4">
+            <Row label="Certifications" value={c.certifications?.join(", ")} />
+            <Row label="Languages" value={c.languages?.join(", ")} />
+          </div>
+        )}
+
         {c.linkedIn && (
           <div className="space-y-0.5">
             <div className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">LinkedIn / portfolio</div>

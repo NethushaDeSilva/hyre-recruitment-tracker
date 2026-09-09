@@ -4,7 +4,7 @@
 // owning role (or Management) can advance/reject a candidate in that stage.
 import { useState, useRef, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronRight, Plus, Settings2, Check, ArrowLeft, X, Search, SlidersHorizontal, GitCompare, Sparkles } from "lucide-react";
+import { ChevronRight, Plus, Settings2, Check, ArrowLeft, X, Search, SlidersHorizontal, Sparkles, Link2, Copy } from "lucide-react";
 import { useHyreData, advanceStage, rejectCandidate, bulkReject } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
@@ -16,13 +16,12 @@ import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { formatDate } from "@/lib/format";
+import { formatDate, displayName } from "@/lib/format";
 import CheckDropdown from "@/components/CheckDropdown";
 import AddCandidateModal from "@/components/AddCandidateModal";
 import RejectModal from "@/components/RejectModal";
 import StageConfigModal from "@/components/StageConfigModal";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
-import CompareModal from "@/components/CompareModal";
 import EligibilityTag from "@/components/EligibilityTag";
 
 export default function PositionDetail() {
@@ -38,10 +37,6 @@ export default function PositionDetail() {
   const [reviewFor, setReviewFor] = useState(null);    // candidate id showing the inline "review first" hint on its card
   // Applied-stage bulk select (HR only) — tick applicants and move them together.
   const [picked, setPicked] = useState(() => new Set());
-  // Side-by-side compare (HR & Interviewer) — a separate selection mode.
-  const [compareMode, setCompareMode] = useState(false);
-  const [compareSet, setCompareSet] = useState(() => new Set());
-  const [compareOpen, setCompareOpen] = useState(false);
   // board filters (HR only) — search is live; the multi-select qualification /
   // experience filters take effect when Apply is pressed.
   const [q, setQ] = useState("");
@@ -53,6 +48,7 @@ export default function PositionDetail() {
   // the AI screening panel lives in a popover opened by the "AI Mode" button.
   const [collapsed, setCollapsed] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const aiWrapRef = useRef(null);
   useEffect(() => {
     if (!aiOpen) return;
@@ -74,8 +70,6 @@ export default function PositionDetail() {
 
   const canConfigure = can(user?.role, "managePositions");
   const isHR = user?.role === ROLES.HR; // board filter + Applied bulk-move are HR-only
-  const canCompare = can(user?.role, "compareCandidates"); // HR & Interviewer, NOT Management
-  const MAX_COMPARE = 3;
   const actor = user ? { name: user.name, role: user.role, uid: user.uid || user.email || user.name } : null;
   const toast = useToast();
 
@@ -114,7 +108,7 @@ export default function PositionDetail() {
     if (qualActive.length && !qualActive.includes(c.highestQualification)) return false;
     if (expActive.length && !expActive.includes(c.experience)) return false;
     if (needle) {
-      const hay = `${c.name} ${c.email} ${c.skills} ${c.currentRole} ${c.currentCompany} ${c.fieldOfStudy}`.toLowerCase();
+      const hay = `${displayName(c)} ${c.email} ${c.skills} ${c.currentRole} ${c.currentCompany} ${c.fieldOfStudy}`.toLowerCase();
       if (!hay.includes(needle)) return false;
     }
     return true;
@@ -132,12 +126,15 @@ export default function PositionDetail() {
       setReviewFor(c.id);
       setMustReview(true);
       setDetail(c);
+    } else if (res && res.ok === false && res.reason === "offer-required") {
+      toast.error(`${displayName(c)} needs an accepted offer before they can be hired.`);
+      setDetail(c);
     } else if (res?.hired) {
       // Hired: the candidate is now an employee, issued an employee ID.
       toast.success(
         res.employeeId
-          ? `${c.name} hired — employee ID ${res.employeeId} issued.`
-          : `${c.name} hired.`
+          ? `${displayName(c)} hired — employee ID ${res.employeeId} issued.`
+          : `${displayName(c)} hired.`
       );
     }
   };
@@ -169,22 +166,6 @@ export default function PositionDetail() {
     await Promise.all(ids.map((id) => advanceStage(id, actor))); // no note — it's just an application
   };
 
-  // --- Side-by-side compare (HR & Interviewer) ---
-  const toggleCompareMode = () => {
-    setCompareMode((on) => !on);
-    setCompareSet(new Set());
-    setPicked(new Set()); // the two selection modes don't mix
-  };
-  const toggleCompare = (id) =>
-    setCompareSet((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else if (next.size < MAX_COMPARE) next.add(id); // cap at MAX_COMPARE
-      return next;
-    });
-  const compareList = [...compareSet].map((cid) => cands.find((c) => c.id === cid)).filter(Boolean);
-  const compareAtCap = compareSet.size >= MAX_COMPARE;
-
   return (
     <div className={`flex h-full flex-col px-4 pb-4 transition-[padding] duration-200 ease-natural sm:px-7 sm:pb-7 ${collapsed ? "pt-3 sm:pt-4" : "pt-4 sm:pt-7"}`}>
       {/* header — collapses as you scroll the board so the board gets more room.
@@ -204,30 +185,49 @@ export default function PositionDetail() {
           </div>
           <div className={`overflow-hidden text-sm font-medium text-muted-foreground transition-[max-height,opacity] duration-200 ease-natural ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
             {position.department} · {anyFilter ? `${filtered.length} of ${cands.length}` : cands.length} candidates · Opened {formatDate(position.createdAt)}
+            {position.hiringManagerName && <> · Hiring manager: {position.hiringManagerName}</>}
+            {" · "}{position.hiredCount || 0}/{position.headcount || 1} hired
           </div>
         </div>
-        {(canCompare || canConfigure) && (
+        {canConfigure && (
           <div className="flex flex-wrap items-center gap-2.5">
-            {/* Compare lives up here now; no manual open/close/reopen — positions
-                close only on their auto-close date and can never be reopened. */}
-            {canCompare && (
-              <Button variant={compareMode ? "primary" : "ghost"} onClick={toggleCompareMode}>
-                <GitCompare size={16} /> {compareMode ? "Exit compare" : "Compare candidates"}
-              </Button>
-            )}
-            {canConfigure && (
-              <>
-                <Button variant="ghost" onClick={() => setConfigOpen(true)}>
-                  <Settings2 size={16} /> Configure stages
-                </Button>
-                <Button onClick={() => setAddOpen(true)}>
-                  <Plus size={16} /> Add candidate
-                </Button>
-              </>
-            )}
+            <Button variant="ghost" onClick={() => setShareOpen((o) => !o)}>
+              <Link2 size={16} /> Share
+            </Button>
+            <Button variant="ghost" onClick={() => setConfigOpen(true)}>
+              <Settings2 size={16} /> Configure stages
+            </Button>
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus size={16} /> Add candidate
+            </Button>
           </div>
         )}
       </div>
+
+      {/* application link — how candidates reach this position without ever
+          touching the internal board (WS1 step 3). */}
+      {shareOpen && (
+        <div className="mt-3 space-y-2 rounded-lg border border-border bg-background p-3.5 text-sm">
+          {[
+            { icon: Link2, label: "Application link", value: `${window.location.origin}/jobs?position=${position.id}` },
+          ].map(({ icon: Icon, label, value }) => (
+            <div key={label} className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                <Icon size={14} className="shrink-0" />
+                <span className="shrink-0 font-semibold text-foreground">{label}:</span>
+                <span className="truncate font-mono text-xs">{value}</span>
+              </div>
+              <button
+                onClick={() => { navigator.clipboard.writeText(value); toast.success(`${label} copied.`); }}
+                className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                title={`Copy ${label.toLowerCase()}`}
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* search + filters — HR only. The search bar is long; the ✨ AI Mode button
           on it opens the AI screening panel in a popover (no permanent big box). */}
@@ -270,13 +270,6 @@ export default function PositionDetail() {
               <AiFilter candidates={cands} onOpen={setDetail} onClose={() => setAiOpen(false)} />
             </div>
           )}
-        </div>
-      )}
-
-      {/* compare hint — shown while compare mode is on */}
-      {compareMode && (
-        <div className={`text-[13px] font-medium text-muted-foreground transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-3"}`}>
-          Tick 2–{MAX_COMPARE} candidates{compareAtCap ? ` (max ${MAX_COMPARE} reached)` : ""}, then open the comparison.
         </div>
       )}
 
@@ -355,31 +348,28 @@ export default function PositionDetail() {
                 {inStage.map((c) => {
                   const mayAct = canActOnStageFor(user, position, c.stage);
                   return (
-                    <div key={c.id} className={`space-y-3 rounded-xl border bg-card p-3 shadow-card ${(compareMode && compareSet.has(c.id)) || (!compareMode && isHR && stageId === "applied" && picked.has(c.id)) ? "border-primary ring-1 ring-primary" : "border-border"}`}>
+                    <div key={c.id} className={`space-y-3 rounded-xl border bg-card p-3 shadow-card ${isHR && stageId === "applied" && picked.has(c.id) ? "border-primary ring-1 ring-primary" : "border-border"}`}>
                       <div className="flex items-start gap-2">
-                        {compareMode && canCompare ? (
-                          <input
-                            type="checkbox"
-                            checked={compareSet.has(c.id)}
-                            onChange={() => toggleCompare(c.id)}
-                            disabled={!compareSet.has(c.id) && compareAtCap}
-                            aria-label={`Compare ${c.name}`}
-                            title={!compareSet.has(c.id) && compareAtCap ? `You can compare up to ${MAX_COMPARE} at once` : undefined}
-                            className="mt-2.5 h-4 w-4 shrink-0 cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
-                          />
-                        ) : isHR && stageId === "applied" ? (
+                        {isHR && stageId === "applied" ? (
                           <input
                             type="checkbox"
                             checked={picked.has(c.id)}
                             onChange={() => togglePick(c.id)}
-                            aria-label={`Select ${c.name}`}
+                            aria-label={`Select ${displayName(c)}`}
                             className="mt-2.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
                           />
                         ) : null}
                         <button onClick={() => setDetail(c)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
-                          <Avatar name={c.name} color={c.avatarColor} size={38} />
+                          <Avatar name={displayName(c)} color={c.avatarColor} size={38} />
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-foreground hover:text-primary">{c.name}</div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-sm font-semibold text-foreground hover:text-primary">{displayName(c)}</span>
+                              {c.needsReview && (
+                                <span className="shrink-0 rounded bg-[#FBF1DC] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]" title={c.cvValidation?.reason || "CV validation was borderline — worth a second look"}>
+                                  Review
+                                </span>
+                              )}
+                            </div>
                             <div className="truncate text-xs text-muted-foreground">{c.appliedRole || "Candidate"}</div>
                           </div>
                         </button>
@@ -439,24 +429,6 @@ export default function PositionDetail() {
         })}
       </div>
 
-      {/* floating compare bar */}
-      {compareMode && compareSet.size > 0 && (
-        <div className="fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
-          <div className="flex items-center gap-3 rounded-full border border-border bg-card px-3 py-2 shadow-pop">
-            <span className="pl-2 text-sm font-semibold text-foreground">
-              {compareSet.size} selected{compareSet.size < 2 ? " · pick 1 more" : ""}
-            </span>
-            <Button onClick={() => setCompareOpen(true)} disabled={compareSet.size < 2}>
-              <GitCompare size={15} /> Compare side by side
-            </Button>
-            <button onClick={() => setCompareSet(new Set())} className="rounded-full px-3 py-1.5 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground">
-              Clear
-            </button>
-          </div>
-        </div>
-      )}
-
-      <CompareModal open={compareOpen} onClose={() => setCompareOpen(false)} candidates={compareList} position={position} />
       <AddCandidateModal open={addOpen} onClose={() => setAddOpen(false)} position={position} />
       <StageConfigModal open={configOpen} position={position} onClose={() => setConfigOpen(false)} />
       <CandidateDetailModal

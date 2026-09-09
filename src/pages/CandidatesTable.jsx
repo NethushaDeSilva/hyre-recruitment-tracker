@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { StageBadge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
-import { formatDate } from "@/lib/format";
+import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl } from "@/lib/file";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
 import EligibilityTag from "@/components/EligibilityTag";
@@ -69,7 +69,7 @@ export default function CandidatesTable() {
       if (qualification && c.highestQualification !== qualification) return false;
       if (experience && c.experience !== experience) return false;
       if (needle) {
-        const hay = `${c.name} ${c.email} ${c.skills} ${c.currentRole} ${c.currentCompany} ${titleFor(c.positionId)}`.toLowerCase();
+        const hay = `${displayName(c)} ${c.email} ${c.skills} ${c.currentRole} ${c.currentCompany} ${titleFor(c.positionId)}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -78,7 +78,7 @@ export default function CandidatesTable() {
     const dir = sort.dir === "asc" ? 1 : -1;
     const val = (c) => {
       switch (sort.key) {
-        case "name": return c.name.toLowerCase();
+        case "name": return displayName(c).toLowerCase();
         case "position": return titleFor(c.positionId).toLowerCase();
         case "qualification": return rank(QUALIFICATIONS, c.highestQualification);
         case "experience": return rank(EXPERIENCE_RANGES, c.experience);
@@ -155,7 +155,7 @@ export default function CandidatesTable() {
   const downloadSelected = () => {
     selectedRows
       .filter((c) => c.cvDataUrl)
-      .forEach((c, i) => setTimeout(() => downloadDataUrl(c.cvDataUrl, c.cvFileName || `${c.name}-cv`), i * 250));
+      .forEach((c, i) => setTimeout(() => downloadDataUrl(c.cvDataUrl, c.cvFileName || `${displayName(c)}-cv`), i * 250));
   };
 
   const Th = ({ label, k, className }) => (
@@ -321,19 +321,24 @@ export default function CandidatesTable() {
                         type="checkbox"
                         checked={checked.has(c.id)}
                         onChange={() => toggleOne(c.id)}
-                        aria-label={`Select ${c.name}`}
+                        aria-label={`Select ${displayName(c)}`}
                         className="h-4 w-4 cursor-pointer accent-primary"
                       />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <Avatar name={c.name} color={c.avatarColor} size={34} />
+                        <Avatar name={displayName(c)} color={c.avatarColor} size={34} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate font-semibold text-foreground">{c.name}</span>
+                            <span className="truncate font-semibold text-foreground">{displayName(c)}</span>
                             {c.source === "Role change" && (
                               <span className="shrink-0 rounded bg-[#EEF2FF] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4F46E5] dark:bg-[#4F46E5]/15 dark:text-[#A5B4FC]" title={`Internal role change from ${c.fromRole || "current role"}${c.fromEmployeeId ? ` (${c.fromEmployeeId})` : ""}`}>
                                 Role change
+                              </span>
+                            )}
+                            {c.needsReview && (
+                              <span className="shrink-0 rounded bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]" title={c.cvValidation?.reason || "CV validation was borderline — worth a second look"}>
+                                Needs review
                               </span>
                             )}
                           </div>

@@ -1,13 +1,19 @@
-// CV handling. On the free plan a CV is stored as a base64 `data:` URL INSIDE the
-// candidate's Firestore document (no Firebase Storage / Blaze needed). Firestore
-// caps a document at ~1 MB and base64 adds ~33%, so the raw file is capped at
-// 700 KB. `uploadCv()` (Storage) is kept for if/when Blaze is enabled, but the
-// app currently uses the base64 path. Open/download handle BOTH data URLs and
+// CV handling. New applications (WS2 onward) upload the CV file straight to
+// Firebase Storage via uploadCv() when Firebase is configured — this doesn't
+// need Blaze, only Cloud Functions making outbound calls do. That's what lets
+// us accept up to 5 MB (storage.rules enforces the same cap server-side). In
+// mock/demo mode (no Firebase configured, firebaseReady === false — see
+// firebase/config.js) uploadCv() has nothing to upload to, so ApplyModal falls
+// back to fileToDataUrl() instead, same as it always has there. Candidates who
+// applied before this change also still have their CV as a base64 `data:` URL
+// inside their Firestore document (the old production path, capped at ~700KB
+// by Firestore's ~1MB doc limit) — the data-URL branches below stay so those
+// still open/download correctly. Open/download handle BOTH data URLs and
 // Storage URLs, so nothing breaks either way.
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage, firebaseReady } from "@/firebase/config";
 
-export const MAX_CV_BYTES = 700 * 1024; // 700 KB (base64 fits under the 1 MB Firestore doc limit)
+export const MAX_CV_BYTES = 5 * 1024 * 1024; // 5 MB — matches storage.rules
 export const ACCEPTED_CV_TYPES = ".pdf,.doc,.docx";
 
 // Allowed CV file extensions (the reliable signal in the browser; MIME types for
@@ -54,6 +60,14 @@ const safeName = (name) => String(name || "cv").replace(/[^\w.\- ]+/g, "_").slic
 /**
  * Upload a CV to Firebase Storage under cvs/{uid}/… and return its download URL.
  * Returns { url, name, size, path }. Requires Firebase to be configured.
+ *
+ * WS3 note: ApplyModal only calls this once cv-extract.js's validateCvContent()
+ * has actually passed — a rejected file is never uploaded, so the orphaning
+ * risk this comment used to flag (files uploaded before validation existed)
+ * no longer applies to anything submitted from here on. It could still apply
+ * to any uploads made during the pre-WS3 window, if this ever ran in
+ * production before WS3 shipped — worth a one-off Storage sweep if so, not an
+ * ongoing concern.
  */
 export async function uploadCv(file, { uid } = {}) {
   validateCvFile(file);

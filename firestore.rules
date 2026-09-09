@@ -8,8 +8,10 @@ rules_version = '2';
 //     user must NEVER be able to grant themselves a staff role. Self-serve
 //     accounts are always Candidates; staff roles are provisioned out-of-band
 //     (Firebase console or scripts/provision-staff.mjs) and can't change here.
-//  3. Applicants can create only THEIR OWN application, only into "applied" —
-//     no self-promotion to hired, no forged review data.
+//  3. WS1 identity split: a person's CV/profile lives ONCE in /candidates
+//     (keyed by email); each vacancy they apply to is its own /applications
+//     doc. Applicants can create only THEIR OWN application, only into
+//     "applied" — no self-promotion to hired, no forged review data.
 //  4. Staff writes are gated by STAGE OWNERSHIP (mirrors src/lib/stages.js) and
 //     the audit trail (history[]) is append-only — entries can never be
 //     removed or truncated, so a rejection can't be quietly erased.
@@ -88,7 +90,18 @@ service cloud.firestore {
     match /positions/{id} {
       allow read: if signedIn();
       allow create: if isRecruiter();
-      allow update: if isRecruiter();
+      allow update: if isRecruiter()
+        // Any staff member may close out a requisition as part of hiring a
+        // candidate into it (hireCandidate() in src/data/store.js) — the stage
+        // whose owner triggers the "hired" transition isn't always HR/Management
+        // (e.g. a short pipeline where an Interviewer-owned stage feeds straight
+        // into Hired). Scoped tightly: only hiredCount/status may change,
+        // hiredCount only ever advances by exactly one, and status may only
+        // become "Closed" — never anything else — through this path.
+        || (isStaff()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiredCount', 'status'])
+            && request.resource.data.hiredCount == resource.data.get('hiredCount', 0) + 1
+            && (request.resource.data.status == resource.data.status || request.resource.data.status == 'Closed'));
       allow delete: if isRecruiter();
     }
 
@@ -110,8 +123,45 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // --- candidates ---
+    // --- candidates (IDENTITY — one per person, keyed on lowercased email) ---
+    // WS1: a person's email, phone, CV and parsed profile live ONCE here, shared
+    // across every vacancy they apply to (see /applications below). This is
+    // deliberately permissive on the `email` field itself (mirrors the pre-split
+    // rule, which never cross-checked the typed email against the verified
+    // auth email either) — `submittedByUid`, when present, is the real anchor.
     match /candidates/{id} {
+      // read: staff → all; a person → only their own identity record.
+      allow read: if isStaff()
+        || (signedIn() && (
+              resource.data.submittedByUid == request.auth.uid
+              || resource.data.email == request.auth.token.email));
+
+      // create: staff (HR quick-add, WS5 email intake) or a signed-in person
+      // creating their OWN identity — if submittedByUid is set at all, it must
+      // be their own uid, so nobody can create an identity claiming to be
+      // someone else's account.
+      allow create: if isStaff()
+        || (signedIn()
+            && (!('submittedByUid' in request.resource.data)
+                || request.resource.data.submittedByUid == request.auth.uid));
+
+      // update: staff (enrich/correct a profile, WS5 merge) or the owning
+      // person (WS4's "confirm what we read from your CV" step) — the anchors
+      // (email, candidateId) can never change once minted.
+      allow update: if isStaff()
+        || (signedIn()
+            && (resource.data.submittedByUid == request.auth.uid
+                || resource.data.email == request.auth.token.email)
+            && request.resource.data.email == resource.data.email
+            && request.resource.data.candidateId == resource.data.candidateId);
+
+      // delete: never — identity persists regardless of how many applications
+      // come and go, or whether the person is eventually hired.
+      allow delete: if false;
+    }
+
+    // --- applications (PIPELINE — one per person per vacancy) ---
+    match /applications/{id} {
       // read: staff → all; applicant → only their own (by uid or verified email).
       allow read: if isStaff()
         || (signedIn() && (
@@ -119,14 +169,12 @@ service cloud.firestore {
               || resource.data.email == request.auth.token.email));
 
       // create: staff add anyone; an applicant creates only their own
-      // application, only into "applied", with no forged review payload. The
-      // source is either a plain "Self-applied" application or a "Role change"
-      // request from an existing employee — both are self-created into "applied".
+      // application, only into "applied", with no forged review payload.
       allow create: if isStaff()
         || (signedIn()
             && request.resource.data.submittedByUid == request.auth.uid
             && request.resource.data.stage == 'applied'
-            && request.resource.data.source in ['Self-applied', 'Role change']
+            && request.resource.data.source == 'Self-applied'
             && (!('comments' in request.resource.data)
                 || request.resource.data.comments.size() == 0));
 
@@ -146,18 +194,20 @@ service cloud.firestore {
            );
 
       // delete: only as part of a HIRE transfer — a stage owner (or Management)
-      // removes the candidate the instant they're written into `employees`. A
-      // REJECTED candidate can NEVER be deleted (the talent pool is permanent).
+      // removes the application the instant it's written into `employees`. A
+      // REJECTED application can NEVER be deleted (the talent pool is permanent).
       allow delete: if isStaff()
         && resource.data.stage != 'rejected'
         && ownsStage(resource.data.stage);
     }
 
     // --- employees (HIRED people) ---
-    // The moment a candidate reaches "hired" they're MOVED out of /candidates and
-    // written here (see hireCandidate() in src/data/store.js), keyed by their
-    // readable employee ID (e.g. employees/SE-SNE-0001). Same read scoping as
-    // candidates: staff see everyone; a person sees only their own record.
+    // The moment an application reaches "hired" it's MOVED out of /applications
+    // and written here as a full snapshot (see hireCandidate() in
+    // src/data/store.js), keyed by a readable employee ID (e.g.
+    // employees/SE-SNE-0001). The person's /candidates identity record is left
+    // untouched — it isn't deleted just because they were hired. Same read
+    // scoping as applications: staff see everyone; a person sees only their own.
     match /employees/{id} {
       allow read: if isStaff()
         || (signedIn() && (
@@ -177,6 +227,28 @@ service cloud.firestore {
       // delete: staff only — used to vacate a person's OLD employee record when
       // they're promoted into a new one (one live record per person).
       allow delete: if isStaff();
+    }
+
+    // --- CV validation rejections (WS3) — demo evidence, immutable ---
+    // A signed-in user logs only their OWN rejection (their own uid on the
+    // entry); staff read the whole collection to see the gate is working.
+    // Never updated or deleted — it's a record of what happened, not state.
+    match /validation_logs/{id} {
+      allow read: if isStaff();
+      allow create: if signedIn() && request.resource.data.submittedByUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // --- in-app notifications (WS1 rejection notice, WS6 stage/offer/mention pings) ---
+    // Addressed to one recipient (toUid); only staff ever create one (a candidate
+    // has no one else in this app to notify); only the recipient may read/mark
+    // their own read, and only the `read` field may ever change.
+    match /notifications/{id} {
+      allow read: if signedIn() && resource.data.toUid == request.auth.uid;
+      allow create: if isStaff();
+      allow update: if signedIn() && resource.data.toUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if false;
     }
 
     // Anything not matched above is denied by default.

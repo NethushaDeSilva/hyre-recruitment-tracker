@@ -3,6 +3,16 @@
 // kept in sync with real-time onSnapshot listeners; mutations write to Firestore.
 // When keys are absent, it falls back to in-memory seed data so the app still runs.
 // Either way the UI only ever calls useHyreData() + the helper functions below.
+//
+// IDENTITY / APPLICATION SPLIT (WS1 — one person, many applications):
+// A person's identity — email, phone, CV, parsed profile — lives ONCE in
+// /candidates, keyed by their lowercased email. Every vacancy they apply to is
+// its own /applications document (stage, history, comments, offer, …) that
+// references that identity by `personId`. useHyreData() still hands back a
+// `candidates` array shaped exactly like before (one flattened row per
+// application) by JOINING the two collections client-side — so a person's CV
+// is never re-uploaded or re-typed on a second application, while every other
+// screen that already reads `candidates` keeps working unmodified.
 import { useSyncExternalStore } from "react";
 import { collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
@@ -19,13 +29,16 @@ function pickColor(name) {
 let idCounter = 100;
 const uid = (prefix) => `${prefix}_${++idCounter}`;
 
+const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
+
 // --- unique, sequential CANDIDATE IDs (CAND-0001, CAND-0002, …) ---------------
-// A candidate can only read their OWN rows (security rules), so they can't count
-// how many candidates exist to know they're "the 61st". We hand out unique numbers
-// from a single counter document (counters/candidates.next) inside a transaction,
-// so two people applying at the same moment can never get the same number.
-// 60 candidates are seeded (CAND-0001…0060), so the sequence starts at 61; if the
-// counter doc doesn't exist yet, the first application creates it.
+// This is now a PERSON number, not an application number — minted once, the
+// first time someone's email is ever seen, and carried by their identity doc
+// from then on. A candidate can only read their OWN rows (security rules), so
+// they can't count how many people exist to know they're "the 61st" — numbers
+// come from a single counter document (counters/candidates.next) inside a
+// transaction, so two people applying at the same moment can never collide.
+// 60 people are seeded (CAND-0001…0060), so the sequence starts at 61.
 const CANDIDATE_SEQ_START = 61;
 const fmtCandidateId = (n) => `CAND-${String(n).padStart(4, "0")}`;
 const parseCandNum = (id) => { const m = /(\d+)\s*$/.exec(String(id || "")); return m ? Number(m[1]) : 0; };
@@ -42,9 +55,8 @@ const USER_SEQ_START = 1;
 export const makeUserId = (n) => `USR-${String(n).padStart(4, "0")}`;
 
 // --- unique EMPLOYEE IDs issued ON HIRE ---------------------------------------
-// The moment a candidate is moved to the "hired" stage they stop being a
-// candidate and become an EMPLOYEE — issued an employee ID built from THREE parts:
-//     {DEPT}-{ROLE}-{NUMBER}      e.g.  SE-SNE-0001
+// The moment an application reaches "hired" that person is issued an employee ID
+// built from THREE parts:      {DEPT}-{ROLE}-{NUMBER}      e.g.  SE-SNE-0001
 //   • DEPT   = the position's department short code   (departmentCode → "SE")
 //   • ROLE   = an abbreviation of the job title       (initials → "SNE")
 //   • NUMBER = a global, monotonic employee number    (counters/employees.next)
@@ -106,22 +118,65 @@ const SEED_CANDIDATES = [
   { id: "cand_15", name: "Hannah Cole", email: "hannah.cole@email.com", positionId: "pos_5", stage: "hired", appliedRole: "Product Designer", avatarColor: "#4F46E5", highestQualification: "Bachelor's Degree", experience: "5–10 years", appliedAt: at("2026-06-18") },
 ];
 
+// --- mock-mode in-memory state (used only when Firebase isn't configured) ----
+// Mirrors the real Firestore shape: identities keyed by email, applications and
+// employees as flat lists referencing a personId. A fallback path only — the
+// deployed app always runs against real Firestore.
+const mockIdentities = new Map(); // personId -> identity fields
+const mockApplications = []; // { id, personId, positionId, stage, ... } — pipeline-only
+let mockEmployeesList = []; // flattened, joined snapshots (same shape as before)
+
+function seedMock() {
+  let candNum = CANDIDATE_SEQ_START - 60; // 1
+  let empNum = EMPLOYEE_SEQ_START;
+  for (const c of SEED_CANDIDATES) {
+    const personId = normalizeEmail(c.email) || `noemail_${c.id}`;
+    const identity = {
+      personId, email: personId, candidateId: fmtCandidateId(candNum++), name: c.name,
+      avatarColor: c.avatarColor, highestQualification: c.highestQualification || "", experience: c.experience || "",
+      phone: "", location: "", fieldOfStudy: "", currentRole: "", currentCompany: "", skills: "", linkedIn: "",
+      totalYearsExperience: 0, education: [], experienceEntries: [], certifications: [], languages: [],
+      cvExtractedText: "", emailFromCv: "", emailMismatch: false, cvFileName: "", cvDataUrl: "", cvSize: 0,
+      submittedByUid: "",
+    };
+    mockIdentities.set(personId, identity);
+    const base = {
+      id: c.id, personId, positionId: c.positionId, stage: c.stage, appliedRole: c.appliedRole,
+      appliedAt: at(c.appliedAt), source: "Added by HR", coverNote: "",
+      needsReview: false, cvValidation: null, offer: null, rejection: null, comments: [],
+      history: [{ type: "apply", from: null, to: c.stage === "applied" ? "applied" : c.stage, at: at(c.appliedAt), by: "HR", byRole: "" }],
+      employeeId: "", employeeDept: "", employeeRole: "", hiredAt: 0,
+    };
+    if (c.stage === "hired") {
+      const employeeId = makeEmployeeId("", c.appliedRole, empNum++);
+      mockEmployeesList.push(joinFlat(identity, { ...base, employeeId, employeeRole: c.appliedRole, hiredAt: at(c.appliedAt) }));
+    } else {
+      mockApplications.push(base);
+    }
+  }
+}
+function recomputeMock() {
+  employees = mockEmployeesList;
+  candidates = [
+    ...mockApplications.map((a) => joinFlat(mockIdentities.get(a.personId), a)),
+    ...mockEmployeesList,
+  ].sort((a, b) => a.appliedAt - b.appliedAt);
+}
+
 // --- reactive snapshot store ---
 let positions = firebaseReady ? [] : SEED_POSITIONS;
-let candidates = firebaseReady ? [] : SEED_CANDIDATES;
+let candidates = [];
 let employees = []; // hired people — Firebase: the /employees collection; mock: derived below
+let notifications = []; // in-app notifications addressed to the signed-in user
 let loading = firebaseReady; // true until the first Firestore data arrives
-let snapshot = { positions, candidates, employees, loading };
+if (!firebaseReady) {
+  seedMock();
+  recomputeMock();
+}
+let snapshot = { positions, candidates, employees, notifications, loading };
 const listeners = new Set();
 function commit() {
-  snapshot = {
-    positions,
-    candidates,
-    // In mock mode there is no /employees collection — derive the hired subset so
-    // the Employees page has data either way.
-    employees: firebaseReady ? employees : candidates.filter((c) => c.stage === "hired"),
-    loading,
-  };
+  snapshot = { positions, candidates, employees, notifications, loading };
   listeners.forEach((l) => l());
 }
 function subscribe(cb) {
@@ -143,6 +198,12 @@ const mapPosition = (d) => {
     status: x.status || "Open", stages: x.stages || DEFAULT_PIPELINE, minQualification: x.minQualification || "",
     // mandatory auto-close date (ms) — the vacancy closes itself once this passes
     closesAt: x.closesAt ? ms(x.closesAt) : 0,
+    // headcount target vs. how many have been hired into this requisition so far —
+    // hireCandidate() increments hiredCount and closes the position once it's filled
+    headcount: x.headcount || 1,
+    hiredCount: x.hiredCount || 0,
+    hiringManagerUid: x.hiringManagerUid || "",
+    hiringManagerName: x.hiringManagerName || "",
     // custom-stage metadata + per-stage staff assignments (both optional)
     stageMeta: x.stageMeta || {},
     stageAssignees: x.stageAssignees || {},
@@ -159,24 +220,86 @@ const mapPosition = (d) => {
 const publishStageMeta = (list) => {
   for (const p of list) if (p.stageMeta) registerStageMeta(p.stageMeta);
 };
-const mapCandidate = (d) => {
+
+// --- identity (candidates/{personId}) — one per person, keyed on email -------
+const mapIdentity = (d) => {
+  const x = d.data();
+  return {
+    personId: d.id,
+    candidateId: x.candidateId || "", // human-readable person ID (e.g. CAND-0007)
+    email: x.email || "",
+    phone: x.phone || "",
+    name: x.name || "",
+    location: x.location || "",
+    highestQualification: x.highestQualification || "",
+    fieldOfStudy: x.fieldOfStudy || "",
+    experience: x.experience || "",
+    currentRole: x.currentRole || "",
+    currentCompany: x.currentCompany || "",
+    skills: x.skills || "",
+    linkedIn: x.linkedIn || "",
+    totalYearsExperience: x.totalYearsExperience || 0,
+    education: x.education || [],
+    experienceEntries: x.experienceEntries || [],
+    certifications: x.certifications || [],
+    languages: x.languages || [],
+    cvExtractedText: x.cvExtractedText || "",
+    emailFromCv: x.emailFromCv || "",
+    emailMismatch: !!x.emailMismatch,
+    cvFileName: x.cvFileName || "",
+    cvDataUrl: x.cvDataUrl || "",
+    cvSize: x.cvSize || 0,
+    avatarColor: x.avatarColor || "#1F3A5F",
+    submittedByUid: x.submittedByUid || "",
+  };
+};
+
+// --- applications/{id} — one per (person, vacancy) — the pipeline instance ---
+const mapApplication = (d) => {
   const x = d.data();
   return {
     id: d.id,
-    candidateId: x.candidateId || "", // human-readable candidate ID (e.g. CAND-0007)
-    // --- issued ON HIRE: a candidate who reached "hired" becomes an employee ---
-    employeeId: x.employeeId || "",     // e.g. SE-SNE-0001 (dept · role · number)
-    employeeDept: x.employeeDept || "", // department name, snapshotted at hire
-    employeeRole: x.employeeRole || "", // job title, snapshotted at hire
-    hiredAt: x.hiredAt ? ms(x.hiredAt) : 0,
-    name: x.name,
-    email: x.email || "",
+    personId: x.personId || "",
+    email: x.email || "", // denormalized from identity — needed by security rules
+    submittedByUid: x.submittedByUid || "", // denormalized from identity — ditto
     positionId: x.positionId,
     stage: x.stage || "applied",
     appliedRole: x.appliedRole || "",
+    appliedAt: ms(x.appliedAt),
+    coverNote: x.coverNote || "",
+    source: x.source || "Added by HR",
+    needsReview: !!x.needsReview,
+    cvValidation: x.cvValidation || null,
+    offer: x.offer || null,
+    employeeId: x.employeeId || "",
+    employeeDept: x.employeeDept || "",
+    employeeRole: x.employeeRole || "",
+    hiredAt: x.hiredAt ? ms(x.hiredAt) : 0,
+    history: Array.isArray(x.history) ? x.history : [],
+    rejection: x.rejection || null,
+    comments: Array.isArray(x.comments) ? x.comments : [],
+  };
+};
+
+// employees/{employeeId} — a full point-in-time SNAPSHOT written at hire time
+// (not a live join with identity — matches how it worked before this split).
+const mapEmployee = (d) => {
+  const x = d.data();
+  return {
+    id: d.id,
+    personId: x.personId || "",
+    candidateId: x.candidateId || "",
+    employeeId: x.employeeId || "",
+    employeeDept: x.employeeDept || "",
+    employeeRole: x.employeeRole || "",
+    hiredAt: x.hiredAt ? ms(x.hiredAt) : 0,
+    name: x.name || "",
+    email: x.email || "",
+    positionId: x.positionId || "",
+    stage: "hired",
+    appliedRole: x.appliedRole || "",
     avatarColor: x.avatarColor || "#1F3A5F",
     appliedAt: ms(x.appliedAt),
-    // --- application / CV profile (optional; present for self-applied candidates) ---
     phone: x.phone || "",
     location: x.location || "",
     highestQualification: x.highestQualification || "",
@@ -187,60 +310,127 @@ const mapCandidate = (d) => {
     skills: x.skills || "",
     linkedIn: x.linkedIn || "",
     coverNote: x.coverNote || "",
+    totalYearsExperience: x.totalYearsExperience || 0,
+    education: x.education || [],
+    experienceEntries: x.experienceEntries || [],
+    certifications: x.certifications || [],
+    languages: x.languages || [],
+    cvExtractedText: x.cvExtractedText || "",
+    emailFromCv: x.emailFromCv || "",
+    emailMismatch: !!x.emailMismatch,
     cvFileName: x.cvFileName || "",
     cvDataUrl: x.cvDataUrl || "",
     cvSize: x.cvSize || 0,
+    offer: x.offer || null,
     source: x.source || "Added by HR",
     submittedByUid: x.submittedByUid || "",
-    // internal ROLE-CHANGE context (set when a hired employee requests another role)
-    fromRole: x.fromRole || "",           // their current job role, e.g. "Network Engineer"
-    fromEmployeeId: x.fromEmployeeId || "", // their current employee ID, e.g. SE-SNE-0001
-    fromPositionId: x.fromPositionId || "", // the position they currently hold
-    // --- pipeline history + rejection record (talent pool) ---
+    needsReview: !!x.needsReview,
+    cvValidation: x.cvValidation || null,
     history: Array.isArray(x.history) ? x.history : [],
-    rejection: x.rejection || null, // { reason, comment, stage, at, by, byRole }
-    // reviewer comments passed down the pipeline (HR → interviewer → management)
-    comments: Array.isArray(x.comments) ? x.comments : [], // { text, by, byRole, stage, at }
+    rejection: x.rejection || null,
+    comments: Array.isArray(x.comments) ? x.comments : [],
   };
 };
 
+// Merge one application with its identity into the SAME flattened shape every
+// existing screen already reads (CandidatesTable, PositionDetail, CandidateDetailModal,
+// Jobs, MyApplications, …) — so nothing downstream needs to change just because
+// the underlying data now lives in two collections instead of one.
+function joinFlat(identity, app) {
+  const idn = identity || {};
+  return {
+    id: app.id,
+    personId: app.personId,
+    candidateId: idn.candidateId || "",
+    employeeId: app.employeeId,
+    employeeDept: app.employeeDept,
+    employeeRole: app.employeeRole,
+    hiredAt: app.hiredAt,
+    name: idn.name || "",
+    email: idn.email || app.email || "",
+    positionId: app.positionId,
+    stage: app.stage,
+    appliedRole: app.appliedRole,
+    avatarColor: idn.avatarColor || "#1F3A5F",
+    appliedAt: app.appliedAt,
+    phone: idn.phone || "",
+    location: idn.location || "",
+    highestQualification: idn.highestQualification || "",
+    fieldOfStudy: idn.fieldOfStudy || "",
+    experience: idn.experience || "",
+    currentRole: idn.currentRole || "",
+    currentCompany: idn.currentCompany || "",
+    skills: idn.skills || "",
+    linkedIn: idn.linkedIn || "",
+    coverNote: app.coverNote || "",
+    totalYearsExperience: idn.totalYearsExperience || 0,
+    education: idn.education || [],
+    experienceEntries: idn.experienceEntries || [],
+    certifications: idn.certifications || [],
+    languages: idn.languages || [],
+    cvExtractedText: idn.cvExtractedText || "",
+    emailFromCv: idn.emailFromCv || "",
+    emailMismatch: !!idn.emailMismatch,
+    cvFileName: idn.cvFileName || "",
+    cvDataUrl: idn.cvDataUrl || "",
+    cvSize: idn.cvSize || 0,
+    offer: app.offer || null,
+    source: app.source || "Added by HR",
+    submittedByUid: idn.submittedByUid || app.submittedByUid || "",
+    needsReview: app.needsReview,
+    cvValidation: app.cvValidation,
+    history: app.history || [],
+    rejection: app.rejection || null,
+    comments: app.comments || [],
+  };
+}
+
 // --- Firestore wiring (only when configured), scoped to the signed-in user ---
-// Security: staff subscribe to the whole candidates collection; an applicant may
-// only read their OWN rows, so we subscribe with where() filters that match the
-// Firestore rules (by uid and by verified email). Positions are readable by any
-// signed-in user. syncAuth() is called by AuthProvider whenever the user changes.
+// Security: staff subscribe to whole collections; an applicant may only read
+// THEIR OWN identity + applications/employee rows, so we subscribe with where()
+// filters that match the Firestore rules (by uid and by verified email).
+// Positions are readable by any signed-in user. syncAuth() is called by
+// AuthProvider whenever the user changes.
 let unsubPositions = null;
-let unsubCandidateFns = []; // candidate + employee listeners to tear down
+let unsubCandidateFns = []; // identity + application + employee listeners to tear down
+let unsubNotifications = null;
 let authKey = null; // uid|role|email — avoid needless resubscribes on profile edits
-// People arrive from TWO collections: /candidates (pipeline) and /employees (hired).
-// A candidate user reads each on two streams (by uid + by verified email); staff read
-// each whole collection. Every stream lands in this bag, tagged with its _kind, and we
-// recompute the merged views whenever any stream updates.
-const streams = new Map(); // streamName -> mapped docs (each tagged _kind)
+// Every stream lands in one of these two bags, tagged by name, and we recompute
+// the merged/joined views whenever any stream updates.
+const identityStreams = new Map(); // streamName -> mapped identity docs
+const streams = new Map(); // streamName -> mapped application/employee docs (each tagged _kind)
+function setIdentityStream(name, docs) {
+  identityStreams.set(name, docs);
+  recompute();
+}
 function setStream(name, docs) {
   streams.set(name, docs);
   recompute();
 }
 function recompute() {
-  const candById = new Map();
+  const identityById = new Map();
+  for (const docs of identityStreams.values()) for (const d of docs) identityById.set(d.personId, d);
+
+  const appById = new Map();
   const empById = new Map();
   for (const docs of streams.values()) {
-    for (const d of docs) (d._kind === "employee" ? empById : candById).set(d.id, d);
+    for (const d of docs) (d._kind === "employee" ? empById : appById).set(d.id, d);
   }
   employees = [...empById.values()].sort((a, b) => (b.hiredAt || 0) - (a.hiredAt || 0));
-  // Exposed `candidates` = pipeline people PLUS hired employees (which carry
-  // stage:"hired"), so every existing consumer that filters by stage keeps working
-  // even though the DATABASE keeps the two collections cleanly separate.
-  candidates = [...candById.values(), ...employees].sort((a, b) => a.appliedAt - b.appliedAt);
+  const liveApplications = [...appById.values()].map((app) => joinFlat(identityById.get(app.personId), app));
+  candidates = [...liveApplications, ...employees].sort((a, b) => a.appliedAt - b.appliedAt);
   loading = false;
   commit();
 }
 function teardownData() {
   if (unsubPositions) unsubPositions();
   unsubPositions = null;
+  if (unsubNotifications) unsubNotifications();
+  unsubNotifications = null;
   unsubCandidateFns.forEach((fn) => fn());
   unsubCandidateFns = [];
   streams.clear();
+  identityStreams.clear();
 }
 
 /**
@@ -258,6 +448,7 @@ export function syncAuth(user) {
   if (!user) {
     positions = [];
     candidates = [];
+    notifications = [];
     loading = false;
     commit();
     return;
@@ -265,6 +456,20 @@ export function syncAuth(user) {
 
   loading = true;
   commit();
+
+  // Notifications are addressed to this exact uid, regardless of role — a
+  // candidate reads their own rejection notice, staff read their own mentions/
+  // stage-change/offer-response pings (see notifyUser()).
+  unsubNotifications = onSnapshot(
+    query(collection(db, "notifications"), where("toUid", "==", user.uid)),
+    (snap) => {
+      notifications = snap.docs
+        .map((d) => ({ id: d.id, ...d.data(), createdAt: ms(d.data().createdAt) }))
+        .sort((a, b) => b.createdAt - a.createdAt);
+      commit();
+    },
+    (err) => console.error("notifications listener:", err)
+  );
 
   unsubPositions = onSnapshot(
     collection(db, "positions"),
@@ -285,6 +490,13 @@ export function syncAuth(user) {
     }
   );
 
+  const subscribeIdentityStream = (name, filter) => {
+    const base = collection(db, "candidates");
+    const ref = filter ? query(base, where(filter.field, "==", filter.value)) : base;
+    unsubCandidateFns.push(
+      onSnapshot(ref, (snap) => setIdentityStream(name, snap.docs.map(mapIdentity)), (err) => console.error(`${name} listener:`, err))
+    );
+  };
   // Subscribe one collection stream (optionally filtered) into the merge bag.
   const subscribeStream = (name, col, kind, filter) => {
     const base = collection(db, col);
@@ -292,24 +504,28 @@ export function syncAuth(user) {
     unsubCandidateFns.push(
       onSnapshot(
         ref,
-        (snap) => setStream(name, snap.docs.map((d) => ({ ...mapCandidate(d), _kind: kind }))),
+        (snap) => setStream(name, snap.docs.map((d) => ({ ...(kind === "employee" ? mapEmployee(d) : mapApplication(d)), _kind: kind }))),
         (err) => console.error(`${name} listener:`, err)
       )
     );
   };
 
   if (user.role === "Candidate") {
-    // Scoped: only this person's OWN records — by uid and by verified email — across
-    // both /candidates (their applications) and /employees (their job, once hired).
-    subscribeStream("cand:uid", "candidates", "candidate", { field: "submittedByUid", value: user.uid });
+    // Scoped: only this person's OWN identity + rows — by uid and by verified
+    // email — across /candidates (identity), /applications (their applications)
+    // and /employees (their job, once hired).
+    subscribeIdentityStream("id:uid", { field: "submittedByUid", value: user.uid });
+    subscribeStream("app:uid", "applications", "application", { field: "submittedByUid", value: user.uid });
     subscribeStream("emp:uid", "employees", "employee", { field: "submittedByUid", value: user.uid });
     if (user.email) {
-      subscribeStream("cand:email", "candidates", "candidate", { field: "email", value: user.email });
+      subscribeIdentityStream("id:email", { field: "email", value: user.email });
+      subscribeStream("app:email", "applications", "application", { field: "email", value: user.email });
       subscribeStream("emp:email", "employees", "employee", { field: "email", value: user.email });
     }
   } else {
-    // Staff: the whole of both collections.
-    subscribeStream("cand:all", "candidates", "candidate", null);
+    // Staff: the whole of all three collections.
+    subscribeIdentityStream("id:all", null);
+    subscribeStream("app:all", "applications", "application", null);
     subscribeStream("emp:all", "employees", "employee", null);
     // Only recruiters may write positions — seed from a recruiter session.
     if (user.role === "HR" || user.role === "Management") seedIfEmpty();
@@ -317,9 +533,9 @@ export function syncAuth(user) {
 }
 
 // One-time seed: if the positions collection is empty, write the demo data with
-// READABLE document ids (candidates/CAND-0001, employees/…), splitting already-hired
-// seed people into /employees, and seeding the counters so live writes continue the
-// sequence. Only ever runs against a brand-new, empty database.
+// READABLE document ids (candidates/CAND-0001 as identities, employees/…), and
+// seed the counters so live writes continue the sequence. Only ever runs against
+// a brand-new, empty database.
 async function seedIfEmpty() {
   try {
     const existing = await getDocs(collection(db, "positions"));
@@ -348,22 +564,30 @@ async function seedIfEmpty() {
     const writes = [];
     for (const c of SEED_CANDIDATES) {
       const candidateId = fmtCandidateId(candNum++);
-      const base = {
-        name: c.name, email: c.email, positionId: posIdMap.get(c.positionId) || c.positionId, stage: c.stage,
-        appliedRole: c.appliedRole, avatarColor: c.avatarColor,
+      const emailKey = normalizeEmail(c.email) || `noemail_${c.id}`;
+      writes.push(setDoc(doc(db, "candidates", emailKey), {
+        email: emailKey, candidateId, name: c.name, avatarColor: c.avatarColor,
         highestQualification: c.highestQualification || "", experience: c.experience || "",
-        candidateId, appliedAt: new Date(c.appliedAt),
-      };
+        createdAt: new Date(c.appliedAt),
+      }));
+      const positionId = posIdMap.get(c.positionId) || c.positionId;
       if (c.stage === "hired") {
         const pos = posByIdSeed.get(c.positionId) || {};
         const deptName = pos.department || "";
         const title = pos.title || c.appliedRole || "";
         const employeeId = makeEmployeeId(deptName, title, empNum++);
         writes.push(setDoc(doc(db, "employees", employeeId), {
-          ...base, employeeId, employeeDept: deptName, employeeRole: title, hiredAt: new Date(c.appliedAt),
+          personId: emailKey, candidateId, name: c.name, email: emailKey, avatarColor: c.avatarColor,
+          highestQualification: c.highestQualification || "", experience: c.experience || "",
+          positionId, appliedRole: c.appliedRole, employeeId, employeeDept: deptName, employeeRole: title,
+          hiredAt: new Date(c.appliedAt), appliedAt: new Date(c.appliedAt),
         }));
       } else {
-        writes.push(setDoc(doc(db, "candidates", candidateId), base));
+        writes.push(addDoc(collection(db, "applications"), {
+          personId: emailKey, email: emailKey, positionId, stage: c.stage,
+          appliedRole: c.appliedRole, appliedAt: new Date(c.appliedAt), source: "Added by HR",
+          history: [{ type: "apply", from: null, to: "applied", at: at(c.appliedAt), by: "HR", byRole: "" }],
+        }));
       }
     }
     await Promise.all(writes);
@@ -382,8 +606,58 @@ export const getPositions = () => positions;
 export const getPosition = (id) => positions.find((p) => p.id === id) || null;
 export const getCandidatesFor = (positionId) => candidates.filter((c) => c.positionId === positionId);
 
+/**
+ * Write an in-app notification addressed to one user's uid. Used for the
+ * things that used to live in a chat thread — a rejection, a stage change, a
+ * requested review, an offer response — so nobody has to go ask. Never throws:
+ * a failed notification must never block the action that triggered it.
+ */
+export async function notifyUser({ uid, type, message, candidateId = "", positionId = "" }) {
+  if (!uid || !firebaseReady) return;
+  try {
+    await addDoc(collection(db, "notifications"), {
+      toUid: uid, type, message, candidateId, positionId, read: false, createdAt: new Date(),
+    });
+  } catch (err) {
+    console.error("notifyUser:", err);
+  }
+}
+
+export async function markNotificationRead(id) {
+  if (!firebaseReady) return;
+  try {
+    await updateDoc(doc(db, "notifications", id), { read: true });
+  } catch (err) {
+    console.error("markNotificationRead:", err);
+  }
+}
+
+/** Staff directory, optionally filtered to a set of role names (e.g. picking a hiring manager). */
+export async function listStaff(roles) {
+  if (!firebaseReady) return [];
+  const snap = await getDocs(collection(db, "users"));
+  const raw = snap.docs.map((d) => {
+    const x = d.data();
+    return { uid: d.id, name: x.displayName || x.email || "Team member", role: x.role, email: x.email || "" };
+  });
+  const allowed = roles && roles.length ? raw.filter((u) => roles.includes(u.role)) : raw;
+  const seen = new Set();
+  const list = [];
+  for (const u of allowed) {
+    const key = `${u.role}::${u.name.trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    list.push(u);
+  }
+  return list;
+}
+
 // --- mutators (write to Firestore when configured, else the mock arrays) ---
-export async function addPosition({ title, department, description, stages, minQualification = "", closesAt = 0, createdByRole = "", createdByUid = "", createdByName = "" }) {
+export async function addPosition({
+  title, department, description, stages, minQualification = "", closesAt = 0,
+  headcount = 1, hiringManagerUid = "", hiringManagerName = "",
+  createdByRole = "", createdByUid = "", createdByName = "",
+}) {
   // HR is the recruitment authority now, so a newly opened vacancy goes live
   // immediately — there's no separate Management approval step anymore.
   const status = "Open";
@@ -396,6 +670,10 @@ export async function addPosition({ title, department, description, stages, minQ
     minQualification,
     // mandatory auto-close date: the position closes itself once this passes
     closesAt: closesAt ? new Date(closesAt) : null,
+    headcount: Math.max(1, Number(headcount) || 1),
+    hiredCount: 0, // incremented transactionally as candidates are hired — see hireCandidate()
+    hiringManagerUid,
+    hiringManagerName,
     createdByUid,
     createdByName,
     createdAt: new Date(),
@@ -421,70 +699,123 @@ export async function addPosition({ title, department, description, stages, minQ
   return pos;
 }
 
-export async function addCandidate({ name, email, positionId, appliedRole, ...extra }) {
-  // `extra` carries the optional CV / application profile fields (phone, location,
-  // highestQualification, fieldOfStudy, experience, currentRole, currentCompany,
-  // skills, linkedIn, coverNote, cvFileName, cvDataUrl, cvSize, source, submittedByUid).
-  const clean = {};
-  // Ignore any candidateId carried over from a previous application: every
-  // application is its OWN document keyed by its OWN fresh number (see below).
-  for (const [k, v] of Object.entries(extra)) if (v !== undefined && k !== "candidateId") clean[k] = v;
-  const source = clean.source || "Added by HR";
-  const data = {
-    name: name.trim(),
-    email: (email || "").trim(),
+// Fields that belong to the PERSON (shared across every application they ever
+// make) rather than to one specific application. Keep in sync with what
+// profileToCandidateFields() (WS4) and ApplyModal actually send.
+const IDENTITY_FIELDS = new Set([
+  "phone", "location", "fieldOfStudy", "highestQualification", "experience",
+  "currentRole", "currentCompany", "skills", "linkedIn",
+  "totalYearsExperience", "education", "experienceEntries", "certifications", "languages",
+  "cvExtractedText", "emailFromCv", "emailMismatch",
+  "cvFileName", "cvDataUrl", "cvSize", "submittedByUid",
+]);
+
+// Resolve (or create) the ONE identity record for a person, keyed on their
+// email — the anchor that lets one person hold many applications while their
+// CV/profile is written and corrected in exactly one place (WS1 + WS4). Reads
+// happen before writes (Firestore transaction requirement); an existing
+// identity is enriched with any new non-empty fields this application brought,
+// never overwritten with blanks. A missing email (HR's quick "Add candidate"
+// has no email field) gets a private, unshared identity — nothing to
+// correlate without one.
+async function upsertIdentityInTx(tx, email, seed) {
+  const emailKey = normalizeEmail(email);
+  const key = emailKey || `noemail_${uid("id")}`;
+  const ref = doc(db, "candidates", key);
+  const snap = emailKey ? await tx.get(ref) : null;
+  if (snap && snap.exists()) {
+    const cur = snap.data();
+    const patch = {};
+    for (const [k, v] of Object.entries(seed)) {
+      if (v === undefined || v === "" || (Array.isArray(v) && v.length === 0)) continue;
+      patch[k] = v;
+    }
+    if (Object.keys(patch).length) tx.update(ref, patch);
+    return { key, candidateId: cur.candidateId || "" };
+  }
+  const counterRef = doc(db, "counters", "candidates");
+  const counterSnap = await tx.get(counterRef);
+  const next = counterSnap.exists() ? Number(counterSnap.data().next) || CANDIDATE_SEQ_START : CANDIDATE_SEQ_START;
+  const candidateId = fmtCandidateId(next);
+  tx.set(counterRef, { next: next + 1 });
+  tx.set(ref, { email: emailKey, candidateId, createdAt: new Date(), ...seed });
+  return { key, candidateId };
+}
+
+export async function addCandidate({ name = "", email, positionId, appliedRole, ...extra }) {
+  // Split the payload: identity-shaped fields persist once on the person;
+  // everything else is specific to THIS application.
+  const identitySeed = {};
+  const appExtra = {};
+  for (const [k, v] of Object.entries(extra)) {
+    if (v === undefined || k === "candidateId") continue;
+    (IDENTITY_FIELDS.has(k) ? identitySeed : appExtra)[k] = v;
+  }
+  const cleanName = name.trim();
+  if (cleanName) identitySeed.name = cleanName;
+  identitySeed.avatarColor = pickColor(cleanName || email || "");
+
+  const source = appExtra.source || "Added by HR";
+  const appData = {
     positionId,
     stage: "applied",
     appliedRole: (appliedRole || "").trim(),
-    avatarColor: pickColor(name),
-    source,
     appliedAt: new Date(),
     rejection: null,
     comments: [],
-    history: [{ type: "apply", from: null, to: "applied", at: Date.now(), by: source === "Self-applied" ? name.trim() : "HR", byRole: "" }],
-    ...clean,
+    history: [{ type: "apply", from: null, to: "applied", at: Date.now(), by: source === "Self-applied" ? cleanName : "HR", byRole: "" }],
+    ...appExtra,
+    source,
   };
+
   if (firebaseReady) {
-    // Always claim a FRESH candidate number and write the candidate under a READABLE
-    // document id (the number itself → candidates/CAND-0063) in ONE transaction, so
-    // the number and the row commit together (or not at all). Each application is its
-    // own document; reusing a number across a person's applications would collide on
-    // the (readable) document id and turn a create into a denied update.
+    let applicationId = "";
     let candidateId = "";
+    let personId = "";
+    const submittedByUid = identitySeed.submittedByUid || "";
+    const emailKey = normalizeEmail(email);
     await runTransaction(db, async (tx) => {
-      const counterRef = doc(db, "counters", "candidates");
-      const snap = await tx.get(counterRef);
-      const next = snap.exists() ? Number(snap.data().next) || CANDIDATE_SEQ_START : CANDIDATE_SEQ_START;
-      candidateId = fmtCandidateId(next);
-      tx.set(counterRef, { next: next + 1 });
-      tx.set(doc(db, "candidates", candidateId), { ...data, candidateId });
+      const identity = await upsertIdentityInTx(tx, email, identitySeed);
+      personId = identity.key;
+      candidateId = identity.candidateId;
+      const appRef = doc(collection(db, "applications"));
+      applicationId = appRef.id;
+      tx.set(appRef, { ...appData, personId, email: emailKey, submittedByUid });
     });
-    return { id: candidateId, ...data, candidateId, appliedAt: Date.now() };
+    return { id: applicationId, personId, candidateId, ...appData, email: emailKey, submittedByUid, appliedAt: Date.now() };
   }
-  // mock mode — a fresh number from the highest existing candidate id in memory
-  const candidateId = fmtCandidateId(Math.max(CANDIDATE_SEQ_START - 1, ...candidates.map((c) => parseCandNum(c.candidateId)), 0) + 1);
-  const cand = { id: uid("cand"), ...data, candidateId, appliedAt: Date.now() };
-  candidates = [...candidates, cand];
+
+  // mock mode
+  const personId = normalizeEmail(email) || `noemail_${uid("id")}`;
+  let identity = mockIdentities.get(personId);
+  if (!identity) {
+    const candidateId = fmtCandidateId(Math.max(CANDIDATE_SEQ_START - 1, ...[...mockIdentities.values()].map((i) => parseCandNum(i.candidateId)), 0) + 1);
+    identity = { personId, email: personId, candidateId, ...identitySeed };
+    mockIdentities.set(personId, identity);
+  } else {
+    for (const [k, v] of Object.entries(identitySeed)) {
+      if (v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0)) identity[k] = v;
+    }
+  }
+  const app = { id: uid("app"), personId, email: personId, submittedByUid: identitySeed.submittedByUid || "", ...appData, appliedAt: Date.now() };
+  mockApplications.push(app);
+  recomputeMock();
   commit();
-  return cand;
+  return { ...app, candidateId: identity.candidateId };
 }
 
 /**
- * A candidate applying to an open position. There is ONE flow for everyone — the
- * "request a role change" concept has been removed entirely:
- *  • You may hold only ONE application at a time. While it's live (not yet
- *    decided) you can't apply to any other role.
- *  • Once it's REJECTED you may apply to a DIFFERENT role — but never re-apply to
- *    the same posting you were rejected from (only HR can reconsider you for it).
- *  • Once you're HIRED you're done: being hired is terminal and you can't apply
- *    to anything else, ever.
+ * A candidate applying to an open position. One person may hold applications
+ * to many different vacancies at once (WS1): the only things that block an
+ * apply are being already hired (globally terminal), being rejected from THIS
+ * exact posting, or already having a live application to THIS exact posting.
  * Every application is tagged "Self-applied".
  */
 export async function applyToPosition(payload) {
-  const uid = payload.submittedByUid;
+  const authUid = payload.submittedByUid;
   const email = (payload.email || "").toLowerCase();
   const mine = candidates.filter(
-    (c) => (uid && c.submittedByUid === uid) || (email && (c.email || "").toLowerCase() === email)
+    (c) => (authUid && c.submittedByUid === authUid) || (email && (c.email || "").toLowerCase() === email)
   );
   const pos = positions.find((p) => p.id === payload.positionId);
   const appliedRole = pos ? pos.title : payload.appliedRole || "";
@@ -496,8 +827,7 @@ export async function applyToPosition(payload) {
     throw err;
   }
 
-  // HIRED is terminal — a hired person can never apply to another role. (There is
-  // no internal role-change flow anymore.)
+  // HIRED is terminal — a hired person can never apply to another role, anywhere.
   if (mine.some((c) => c.stage === "hired")) {
     const err = new Error("You've been hired, so you can't apply to other roles.");
     err.code = "already-hired";
@@ -512,12 +842,11 @@ export async function applyToPosition(payload) {
     throw err;
   }
 
-  // ONE active application at a time: you can't apply to another job while you
-  // still have a LIVE (non-rejected) application anywhere. Once that one is
-  // decided — i.e. rejected — you may apply elsewhere.
-  if (mine.some((c) => c.stage !== "rejected" && c.stage !== "hired")) {
-    const err = new Error("You already have an active application. You can apply to another role once a decision has been made on it.");
-    err.code = "has-active-application";
+  // No duplicate record for the SAME vacancy — but applying to a DIFFERENT
+  // vacancy while this one is still active is exactly what WS1 asks for.
+  if (mine.some((c) => c.positionId === payload.positionId && c.stage !== "rejected")) {
+    const err = new Error("You've already applied to this role.");
+    err.code = "already-applied-here";
     throw err;
   }
   return addCandidate({ ...payload, appliedRole, source: "Self-applied" });
@@ -525,7 +854,7 @@ export async function applyToPosition(payload) {
 
 /**
  * Make sure a STAFF account has a readable User ID (USR-####), minting one the
- * first time if it's missing. Self-healing: called on login, so the existing
+ * first time it's missing. Self-healing: called on login, so the existing
  * staff accounts pick up an ID on their next sign-in with no migration needed.
  * The number is claimed from counters/users inside a transaction (same uniqueness
  * guarantee as candidate/employee ids) and written as a FIELD on users/{uid} — the
@@ -557,33 +886,39 @@ export async function ensureUserId(uid) {
   return userId;
 }
 
-// Which collection holds this id? A HIRED person lives in /employees, everyone
-// else in /candidates — so updates (comments, edits) hit the right document.
-const collectionForId = (id) => (employees.some((e) => e.id === id) ? "employees" : "candidates");
+// Which collection holds this application id? A HIRED person's row lives in
+// /employees, everyone else in /applications — so updates (comments, edits)
+// hit the right document.
+const collectionForId = (id) => (employees.some((e) => e.id === id) ? "employees" : "applications");
 
-// Persist a change to one candidate (Firestore or in-memory).
+// Persist a change to one application (or its post-hire employee snapshot).
 // Array fields (history/comments) are mutated with arrayUnion/arrayRemove so
 // two people acting on the same candidate at once can't clobber each other's
 // entries (the old read-modify-write on `[...arr, x]` silently lost writes).
-async function writeCandidate(candidateId, { set = {}, appendHistory = null, appendComment = null, removeComment = null } = {}) {
+async function writeApplication(id, { set = {}, appendHistory = null, appendComment = null, removeComment = null } = {}) {
   if (firebaseReady) {
     const patch = { ...set };
     if (appendHistory) patch.history = arrayUnion(appendHistory);
     if (appendComment) patch.comments = arrayUnion(appendComment);
     if (removeComment) patch.comments = arrayRemove(removeComment);
-    // A hired person now lives in /employees, everyone else in /candidates — write
-    // to whichever collection actually holds them.
-    await updateDoc(doc(db, collectionForId(candidateId), candidateId), patch);
+    await updateDoc(doc(db, collectionForId(id), id), patch);
     return;
   }
-  candidates = candidates.map((c) => {
-    if (c.id !== candidateId) return c;
-    const next = { ...c, ...set };
-    if (appendHistory) next.history = [...(c.history || []), appendHistory];
-    if (appendComment) next.comments = [...(c.comments || []), appendComment];
-    if (removeComment) next.comments = (c.comments || []).filter((cm) => cm !== removeComment);
+  const applyPatch = (obj) => {
+    const next = { ...obj, ...set };
+    if (appendHistory) next.history = [...(obj.history || []), appendHistory];
+    if (appendComment) next.comments = [...(obj.comments || []), appendComment];
+    if (removeComment) next.comments = (obj.comments || []).filter((cm) => cm !== removeComment);
     return next;
-  });
+  };
+  const ai = mockApplications.findIndex((a) => a.id === id);
+  if (ai !== -1) {
+    mockApplications[ai] = applyPatch(mockApplications[ai]);
+  } else {
+    const ei = mockEmployeesList.findIndex((e) => e.id === id);
+    if (ei !== -1) mockEmployeesList[ei] = applyPatch(mockEmployeesList[ei]);
+  }
+  recomputeMock();
   commit();
 }
 const actorFields = (actor) => ({ by: actor?.name || "", byRole: actor?.role || "", byUid: actor?.uid || actor?.name || "" });
@@ -608,12 +943,16 @@ export async function advanceStage(candidateId, actor) {
   const nx = nextStage(pos ? pos.stages : DEFAULT_PIPELINE, cand.stage);
   if (!nx) return { ok: false, reason: "terminal" };
 
-  const uid = idOf(actor);
+  const uidActor = idOf(actor);
   const review = (cand.comments || []).find(
-    (cm) => commentId(cm) === uid && cm.stage === cand.stage && cm.score != null
+    (cm) => commentId(cm) === uidActor && cm.stage === cand.stage && cm.score != null
   );
   if (cand.stage !== "applied" && !review) {
     return { ok: false, reason: "review-required" };
+  }
+  // Ties the loop closed: nobody reaches "hired" without a candidate-accepted offer.
+  if (nx === "hired" && cand.offer?.status !== "accepted") {
+    return { ok: false, reason: "offer-required" };
   }
 
   const entry = { type: nx === "hired" ? "hire" : "stage", from: cand.stage, to: nx, at: Date.now(), ...actorFields(actor) };
@@ -627,63 +966,118 @@ export async function advanceStage(candidateId, actor) {
   if (nx === "hired") {
     const deptName = (pos && pos.department) || "";
     const title = (pos && pos.title) || cand.appliedRole || "";
-    const employeeId = await hireCandidate(candidateId, { deptName, title, entry });
+    const employeeId = await hireCandidate(candidateId, { deptName, title, entry, positionId: cand.positionId, personId: cand.personId });
     return { ok: true, hired: true, employeeId };
   }
 
-  await writeCandidate(candidateId, { set: { stage: nx }, appendHistory: entry });
+  await writeApplication(candidateId, { set: { stage: nx }, appendHistory: entry });
   return { ok: true };
 }
 
 /**
- * Move a candidate into "hired" AND mint their employee ID in ONE atomic step.
+ * Move an application into "hired" AND mint an employee ID in ONE atomic step.
  * The employee number is claimed from counters/employees inside the same
- * transaction as the candidate write, so the number and the hire commit together
- * (or not at all) — no gaps from a half-finished hire, no two hires sharing a
- * number. Returns the issued employee ID string.
+ * transaction as the writes, so the number and the hire commit together (or not
+ * at all). The transaction reads the application + its identity + the position,
+ * writes a full flattened snapshot into /employees (same shape as before this
+ * split), deletes the application (its identity persists — a person's CV/profile
+ * outlive any one application), and bumps the position's hiredCount, closing it
+ * once headcount is filled (WS1 "hire and close"). Returns the issued employee
+ * ID string.
  */
-async function hireCandidate(candidateId, { deptName, title, entry }) {
+async function hireCandidate(applicationId, { deptName, title, entry, positionId, personId }) {
   if (firebaseReady) {
-    const candRef = doc(db, "candidates", candidateId);
+    const appRef = doc(db, "applications", applicationId);
+    const identityRef = personId ? doc(db, "candidates", personId) : null;
     const counterRef = doc(db, "counters", "employees");
+    const posRef = positionId ? doc(db, "positions", positionId) : null;
     let employeeId = "";
     await runTransaction(db, async (tx) => {
       // All reads first (Firestore requires reads before writes in a transaction).
-      const candSnap = await tx.get(candRef);
-      if (!candSnap.exists()) throw new Error("candidate-not-found");
-      const cand = candSnap.data();
+      const appSnap = await tx.get(appRef);
+      if (!appSnap.exists()) throw new Error("application-not-found");
+      const app = appSnap.data();
+      const identitySnap = identityRef ? await tx.get(identityRef) : null;
+      const identity = identitySnap && identitySnap.exists() ? identitySnap.data() : {};
       const counterSnap = await tx.get(counterRef);
       const next = counterSnap.exists() ? Number(counterSnap.data().next) || EMPLOYEE_SEQ_START : EMPLOYEE_SEQ_START;
+      const posSnap = posRef ? await tx.get(posRef) : null;
       employeeId = makeEmployeeId(deptName, title, next);
-      const history = Array.isArray(cand.history) ? [...cand.history, entry] : [entry];
-      // MOVE the person: write the employee record under a readable id (the employee
-      // id itself), then delete the candidate — so they're never in both at once.
+      const history = Array.isArray(app.history) ? [...app.history, entry] : [entry];
       tx.set(doc(db, "employees", employeeId), {
-        ...cand,
-        candidateId: cand.candidateId || candidateId,
+        personId: personId || "",
+        candidateId: identity.candidateId || "",
+        name: identity.name || "",
+        email: identity.email || app.email || "",
+        avatarColor: identity.avatarColor || "#1F3A5F",
+        phone: identity.phone || "",
+        location: identity.location || "",
+        highestQualification: identity.highestQualification || "",
+        fieldOfStudy: identity.fieldOfStudy || "",
+        experience: identity.experience || "",
+        currentRole: identity.currentRole || "",
+        currentCompany: identity.currentCompany || "",
+        skills: identity.skills || "",
+        linkedIn: identity.linkedIn || "",
+        totalYearsExperience: identity.totalYearsExperience || 0,
+        education: identity.education || [],
+        experienceEntries: identity.experienceEntries || [],
+        certifications: identity.certifications || [],
+        languages: identity.languages || [],
+        cvExtractedText: identity.cvExtractedText || "",
+        emailFromCv: identity.emailFromCv || "",
+        emailMismatch: !!identity.emailMismatch,
+        cvFileName: identity.cvFileName || "",
+        cvDataUrl: identity.cvDataUrl || "",
+        cvSize: identity.cvSize || 0,
+        submittedByUid: identity.submittedByUid || app.submittedByUid || "",
+        positionId: app.positionId,
+        appliedRole: app.appliedRole,
+        coverNote: app.coverNote || "",
+        source: app.source || "Added by HR",
+        needsReview: !!app.needsReview,
+        cvValidation: app.cvValidation || null,
+        offer: app.offer || null,
+        rejection: app.rejection || null,
+        comments: Array.isArray(app.comments) ? app.comments : [],
         stage: "hired",
         employeeId,
         employeeDept: deptName,
         employeeRole: title,
         hiredAt: new Date(),
+        appliedAt: app.appliedAt || new Date(),
         history,
       });
-      tx.delete(candRef);
-      // Promotion (internal role change): vacate their PREVIOUS employee record so
-      // there's exactly one live employee row per person.
-      if (cand.fromEmployeeId) tx.delete(doc(db, "employees", cand.fromEmployeeId));
+      tx.delete(appRef);
       tx.set(counterRef, { next: next + 1 });
+      // Fill the requisition: bump hiredCount, close the position once headcount is met.
+      if (posSnap && posSnap.exists()) {
+        const p = posSnap.data();
+        const headcount = Number(p.headcount) || 1;
+        const hiredCount = (Number(p.hiredCount) || 0) + 1;
+        tx.update(posRef, hiredCount >= headcount ? { hiredCount, status: "Closed" } : { hiredCount });
+      }
     });
     return employeeId;
   }
-  // mock mode — next number from the highest existing employee id in memory
-  const nextNum = Math.max(EMPLOYEE_SEQ_START - 1, ...candidates.map((c) => parseCandNum(c.employeeId)), 0) + 1;
+  // mock mode
+  const identity = mockIdentities.get(personId) || {};
+  const nextNum = Math.max(EMPLOYEE_SEQ_START - 1, ...mockEmployeesList.map((e) => parseCandNum(e.employeeId)), 0) + 1;
   const employeeId = makeEmployeeId(deptName, title, nextNum);
-  candidates = candidates.map((c) =>
-    c.id === candidateId
-      ? { ...c, stage: "hired", employeeId, employeeDept: deptName, employeeRole: title, hiredAt: Date.now(), history: [...(c.history || []), entry] }
-      : c
-  );
+  const ai = mockApplications.findIndex((a) => a.id === applicationId);
+  const app = ai !== -1 ? mockApplications[ai] : null;
+  if (ai !== -1) mockApplications.splice(ai, 1);
+  mockEmployeesList.push(joinFlat(identity, {
+    ...(app || { id: applicationId, positionId, appliedRole: title, appliedAt: Date.now(), coverNote: "", source: "Added by HR", needsReview: false, cvValidation: null, offer: null, rejection: null, comments: [] }),
+    id: applicationId, stage: "hired", employeeId, employeeDept: deptName, employeeRole: title,
+    hiredAt: Date.now(), history: [...((app && app.history) || []), entry],
+  }));
+  positions = positions.map((p) => {
+    if (p.id !== positionId) return p;
+    const hiredCount = (p.hiredCount || 0) + 1;
+    return { ...p, hiredCount, status: hiredCount >= (p.headcount || 1) ? "Closed" : p.status };
+  });
+  recomputeMock();
   commit();
   return employeeId;
 }
@@ -697,7 +1091,19 @@ export async function rejectCandidate(candidateId, { reason = "", comment = "", 
   if (!cand) return;
   const rejection = { reason, comment, stage: cand.stage, at: Date.now(), ...actorFields(actor) };
   const entry = { type: "reject", from: cand.stage, to: "rejected", reason, comment, at: Date.now(), ...actorFields(actor) };
-  await writeCandidate(candidateId, { set: { stage: "rejected", rejection }, appendHistory: entry });
+  await writeApplication(candidateId, { set: { stage: "rejected", rejection }, appendHistory: entry });
+  // Notify the applicant, if this application is linked to a real account (a
+  // candidate added directly by HR with no login has nowhere to be notified).
+  if (cand.submittedByUid) {
+    const pos = positions.find((p) => p.id === cand.positionId);
+    notifyUser({
+      uid: cand.submittedByUid,
+      type: "rejection",
+      message: `Your application for ${pos?.title || "this role"} wasn't successful${reason ? ` — ${reason}` : ""}.`,
+      candidateId,
+      positionId: cand.positionId,
+    });
+  }
 }
 
 /**
@@ -720,7 +1126,7 @@ export async function reconsiderCandidate(candidateId, actor) {
   const cand = candidates.find((c) => c.id === candidateId);
   if (!cand) return;
   const entry = { type: "reconsider", from: cand.stage, to: "applied", at: Date.now(), ...actorFields(actor) };
-  await writeCandidate(candidateId, { set: { stage: "applied", rejection: null }, appendHistory: entry });
+  await writeApplication(candidateId, { set: { stage: "applied", rejection: null }, appendHistory: entry });
 }
 
 /**
@@ -728,7 +1134,9 @@ export async function reconsiderCandidate(candidateId, actor) {
  * thoughts; the note is tagged with who wrote it, their role and the stage the
  * candidate was at — so the next reviewer down the pipeline can read it.
  */
-export async function addComment(candidateId, { text, score = null, actor }) {
+const RECOMMENDATIONS = ["advance", "reject", "hold"];
+
+export async function addComment(candidateId, { text, score = null, recommendation = null, actor }) {
   const cand = candidates.find((c) => c.id === candidateId);
   if (!cand || !text || !text.trim()) return;
   // One comment per user per stage — enforced HERE, not only in the UI, so a
@@ -743,7 +1151,10 @@ export async function addComment(candidateId, { text, score = null, actor }) {
     const n = Number(score);
     if (Number.isFinite(n)) entry.score = Math.min(100, Math.max(0, Math.round(n)));
   }
-  await writeCandidate(candidateId, { appendComment: entry });
+  // Structured recommendation (advance / reject / hold) — this is what turns a
+  // scorecard into a decision, not just free-text feedback. Anything else is dropped.
+  if (RECOMMENDATIONS.includes(recommendation)) entry.recommendation = recommendation;
+  await writeApplication(candidateId, { appendComment: entry });
 }
 
 /**
@@ -757,7 +1168,27 @@ export async function deleteComment(candidateId, { at, byUid }) {
   // never touch anyone else's comment).
   const target = (cand.comments || []).find((cm) => cm.at === at && commentId(cm) === byUid);
   if (!target) return;
-  await writeCandidate(candidateId, { removeComment: target });
+  await writeApplication(candidateId, { removeComment: target });
+}
+
+const OFFER_STATUSES = ["sent", "accepted", "declined", "negotiating"];
+
+/** Create and send an offer — salary + start date, status starts at "sent". */
+export async function sendOffer(candidateId, { salary, startDate, actor }) {
+  const cand = candidates.find((c) => c.id === candidateId);
+  if (!cand || !String(salary || "").trim() || !startDate) return;
+  const offer = { salary: String(salary).trim(), startDate, status: "sent", sentAt: Date.now(), ...actorFields(actor) };
+  const entry = { type: "offer", status: "sent", at: Date.now(), ...actorFields(actor) };
+  await writeApplication(candidateId, { set: { offer }, appendHistory: entry });
+}
+
+/** Record the candidate's response to an offer already sent. */
+export async function respondToOffer(candidateId, { status, actor }) {
+  const cand = candidates.find((c) => c.id === candidateId);
+  if (!cand || !cand.offer || !OFFER_STATUSES.includes(status)) return;
+  const offer = { ...cand.offer, status, respondedAt: Date.now() };
+  const entry = { type: "offer", status, at: Date.now(), ...actorFields(actor) };
+  await writeApplication(candidateId, { set: { offer }, appendHistory: entry });
 }
 
 /** Update the configured stage pipeline for a vacancy. */
@@ -814,6 +1245,31 @@ function autoCloseExpired() {
       updatePositionStatus(p.id, "Closed").catch(() => {});
     }
   }
+}
+
+/**
+ * Record a CV validation rejection (WS3) — demo evidence that the gate
+ * actually works. Only ever called for a hard BLOCK, never a pass or a
+ * needs-review accept, matching the brief's "log every rejection" scope.
+ */
+export async function logCvRejection({ reason, stage, confidence, missingSections, fileName, fileSize, positionId, submittedByUid }) {
+  const data = {
+    reason: reason || "",
+    stage: stage || "",
+    confidence: confidence ?? null,
+    missingSections: missingSections || [],
+    fileName: fileName || "",
+    fileSize: fileSize || 0,
+    positionId: positionId || "",
+    submittedByUid: submittedByUid || "",
+    at: new Date(),
+  };
+  if (firebaseReady) {
+    await addDoc(collection(db, "validation_logs"), data);
+    return;
+  }
+  // Mock mode: nothing to persist to — no UI reads this collection, it's pure
+  // demo evidence for a real Firestore-backed deployment.
 }
 
 /** Delete a vacancy entirely (Management-only). Candidates are never deleted. */

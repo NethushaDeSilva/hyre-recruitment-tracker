@@ -1,13 +1,15 @@
 // Candidate portal — browse open roles and apply. Card colours carry the meaning:
 //   • no application yet    → "Apply" button (available).
-//   • an application is LIVE → YELLOW "In hiring process" — you're in the pipeline.
-//   • it gets REJECTED       → RED "Not selected" (can't reapply); others unlock.
+//   • an application is LIVE → YELLOW "In hiring process" — you're in the pipeline
+//                              FOR THAT ROLE. You can hold a live application to
+//                              any number of other roles at the same time (WS1).
+//   • it gets REJECTED       → RED "Not selected" (can't reapply to that posting).
 //   • the person is HIRED    → GREEN "Hired" on the role they landed (shown even if
 //                              that vacancy has since closed); every OTHER role is
-//                              a neutral GRAY "Applications closed" (not available).
-// Only ONE application at a time, and being hired is terminal.
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+//                              a neutral GRAY "Applications closed" — being hired
+//                              is terminal, globally, regardless of role.
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Briefcase, MapPin, CheckCircle2, ArrowRight, Ban, Lock, BadgeCheck, Clock } from "lucide-react";
 import { useHyreData } from "@/data/store";
 import { isOpenNow } from "@/lib/positions";
@@ -23,6 +25,7 @@ export default function Jobs() {
   const { positions, candidates, loading } = useHyreData();
   const [applyTo, setApplyTo] = useState(null);
   const [justApplied, setJustApplied] = useState(null);
+  const [searchParams] = useSearchParams();
 
   // Only genuinely-open vacancies — anything past its auto-close date is hidden.
   const openPositions = useMemo(() => positions.filter((p) => isOpenNow(p)), [positions]);
@@ -32,17 +35,18 @@ export default function Jobs() {
     () => candidates.filter((c) => (c.submittedByUid && c.submittedByUid === user?.uid) || c.email === user?.email),
     [candidates, user]
   );
-  // At most one of each: a LIVE (still-in-progress) application, and a HIRED record.
-  // Being hired is TERMINAL — once hired we ignore any leftover in-progress row, so a
-  // hired person never shows an "in-process" card (every other role is simply closed).
+  // A HIRED record, if any. Being hired is TERMINAL — once hired every other
+  // role is simply closed, regardless of any application still sitting active
+  // elsewhere (WS1: hiring one role doesn't retroactively withdraw the others).
   const hiredApp = useMemo(() => myApps.find((c) => c.stage === "hired") || null, [myApps]);
-  const activeApp = useMemo(
-    () => (hiredApp ? null : myApps.find((c) => c.stage !== "rejected" && c.stage !== "hired") || null),
+  // Every LIVE (still-in-progress) application, one per vacancy — WS1: "one
+  // person may apply to any number of jobs." Keyed by positionId for O(1)
+  // per-card lookup below.
+  const activeApps = useMemo(
+    () => (hiredApp ? [] : myApps.filter((c) => c.stage !== "rejected" && c.stage !== "hired")),
     [myApps, hiredApp]
   );
-  // While one application is live OR the person is hired, every OTHER role is
-  // blocked — you can only ever hold one application at a time.
-  const locked = !!activeApp || !!hiredApp;
+  const activeByPosition = useMemo(() => new Map(activeApps.map((c) => [c.positionId, c])), [activeApps]);
 
   // The role a person was HIRED into should always appear here (in green), even
   // after its vacancy closed — so they can see where they landed. Prepend it if it
@@ -61,6 +65,20 @@ export default function Jobs() {
     return [hp, ...openPositions];
   }, [openPositions, positions, hiredApp]);
 
+  // A shared "application link" (WS1 step 3) — /jobs?position=<id> — jumps
+  // straight into applying for that one role, unless the person is hired
+  // (globally terminal) or already has a row (active or rejected) for it.
+  useEffect(() => {
+    if (loading || hiredApp) return;
+    const id = searchParams.get("position");
+    if (!id) return;
+    const pos = displayPositions.find((p) => p.id === id);
+    if (!pos) return;
+    const already = myApps.some((c) => c.positionId === id);
+    if (!already) setApplyTo(pos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, hiredApp, myApps, displayPositions.length]);
+
   const gridRef = useStaggerReveal(!loading && displayPositions.length > 0);
 
   return (
@@ -70,7 +88,7 @@ export default function Jobs() {
         <p className="text-sm font-medium text-muted-foreground">
           {loading
             ? "Loading…"
-            : `${openPositions.length} open ${openPositions.length === 1 ? "role" : "roles"}${locked ? "" : " · apply with the standard application"}`}
+            : `${openPositions.length} open ${openPositions.length === 1 ? "role" : "roles"}${hiredApp ? "" : " · apply with the standard application"}`}
         </p>
       </div>
 
@@ -82,17 +100,20 @@ export default function Jobs() {
         </div>
       )}
 
-      {/* Status banner — hired (green) or one live application (yellow). */}
+      {/* Status banner — hired (green) or N live applications (yellow). */}
       {!justApplied && hiredApp ? (
         <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-[#BBE7C9] bg-[#E7F6EC] px-4 py-3.5 text-sm text-[#166534] dark:border-[#16A34A]/40 dark:bg-[#16A34A]/10 dark:text-[#86EFAC]">
           <BadgeCheck size={18} className="mt-0.5 shrink-0 text-[#16A34A] dark:text-[#4ADE80]" />
           <span><b className="font-bold">You've been hired.</b> Applications are now closed for you — welcome aboard.</span>
         </div>
-      ) : !justApplied && activeApp ? (
+      ) : !justApplied && activeApps.length > 0 ? (
         <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-[#F0D48A] bg-[#FBF3DC] px-4 py-3.5 text-sm text-[#8A6D1F] dark:border-[#E0A422]/40 dark:bg-[#E0A422]/10 dark:text-[#F5D77E]">
           <Clock size={17} className="mt-0.5 shrink-0 text-[#E0A422]" />
           <span>
-            <b className="font-bold">You're in the hiring process for one role.</b> You can apply to another once a decision is made on it. Track it under{" "}
+            <b className="font-bold">
+              You're in the hiring process for {activeApps.length === 1 ? "one role" : `${activeApps.length} roles`}.
+            </b>{" "}
+            You can apply to as many other roles as you like. Track them under{" "}
             <Link to="/applications" className="font-semibold underline">My Applications</Link>.
           </span>
         </div>
@@ -106,10 +127,12 @@ export default function Jobs() {
         <div ref={gridRef} className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
           {displayPositions.map((pos) => {
             const hiredHere = hiredApp && hiredApp.positionId === pos.id;         // GREEN
-            const appliedHere = activeApp && activeApp.positionId === pos.id;     // YELLOW
+            const appliedHere = activeByPosition.get(pos.id) || null;             // YELLOW
             const rejectedHere = myApps.some((c) => c.positionId === pos.id && c.stage === "rejected"); // RED
-            // A blocked "other" card: something is live/terminal and this isn't it.
-            const blocked = locked && !hiredHere && !appliedHere;
+            // Blocked only when hired elsewhere — being hired is the one thing
+            // that closes every OTHER role; an active application to a
+            // different vacancy never blocks this one (WS1: apply to many).
+            const blocked = !!hiredApp && !hiredHere;
 
             const tint = hiredHere
               ? "border-[#16A34A]/45 bg-[#16A34A]/[0.07] dark:bg-[#16A34A]/[0.10]"
@@ -155,7 +178,7 @@ export default function Jobs() {
                     </div>
                   ) : blocked ? (
                     <div className="flex items-center justify-center gap-1.5 rounded-md bg-[#EDEFF2] py-2.5 text-sm font-semibold text-[#8A94A6] dark:bg-white/[0.05] dark:text-[#7C8592]">
-                      <Lock size={15} /> {hiredApp ? "Applications closed" : "Not available — one at a time"}
+                      <Lock size={15} /> Applications closed
                     </div>
                   ) : (
                     <Button className="w-full" onClick={() => setApplyTo(pos)}>

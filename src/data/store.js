@@ -728,6 +728,61 @@ export async function addPosition({
   return pos;
 }
 
+// WS1 — edit an existing vacancy (title/department/description/minQualification/
+// requirements/close date/headcount/hiring manager). Deliberately does NOT touch
+// stages/stageMeta/stageAssignees — that's savePipeline()'s job via
+// StageConfigModal, a separate, already-working flow this doesn't duplicate.
+export async function updatePosition(id, {
+  title, department, description, minQualification = "", closesAt = 0,
+  headcount = 1, hiringManagerUid = "", hiringManagerName = "",
+  requirements = null,
+}) {
+  const current = positions.find((p) => p.id === id);
+  if (!current) throw new Error(`updatePosition: no position ${id}`);
+
+  // 5.5 — same gate as create: an Open position can never end up with empty
+  // requiredSkills. A Closed position is terminal (can't be reopened) so
+  // there's no live scoring surface left to protect there.
+  if (current.status === "Open") assertPublishableRequirements(requirements);
+
+  const requirementsChanged = JSON.stringify(current.requirements || null) !== JSON.stringify(requirements || null);
+
+  const data = {
+    title: title.trim(),
+    department: department.trim(),
+    description: (description || "").trim(),
+    minQualification,
+    requirements,
+    closesAt: closesAt ? new Date(closesAt) : null,
+    headcount: Math.max(1, Number(headcount) || 1),
+    hiringManagerUid,
+    hiringManagerName,
+  };
+
+  if (firebaseReady) {
+    await updateDoc(doc(db, "positions", id), data);
+  } else {
+    positions = positions.map((p) => (p.id === id ? { ...p, ...data } : p));
+    commit();
+  }
+
+  // Requirements changed under applications that were scored against the OLD
+  // ones — those scores were computed against a document comparison that no
+  // longer exists (5.1: the vacancy IS one half of that comparison). Mark them
+  // stale rather than silently leaving a number HR would otherwise trust.
+  // Nothing to mark yet in practice (WS5 hasn't scored anything, so no
+  // application carries a `score` field today) — this only starts touching
+  // real documents the moment scoring exists, at which point it has to
+  // already be correct rather than bolted on afterward.
+  if (requirementsChanged && firebaseReady) {
+    const appsSnap = await getDocs(query(collection(db, "applications"), where("positionId", "==", id)));
+    const scored = appsSnap.docs.filter((d) => d.data().score);
+    await Promise.all(scored.map((d) => updateDoc(d.ref, { "score.stale": true })));
+  }
+
+  return { id, ...current, ...data };
+}
+
 // Fields that belong to the PERSON (shared across every application they ever
 // make) rather than to one specific application. Keep in sync with what
 // profileToCandidateFields() (WS4) and ApplyModal actually send.

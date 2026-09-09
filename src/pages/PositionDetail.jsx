@@ -4,7 +4,7 @@
 // owning role (or Management) can advance/reject a candidate in that stage.
 import { useState, useRef, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronRight, Plus, Settings2, Check, ArrowLeft, X, Search, SlidersHorizontal, Sparkles, Link2, Copy } from "lucide-react";
+import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, SlidersHorizontal, Sparkles, Link2, Copy } from "lucide-react";
 import { useHyreData, advanceStage, rejectCandidate, bulkReject } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
@@ -21,6 +21,7 @@ import CheckDropdown from "@/components/CheckDropdown";
 import AddCandidateModal from "@/components/AddCandidateModal";
 import RejectModal from "@/components/RejectModal";
 import StageConfigModal from "@/components/StageConfigModal";
+import OpenPositionModal from "@/components/OpenPositionModal";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
 import EligibilityTag from "@/components/EligibilityTag";
 
@@ -30,6 +31,7 @@ export default function PositionDetail() {
   const { positions, candidates, loading } = useHyreData();
   const [addOpen, setAddOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [bulkRejectOpen, setBulkRejectOpen] = useState(false); // reject all selected applicants at once
   const [detail, setDetail] = useState(null);
@@ -193,6 +195,9 @@ export default function PositionDetail() {
           <div className="flex flex-wrap items-center gap-2.5">
             <Button variant="ghost" onClick={() => setShareOpen((o) => !o)}>
               <Link2 size={16} /> Share
+            </Button>
+            <Button variant="ghost" onClick={() => setEditOpen(true)}>
+              <Pencil size={16} /> Edit position
             </Button>
             <Button variant="ghost" onClick={() => setConfigOpen(true)}>
               <Settings2 size={16} /> Configure stages
@@ -431,6 +436,7 @@ export default function PositionDetail() {
 
       <AddCandidateModal open={addOpen} onClose={() => setAddOpen(false)} position={position} />
       <StageConfigModal open={configOpen} position={position} onClose={() => setConfigOpen(false)} />
+      <OpenPositionModal open={editOpen} position={position} onClose={() => setEditOpen(false)} />
       <CandidateDetailModal
         open={!!detail}
         candidate={detail && (candidates.find((x) => x.id === detail.id) || detail)}

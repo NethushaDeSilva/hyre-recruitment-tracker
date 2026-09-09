@@ -11,6 +11,7 @@ import { ROLES } from "@/lib/permissions";
 import RequireAuth from "@/components/RequireAuth";
 import RequireRole from "@/components/RequireRole";
 import AppLayout from "@/components/layout/AppLayout";
+import WorkerHealthBanner from "@/components/WorkerHealthBanner";
 
 // Every PAGE is its own chunk, fetched only when its route is actually visited
 // — the initial download is App shell + router + auth only, not all ~15 pages'
@@ -44,6 +45,7 @@ export default function App() {
     <AuthProvider>
       <ConfirmProvider>
       <ToastProvider>
+      <WorkerHealthBanner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Suspense fallback={<RouteLoading />}>
         <Routes>

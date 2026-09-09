@@ -11,7 +11,27 @@
 //                              must offer a retry, never treat this as a pass
 //                              and never tell the candidate their CV is bad.
 
-const VALIDATE_URL = import.meta.env.VITE_CV_VALIDATE_URL || "/api/validate-cv";
+// Fail loudly at import time if a VITE_-prefixed env var resolves to garbage.
+// The undeployed/unreachable-Worker symptom this project hit earlier traced
+// back to exactly this class of bug elsewhere in the stack: a misconfigured
+// build produces the literal string "undefined" baked into the URL instead of
+// throwing, and the failure only surfaces later as an opaque network error.
+// The empty-string default here can never trigger that (both fall back to a
+// same-origin relative path), so this only fires if an env var is explicitly
+// SET to something broken — which is exactly the case worth crashing on.
+function resolveApiBase(envValue, fallbackPath, label) {
+  const url = envValue || fallbackPath;
+  if (!url || url.includes("undefined") || url.includes("null")) {
+    throw new Error(
+      `[cv-extract] ${label} resolved to an invalid URL ("${url}"). ` +
+      `A VITE_-prefixed env var is likely set to a broken value, or was added ` +
+      `to .env.local without restarting the dev server (Vite does not hot-reload env vars).`
+    );
+  }
+  return url;
+}
+
+const VALIDATE_URL = resolveApiBase(import.meta.env.VITE_CV_VALIDATE_URL, "/api/validate-cv", "VITE_CV_VALIDATE_URL");
 
 const MIN_CHARS = 200;
 const MAX_CHARS = 20000;
@@ -158,31 +178,57 @@ async function classifyWithWorker(text, sectionsFound) {
   }
 }
 
+// Cheap GET ping — not a validation call, just "is this endpoint deployed and
+// bound to env.AI right now." Returns a structured result rather than a bare
+// boolean so a caller (the app-load health banner) can say WHY it's down.
+async function pingEndpoint(url, label) {
+  try {
+    const res = await fetch(url, { method: "GET" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) {
+      console.error(`[cv-extract] ${label} Worker health check failed (HTTP ${res.status}):`, data);
+      return { ok: false, status: res.status, detail: data };
+    }
+    return { ok: true, status: res.status };
+  } catch (err) {
+    console.error(`[cv-extract] ${label} Worker is unreachable:`, err.message);
+    return { ok: false, status: null, detail: err.message };
+  }
+}
+
 /**
- * Cheap GET ping to confirm the Worker is actually deployed and reachable —
- * not a validation call, just a deploy/config sanity check. Call this once
- * when the apply flow becomes available, so a misconfigured or undeployed
- * Worker shows up in the console immediately rather than only the first time
+ * Confirm the CV validation Worker (WS3) is actually deployed and reachable.
+ * Call this once when the apply flow becomes available, so a misconfigured
+ * or undeployed Worker shows up immediately rather than only the first time
  * a candidate actually submits a CV.
  */
 export async function healthCheckCvValidator() {
-  try {
-    const res = await fetch(VALIDATE_URL, { method: "GET" });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data?.ok) {
-      console.error(`[cv-extract] CV validation Worker health check failed (HTTP ${res.status}):`, data);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("[cv-extract] CV validation Worker is unreachable:", err.message);
-    return false;
-  }
+  return pingEndpoint(VALIDATE_URL, "CV validation");
 }
 
 // --- WS4: CV parsing/extraction ---------------------------------------------
 
-const PARSE_URL = import.meta.env.VITE_CV_PARSE_URL || "/api/parse-cv";
+const PARSE_URL = resolveApiBase(import.meta.env.VITE_CV_PARSE_URL, "/api/parse-cv", "VITE_CV_PARSE_URL");
+
+/** Confirm the CV parsing Worker (WS4) is actually deployed and reachable. */
+export async function healthCheckCvParser() {
+  return pingEndpoint(PARSE_URL, "CV parsing");
+}
+
+/**
+ * App-load health check (section 7 of CLAUDE.md): runs both CV Worker
+ * endpoints in parallel and reports which, if any, are down. This is what
+ * drives the visible startup warning banner — a console line alone doesn't
+ * count as "surfaced," because nobody but a developer with devtools open
+ * would ever see it.
+ */
+export async function checkAiWorkersHealth() {
+  const [validate, parse] = await Promise.all([healthCheckCvValidator(), healthCheckCvParser()]);
+  const failed = [];
+  if (!validate.ok) failed.push("CV validation");
+  if (!parse.ok) failed.push("CV parsing");
+  return { ok: failed.length === 0, failed };
+}
 
 /**
  * Fill the candidate profile from an already-extracted, already-validated CV's

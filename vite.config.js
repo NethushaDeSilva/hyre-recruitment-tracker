@@ -10,6 +10,21 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    // `vite` on its own only serves the SPA — it has no idea `functions/`
+    // exists. Locally, `/api/*` is served by a SEPARATE process, `wrangler
+    // pages dev` (see `npm run dev:functions`), on port 8788. This proxy is
+    // what stitches the two together so the app can call same-origin `/api/*`
+    // paths in dev exactly as it does in production. Without both processes
+    // running, every AI-backed feature (CV validation, extraction, filtering)
+    // fails — see README.md.
+    proxy: {
+      "/api": {
+        target: "http://localhost:8788",
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

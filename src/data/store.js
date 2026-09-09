@@ -196,6 +196,12 @@ const mapPosition = (d) => {
   return {
     id: d.id, title: x.title, department: x.department, description: x.description || "",
     status: x.status || "Open", stages: x.stages || DEFAULT_PIPELINE, minQualification: x.minQualification || "",
+    // WS5 5.2 — structured scoring requirements, separate from minQualification
+    // above (that one drives the candidate-side EligibilityTag hint across the
+    // full O/L-to-PhD ladder; this one is the engine's strict input and only
+    // exists once a position has been created/edited under the new form).
+    // null on every position created before this shipped — never guessed at.
+    requirements: x.requirements || null,
     // mandatory auto-close date (ms) — the vacancy closes itself once this passes
     closesAt: x.closesAt ? ms(x.closesAt) : 0,
     // headcount target vs. how many have been hired into this requisition so far —
@@ -554,7 +560,8 @@ async function seedIfEmpty() {
       SEED_POSITIONS.map((p) =>
         setDoc(doc(db, "positions", posIdMap.get(p.id)), {
           title: p.title, department: p.department, description: p.description,
-          status: p.status, stages: p.stages, minQualification: p.minQualification || "", createdAt: new Date(p.createdAt),
+          status: p.status, stages: p.stages, minQualification: p.minQualification || "",
+          requirements: p.requirements || null, createdAt: new Date(p.createdAt),
         })
       )
     );
@@ -652,14 +659,35 @@ export async function listStaff(roles) {
   return list;
 }
 
+// WS5 5.5 — a position can never publish as Open without enough structured
+// data for the engine to actually compare against a CV. requiredQualification
+// is deliberately NOT required here (5.2/5.3) — a position can genuinely have
+// no degree-level minimum, and forcing one would fabricate a requirement that
+// was never stated. requiredSkills is the one thing that can't be optional:
+// with zero required skills there is nothing left to compare a CV against at
+// all, which is the entire premise of "initial filtration" per 4.8/WS5.
+function assertPublishableRequirements(requirements) {
+  const skills = requirements?.requiredSkills;
+  if (!Array.isArray(skills) || skills.length === 0) {
+    throw new Error(
+      "A position needs at least one required skill before it can be opened — " +
+      "add the position's required skills, or WS5 has nothing to score CVs against."
+    );
+  }
+}
+
 // --- mutators (write to Firestore when configured, else the mock arrays) ---
 export async function addPosition({
   title, department, description, stages, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
   createdByRole = "", createdByUid = "", createdByName = "",
+  requirements = null,
 }) {
   // HR is the recruitment authority now, so a newly opened vacancy goes live
-  // immediately — there's no separate Management approval step anymore.
+  // immediately — there's no separate Management approval step anymore. That
+  // also means the WS5 5.5 publish-gate has to run HERE, not at some later
+  // "publish" step — this IS the publish step.
+  assertPublishableRequirements(requirements);
   const status = "Open";
   const data = {
     title: title.trim(),
@@ -668,6 +696,7 @@ export async function addPosition({
     status,
     stages: stages && stages.length ? stages : DEFAULT_PIPELINE,
     minQualification,
+    requirements,
     // mandatory auto-close date: the position closes itself once this passes
     closesAt: closesAt ? new Date(closesAt) : null,
     headcount: Math.max(1, Number(headcount) || 1),

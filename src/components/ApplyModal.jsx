@@ -19,6 +19,7 @@ import { profileToCandidateFields } from "@/lib/cv-profile";
 import { applyToPosition, logCvRejection, useHyreData } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { firebaseReady } from "@/firebase/config";
+import { isEmail, looksLikeEmail } from "@/lib/validate";
 import { cn } from "@/lib/utils";
 
 const EMPTY = { email: "", phone: "" };
@@ -29,8 +30,6 @@ const REQUIRED = [
   ["email", "Email"],
   ["phone", "Phone number"],
 ];
-
-const isEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 // Light phone check: starts with a digit or "+", then at least 6 more digits/
 // spaces/parens/hyphens — enough to catch empty or obviously-wrong input
 // without policing exact international formats.
@@ -223,6 +222,12 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     if (!fieldErrors.phone && !isPhone(form.phone)) {
       fieldErrors.phone = "Enter a valid phone number.";
     }
+    // The one field the candidate can hand-edit (pre-filled from their CV) —
+    // catch it if it ends up looking like an email rather than a name, the
+    // same failure this field's autofill could otherwise let through.
+    if (nameOverride.trim() && looksLikeEmail(nameOverride.trim())) {
+      fieldErrors.nameOverride = "That looks like an email address, not a name.";
+    }
     const cvMessage = cvReady ? "" : "Please attach a CV that passes the scan above before continuing.";
     return { fieldErrors, cvMessage };
   };
@@ -236,6 +241,7 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
       setCvError(cvMessage);
       // Build a plain-language red summary naming exactly what's missing.
       const names = REQUIRED.filter(([k]) => fieldErrors[k]).map(([, label]) => label);
+      if (fieldErrors.nameOverride) names.push("your full name");
       if (cvMessage) names.push("a validated CV");
       setSummary(
         names.length === 1
@@ -368,10 +374,10 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
         {/* Contact */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Email" required error={errors.email}>
-            <Input type="email" value={form.email} onChange={set("email")} placeholder="name@email.com" className={errCls("email")} />
+            <Input type="email" value={form.email} onChange={set("email")} placeholder="name@email.com" autoComplete="email" className={errCls("email")} />
           </Field>
           <Field label="Phone" required error={errors.phone}>
-            <Input value={form.phone} onChange={set("phone")} placeholder="+94 7X XXX XXXX" className={errCls("phone")} />
+            <Input value={form.phone} onChange={set("phone")} placeholder="+94 7X XXX XXXX" autoComplete="tel" className={errCls("phone")} />
           </Field>
         </div>
 
@@ -500,8 +506,17 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
             )}
             {parseState === "parsed" && parsedProfile && (
               <div className="space-y-2.5">
-                <Field label="Full name">
-                  <Input value={nameOverride} onChange={(e) => setNameOverride(e.target.value)} placeholder="Your full name" />
+                <Field label="Full name" error={errors.nameOverride}>
+                  <Input
+                    value={nameOverride}
+                    onChange={(e) => {
+                      setNameOverride(e.target.value);
+                      setErrors((er) => (er.nameOverride ? { ...er, nameOverride: "" } : er));
+                    }}
+                    placeholder="Your full name"
+                    autoComplete="name"
+                    className={errCls("nameOverride")}
+                  />
                 </Field>
                 <div className="flex flex-wrap gap-1.5 text-xs">
                   {parsedProfile.education?.[0]?.degree && (

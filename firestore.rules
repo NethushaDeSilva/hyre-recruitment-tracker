@@ -229,6 +229,20 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
+    // --- application scores (WS5 — one per application, staff-only) ---
+    // Deliberately a SEPARATE collection from /applications, not a field on it.
+    // WS1 already lets a candidate read their own /applications/{id} (to see
+    // their own application status) — Firestore has no field-level read rules,
+    // so a `score` field there would ride along on that same read and hand
+    // every candidate their own match score, which CLAUDE.md's R3 test
+    // explicitly forbids ("Candidate reads their own match score → Blocked —
+    // internal to HR"). No read path exists here for anyone but staff.
+    match /applicationScores/{applicationId} {
+      allow read: if isStaff();
+      allow create, update: if isStaff();
+      allow delete: if false; // score history persists — never silently erased
+    }
+
     // --- CV validation rejections (WS3) — demo evidence, immutable ---
     // A signed-in user logs only their OWN rejection (their own uid on the
     // entry); staff read the whole collection to see the gate is working.

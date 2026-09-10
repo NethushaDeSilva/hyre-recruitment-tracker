@@ -774,6 +774,8 @@ Automate what can be automated so it re-runs after every change. If a case fails
 
 Test against **Firestore rules**, not the UI. Hiding a route in React is not access control — attempt the read from the console and confirm the rule rejects it.
 
+**Why R3 forced a second collection.** WS1 already gives a candidate read access to their own `applications/{id}` document (so they can see their own application status) — a legitimate, unrelated requirement. Firestore has no field-level read rules: a rule grants a document or it doesn't. Putting `score` on `applications/{id}` would hand every candidate their own match score through a read that has to stay open for another reason entirely, which is exactly what R3 forbids. The fix is a second collection, `applicationScores/{applicationId}`, staff-read-only, with no candidate access path at all. Don't move `score` back onto `applications` later to "simplify" the schema — that reintroduces the R3 violation this split exists to prevent.
+
 ---
 
 ## 9. WS7 (cut) and WS8 (reinstated)

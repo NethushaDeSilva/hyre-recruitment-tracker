@@ -1,0 +1,20 @@
+{
+  "description": "WS6.1 skills — SECONDARY measurement. Phrase (general capability) vs keyword (named tool) — the category_instance relation written the way a vacancy might actually phrase a requirement in free text, rather than as a short skills[]-style keyword. This is informational only: it documents the category-to-instance / directionality limitation named in 5.4 (a vacancy asking for the general capability, matched by a CV naming the specific tool, is correct; the reverse is not, and cosine similarity is symmetric so it cannot enforce that direction). It does NOT feed SKILL_SIMILARITY_THRESHOLD -- calibrate-thresholds.mjs reports whether each pair clears the PRIMARY threshold (from skills-pairs.json) purely as an illustration, never as its own derivation. This is the same pair set that produced skills' v2 100% false-negative result -- kept, not deleted, per the instruction to preserve every result set as evidence.",
+  "pairs": [
+    { "a": "Relational database management", "b": "PostgreSQL", "relation": "category_instance" },
+    { "a": "Container orchestration", "b": "Kubernetes", "relation": "category_instance" },
+    { "a": "Infrastructure as code", "b": "Terraform", "relation": "category_instance" },
+    { "a": "Distributed version control", "b": "Git", "relation": "category_instance" },
+    { "a": "Client-side scripting language", "b": "JavaScript", "relation": "category_instance" },
+    { "a": "Server-side JavaScript runtime", "b": "Node.js", "relation": "category_instance" },
+    { "a": "In-memory data caching", "b": "Redis", "relation": "category_instance" },
+    { "a": "Continuous integration pipelines", "b": "Jenkins", "relation": "category_instance" },
+    { "a": "NoSQL document storage", "b": "MongoDB", "relation": "category_instance" },
+    { "a": "Deep learning model training", "b": "TensorFlow", "relation": "category_instance" },
+    { "a": "Cloud compute provisioning", "b": "AWS", "relation": "category_instance" },
+    { "a": "Building and consuming RESTful APIs", "b": "API development", "relation": "equivalence" },
+    { "a": "Writing automated test suites", "b": "Test automation", "relation": "equivalence" },
+    { "a": "Optimizing SQL query performance", "b": "Database performance tuning", "relation": "equivalence" },
+    { "a": "Troubleshooting production issues", "b": "Live system debugging", "relation": "equivalence" }
+  ]
+}

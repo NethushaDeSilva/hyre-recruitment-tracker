@@ -1,0 +1,604 @@
+{
+  "calibratedAt": "2026-09-10T09:01:06.733Z",
+  "model": "@cf/baai/bge-base-en-v1.5",
+  "skillThreshold": 0.8785898956214505,
+  "qualThreshold": 0.9056316809641424,
+  "skills": {
+    "derived": {
+      "threshold": 0.8785898956214505,
+      "selectionRule": "max(hardNegatives) — distributions overlapped",
+      "separated": false,
+      "stats": {
+        "trueMatch": {
+          "min": 0.5347698801183941,
+          "max": 0.9319599424561505,
+          "n": 15
+        },
+        "trueNonMatch": {
+          "min": 0.45945163661724214,
+          "max": 0.7717833843884321,
+          "n": 15
+        },
+        "hardNegative": {
+          "min": 0.5506408246639002,
+          "max": 0.8785898956214505,
+          "n": 15
+        }
+      },
+      "falseNegativeRate": 0.8,
+      "falseNegativeCount": 12,
+      "hardNegativeFalsePositiveRate": 0.06666666666666667
+    },
+    "pairs": [
+      {
+        "a": "React.js",
+        "b": "React",
+        "category": "true_match",
+        "similarity": 0.8961895757152992
+      },
+      {
+        "a": "PostgreSQL",
+        "b": "Postgres",
+        "category": "true_match",
+        "similarity": 0.9319599424561505
+      },
+      {
+        "a": "AWS",
+        "b": "Amazon Web Services",
+        "category": "true_match",
+        "similarity": 0.8021547986014536
+      },
+      {
+        "a": "Node.js",
+        "b": "Node",
+        "category": "true_match",
+        "similarity": 0.7915702397121743
+      },
+      {
+        "a": "JavaScript",
+        "b": "JS",
+        "category": "true_match",
+        "similarity": 0.834750301089786
+      },
+      {
+        "a": "TypeScript",
+        "b": "TS",
+        "category": "true_match",
+        "similarity": 0.751658925325956
+      },
+      {
+        "a": "Kubernetes",
+        "b": "K8s",
+        "category": "true_match",
+        "similarity": 0.6973951252375147
+      },
+      {
+        "a": "Continuous Integration",
+        "b": "CI",
+        "category": "true_match",
+        "similarity": 0.6619848387036278
+      },
+      {
+        "a": "MongoDB",
+        "b": "Mongo",
+        "category": "true_match",
+        "similarity": 0.7895459707014565
+      },
+      {
+        "a": "Python 3",
+        "b": "Python",
+        "category": "true_match",
+        "similarity": 0.8736329641512176
+      },
+      {
+        "a": "Machine Learning",
+        "b": "ML",
+        "category": "true_match",
+        "similarity": 0.7323229521237166
+      },
+      {
+        "a": "User Interface Design",
+        "b": "UI Design",
+        "category": "true_match",
+        "similarity": 0.9195068486943015
+      },
+      {
+        "a": "User Experience Design",
+        "b": "UX Design",
+        "category": "true_match",
+        "similarity": 0.8536079631648621
+      },
+      {
+        "a": "Representational State Transfer",
+        "b": "REST API",
+        "category": "true_match",
+        "similarity": 0.5347698801183941
+      },
+      {
+        "a": "Amazon Elastic Compute Cloud",
+        "b": "EC2",
+        "category": "true_match",
+        "similarity": 0.6471067597412147
+      },
+      {
+        "a": "Python",
+        "b": "Java",
+        "category": "true_non_match",
+        "similarity": 0.7717833843884321
+      },
+      {
+        "a": "Docker",
+        "b": "Figma",
+        "category": "true_non_match",
+        "similarity": 0.5630211571357521
+      },
+      {
+        "a": "SQL",
+        "b": "HTML",
+        "category": "true_non_match",
+        "similarity": 0.6974355670543502
+      },
+      {
+        "a": "Kubernetes",
+        "b": "Photoshop",
+        "category": "true_non_match",
+        "similarity": 0.512209603262174
+      },
+      {
+        "a": "React",
+        "b": "Excel",
+        "category": "true_non_match",
+        "similarity": 0.5889595657870108
+      },
+      {
+        "a": "AWS",
+        "b": "Illustrator",
+        "category": "true_non_match",
+        "similarity": 0.5614347692331468
+      },
+      {
+        "a": "MongoDB",
+        "b": "CSS",
+        "category": "true_non_match",
+        "similarity": 0.5751549788763646
+      },
+      {
+        "a": "TensorFlow",
+        "b": "InDesign",
+        "category": "true_non_match",
+        "similarity": 0.5238236866415082
+      },
+      {
+        "a": "Git",
+        "b": "PowerPoint",
+        "category": "true_non_match",
+        "similarity": 0.5418403922135587
+      },
+      {
+        "a": "Linux",
+        "b": "Salesforce",
+        "category": "true_non_match",
+        "similarity": 0.5887548734960343
+      },
+      {
+        "a": "GraphQL",
+        "b": "Microsoft Word",
+        "category": "true_non_match",
+        "similarity": 0.541199990316083
+      },
+      {
+        "a": "Jenkins",
+        "b": "Canva",
+        "category": "true_non_match",
+        "similarity": 0.45945163661724214
+      },
+      {
+        "a": "Redis",
+        "b": "Outlook",
+        "category": "true_non_match",
+        "similarity": 0.5712496535363248
+      },
+      {
+        "a": "Terraform",
+        "b": "Keynote",
+        "category": "true_non_match",
+        "similarity": 0.5568528849809962
+      },
+      {
+        "a": "Swift",
+        "b": "Bookkeeping",
+        "category": "true_non_match",
+        "similarity": 0.5076174193102392
+      },
+      {
+        "a": "Java",
+        "b": "JavaScript",
+        "category": "hard_negative",
+        "similarity": 0.8030798498384559
+      },
+      {
+        "a": "C",
+        "b": "C++",
+        "category": "hard_negative",
+        "similarity": 0.6971306392778361
+      },
+      {
+        "a": "React",
+        "b": "React Native",
+        "category": "hard_negative",
+        "similarity": 0.7937586456768542
+      },
+      {
+        "a": "C++",
+        "b": "C#",
+        "category": "hard_negative",
+        "similarity": 0.7204951837526443
+      },
+      {
+        "a": "Angular",
+        "b": "AngularJS",
+        "category": "hard_negative",
+        "similarity": 0.8785898956214505
+      },
+      {
+        "a": "Node.js",
+        "b": "Deno",
+        "category": "hard_negative",
+        "similarity": 0.5506408246639002
+      },
+      {
+        "a": "Vue",
+        "b": "Nuxt",
+        "category": "hard_negative",
+        "similarity": 0.6722947030486388
+      },
+      {
+        "a": "MySQL",
+        "b": "PostgreSQL",
+        "category": "hard_negative",
+        "similarity": 0.8103555123091508
+      },
+      {
+        "a": "Docker",
+        "b": "Kubernetes",
+        "category": "hard_negative",
+        "similarity": 0.7308357024135654
+      },
+      {
+        "a": "Webpack",
+        "b": "Vite",
+        "category": "hard_negative",
+        "similarity": 0.5549517951421764
+      },
+      {
+        "a": "Redux",
+        "b": "MobX",
+        "category": "hard_negative",
+        "similarity": 0.5774287811037587
+      },
+      {
+        "a": "Jest",
+        "b": "Mocha",
+        "category": "hard_negative",
+        "similarity": 0.5523683017941777
+      },
+      {
+        "a": "TensorFlow",
+        "b": "PyTorch",
+        "category": "hard_negative",
+        "similarity": 0.7006057201469235
+      },
+      {
+        "a": "Swift",
+        "b": "Objective-C",
+        "category": "hard_negative",
+        "similarity": 0.6768530616634698
+      },
+      {
+        "a": "Kotlin",
+        "b": "Java",
+        "category": "hard_negative",
+        "similarity": 0.6699264326358213
+      }
+    ]
+  },
+  "qualifications": {
+    "derived": {
+      "threshold": 0.9056316809641424,
+      "selectionRule": "max(hardNegatives) — distributions overlapped",
+      "separated": false,
+      "stats": {
+        "trueMatch": {
+          "min": 0.6846913989424022,
+          "max": 0.9431793990435716,
+          "n": 15
+        },
+        "trueNonMatch": {
+          "min": 0.5346195758631783,
+          "max": 0.6843932876484686,
+          "n": 15
+        },
+        "hardNegative": {
+          "min": 0.6306787936893021,
+          "max": 0.9056316809641424,
+          "n": 15
+        }
+      },
+      "falseNegativeRate": 0.9333333333333333,
+      "falseNegativeCount": 14,
+      "hardNegativeFalsePositiveRate": 0.06666666666666667
+    },
+    "pairs": [
+      {
+        "a": "BSc Computer Science",
+        "b": "BEng Software Engineering",
+        "category": "true_match",
+        "similarity": 0.6846913989424022
+      },
+      {
+        "a": "BSc Information Technology",
+        "b": "BSc Computing",
+        "category": "true_match",
+        "similarity": 0.8652385299277596
+      },
+      {
+        "a": "BEng Electrical Engineering",
+        "b": "BSc Electrical Engineering",
+        "category": "true_match",
+        "similarity": 0.8479716120602437
+      },
+      {
+        "a": "MSc Computer Science",
+        "b": "MEng Computer Science",
+        "category": "true_match",
+        "similarity": 0.7564990936570001
+      },
+      {
+        "a": "BSc Business Administration",
+        "b": "BBA",
+        "category": "true_match",
+        "similarity": 0.8025053498354205
+      },
+      {
+        "a": "MBA",
+        "b": "Master of Business Administration",
+        "category": "true_match",
+        "similarity": 0.8101100690606982
+      },
+      {
+        "a": "BSc Accounting",
+        "b": "BSc Accountancy",
+        "category": "true_match",
+        "similarity": 0.9431793990435716
+      },
+      {
+        "a": "BA Economics",
+        "b": "BSc Economics",
+        "category": "true_match",
+        "similarity": 0.895915387118324
+      },
+      {
+        "a": "BEng Civil Engineering",
+        "b": "BSc Civil Engineering",
+        "category": "true_match",
+        "similarity": 0.8285965553040412
+      },
+      {
+        "a": "BSc Software Engineering",
+        "b": "BEng Software Engineering",
+        "category": "true_match",
+        "similarity": 0.8140790091483555
+      },
+      {
+        "a": "MSc Data Science",
+        "b": "MSc Data Analytics",
+        "category": "true_match",
+        "similarity": 0.9021261920618422
+      },
+      {
+        "a": "BSc Nursing",
+        "b": "Bachelor of Nursing",
+        "category": "true_match",
+        "similarity": 0.8908479012859943
+      },
+      {
+        "a": "LLB",
+        "b": "Bachelor of Laws",
+        "category": "true_match",
+        "similarity": 0.8072865869605267
+      },
+      {
+        "a": "BSc Psychology",
+        "b": "BA Psychology",
+        "category": "true_match",
+        "similarity": 0.8775529430593201
+      },
+      {
+        "a": "PhD Computer Science",
+        "b": "Doctor of Philosophy in Computer Science",
+        "category": "true_match",
+        "similarity": 0.8886350007272086
+      },
+      {
+        "a": "BSc Computer Science",
+        "b": "BA Fine Arts",
+        "category": "true_non_match",
+        "similarity": 0.6083513192559484
+      },
+      {
+        "a": "BSc Nursing",
+        "b": "BA History",
+        "category": "true_non_match",
+        "similarity": 0.6478409028051879
+      },
+      {
+        "a": "BEng Mechanical Engineering",
+        "b": "BA Music",
+        "category": "true_non_match",
+        "similarity": 0.6249336682592808
+      },
+      {
+        "a": "LLB",
+        "b": "BSc Biology",
+        "category": "true_non_match",
+        "similarity": 0.682326854987328
+      },
+      {
+        "a": "MBA",
+        "b": "MSc Physics",
+        "category": "true_non_match",
+        "similarity": 0.6275446347578273
+      },
+      {
+        "a": "BSc Mathematics",
+        "b": "BA Theatre Studies",
+        "category": "true_non_match",
+        "similarity": 0.6456046178808829
+      },
+      {
+        "a": "BSc Chemistry",
+        "b": "BA Journalism",
+        "category": "true_non_match",
+        "similarity": 0.6843932876484686
+      },
+      {
+        "a": "BA English Literature",
+        "b": "BSc Civil Engineering",
+        "category": "true_non_match",
+        "similarity": 0.6363343064947059
+      },
+      {
+        "a": "BSc Psychology",
+        "b": "BEng Electrical Engineering",
+        "category": "true_non_match",
+        "similarity": 0.5935967371857752
+      },
+      {
+        "a": "BA Fine Arts",
+        "b": "BSc Data Science",
+        "category": "true_non_match",
+        "similarity": 0.6278354808871578
+      },
+      {
+        "a": "BSc Agriculture",
+        "b": "BA Philosophy",
+        "category": "true_non_match",
+        "similarity": 0.6514505689964383
+      },
+      {
+        "a": "MSc Physics",
+        "b": "MBA Marketing",
+        "category": "true_non_match",
+        "similarity": 0.5553306562653808
+      },
+      {
+        "a": "BSc Nutrition",
+        "b": "BA Graphic Design",
+        "category": "true_non_match",
+        "similarity": 0.6732722759232803
+      },
+      {
+        "a": "BEng Aerospace Engineering",
+        "b": "BA Sociology",
+        "category": "true_non_match",
+        "similarity": 0.5346195758631783
+      },
+      {
+        "a": "BSc Veterinary Science",
+        "b": "BA Political Science",
+        "category": "true_non_match",
+        "similarity": 0.6812416091614412
+      },
+      {
+        "a": "BSc Computer Science",
+        "b": "BSc Mathematics",
+        "category": "hard_negative",
+        "similarity": 0.812430997528558
+      },
+      {
+        "a": "BSc IT",
+        "b": "BSc Business Information Systems",
+        "category": "hard_negative",
+        "similarity": 0.8901879816082499
+      },
+      {
+        "a": "BEng Civil Engineering",
+        "b": "BEng Mechanical Engineering",
+        "category": "hard_negative",
+        "similarity": 0.8707362130431263
+      },
+      {
+        "a": "BSc Computer Science",
+        "b": "BSc Information Technology",
+        "category": "hard_negative",
+        "similarity": 0.8495965444390674
+      },
+      {
+        "a": "BSc Physics",
+        "b": "BSc Mathematics",
+        "category": "hard_negative",
+        "similarity": 0.8055173526264184
+      },
+      {
+        "a": "BSc Accounting",
+        "b": "BSc Finance",
+        "category": "hard_negative",
+        "similarity": 0.854997330488385
+      },
+      {
+        "a": "BSc Marketing",
+        "b": "BSc Business Administration",
+        "category": "hard_negative",
+        "similarity": 0.803596304326618
+      },
+      {
+        "a": "BSc Biology",
+        "b": "BSc Biomedical Science",
+        "category": "hard_negative",
+        "similarity": 0.9056316809641424
+      },
+      {
+        "a": "BSc Software Engineering",
+        "b": "BSc Computer Science",
+        "category": "hard_negative",
+        "similarity": 0.8667440940700291
+      },
+      {
+        "a": "MSc Data Science",
+        "b": "MSc Computer Science",
+        "category": "hard_negative",
+        "similarity": 0.8612329895528449
+      },
+      {
+        "a": "BSc Electrical Engineering",
+        "b": "BSc Electronic Engineering",
+        "category": "hard_negative",
+        "similarity": 0.8959684757286019
+      },
+      {
+        "a": "BA Economics",
+        "b": "BSc Business Administration",
+        "category": "hard_negative",
+        "similarity": 0.7212570984362493
+      },
+      {
+        "a": "BSc Chemistry",
+        "b": "BSc Chemical Engineering",
+        "category": "hard_negative",
+        "similarity": 0.873985454110473
+      },
+      {
+        "a": "BSc Nursing",
+        "b": "BSc Public Health",
+        "category": "hard_negative",
+        "similarity": 0.8040627668764236
+      },
+      {
+        "a": "LLB",
+        "b": "BSc Criminology",
+        "category": "hard_negative",
+        "similarity": 0.6306787936893021
+      }
+    ]
+  }
+}

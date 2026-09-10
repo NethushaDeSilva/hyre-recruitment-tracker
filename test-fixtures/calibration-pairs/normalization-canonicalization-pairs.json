@@ -1,0 +1,65 @@
+{
+  "description": "Layer 1 (normalisation) and layer 2 (canonicalisation-at-extraction) fixtures for WS5's skill/qualification matching. These pairs were originally miscategorised as embedding true_match cases in the WS6.1 v1 calibration run, which produced an 80-93% false-negative rate purely as a labelling artefact: an abbreviation shares almost no characters with its expansion, so a general-purpose embedding model cannot be expected to see them as equivalent. Neither layer runs at scoring time -- both resolve to a plain string BEFORE scoring, so by the time the JS engine (5.3) compares a CV skill against a requirement, this has already been handled: match is checked at layer 1 (deterministic normalisation, no LLM) first, and if that fails, both the CV and the vacancy requirement were already canonicalised to the same target string at extraction/save time (layer 2), so it becomes an exact match too. Only genuine cross-vocabulary equivalence reaches the embedding layer (layer 3, skills-pairs.json / qualifications-pairs.json). Not run by calibrate-thresholds.mjs -- this is reference data for the WS4 extraction prompt and the vacancy-save canonicalisation step, not a similarity-threshold measurement. A deterministic-match test harness (not embeddings) should be built alongside that implementation.",
+  "skills": {
+    "layer_1_normalisation": {
+      "note": "Pure JS string rules -- case, punctuation, suffix, version number. No LLM call.",
+      "pairs": [
+        { "input": "React.js", "canonical": "React", "rule": "strip .js suffix" },
+        { "input": "Node", "canonical": "Node.js", "rule": "suffix normalisation (kept .js as the canonical form here, opposite direction from React -- Node.js is the more universally recognised full name; React is more commonly written bare)" },
+        { "input": "Python 3", "canonical": "Python", "rule": "strip trailing version number" }
+      ]
+    },
+    "layer_2_canonicalisation_at_extraction": {
+      "note": "Extraction model expands/normalises to one canonical form. Runs once per CV and once per vacancy save -- both sides must go through it or the exact-match check at scoring time silently fails.",
+      "pairs": [
+        { "input": "Postgres", "canonical": "PostgreSQL" },
+        { "input": "Amazon Web Services", "canonical": "AWS" },
+        { "input": "JS", "canonical": "JavaScript" },
+        { "input": "TS", "canonical": "TypeScript" },
+        { "input": "K8s", "canonical": "Kubernetes" },
+        { "input": "CI", "canonical": "Continuous Integration" },
+        { "input": "Mongo", "canonical": "MongoDB" },
+        { "input": "ML", "canonical": "Machine Learning" },
+        { "input": "User Interface Design", "canonical": "UI Design" },
+        { "input": "User Experience Design", "canonical": "UX Design" },
+        { "input": "Representational State Transfer", "canonical": "REST API" },
+        { "input": "Amazon Elastic Compute Cloud", "canonical": "EC2" }
+      ]
+    }
+  },
+  "qualifications": {
+    "degree_type_canonicalisation": {
+      "note": "Degree TYPE strings that name the SAME field and the SAME structural level (5.4's 6/7/8 rule already treats them as equivalent level-wise) -- these never reach the field-only embedding comparison because the type prefix is stripped before comparison, not because the embedding model resolves them.",
+      "pairs": [
+        { "input": "BEng Electrical Engineering", "canonicalType": "Bachelor's (level 6)", "field": "Electrical Engineering" },
+        { "input": "BSc Electrical Engineering", "canonicalType": "Bachelor's (level 6)", "field": "Electrical Engineering" },
+        { "input": "MSc Computer Science", "canonicalType": "Master's (level 7)", "field": "Computer Science" },
+        { "input": "MEng Computer Science", "canonicalType": "Master's (level 7)", "field": "Computer Science" },
+        { "input": "BA Economics", "canonicalType": "Bachelor's (level 6)", "field": "Economics" },
+        { "input": "BSc Economics", "canonicalType": "Bachelor's (level 6)", "field": "Economics" },
+        { "input": "BEng Civil Engineering", "canonicalType": "Bachelor's (level 6)", "field": "Civil Engineering" },
+        { "input": "BSc Civil Engineering", "canonicalType": "Bachelor's (level 6)", "field": "Civil Engineering" },
+        { "input": "BSc Software Engineering", "canonicalType": "Bachelor's (level 6)", "field": "Software Engineering" },
+        { "input": "BEng Software Engineering", "canonicalType": "Bachelor's (level 6)", "field": "Software Engineering" },
+        { "input": "BSc Psychology", "canonicalType": "Bachelor's (level 6)", "field": "Psychology" },
+        { "input": "BA Psychology", "canonicalType": "Bachelor's (level 6)", "field": "Psychology" },
+        { "input": "BSc IT", "canonicalType": "Bachelor's (level 6)", "field": "Information Technology" }
+      ]
+    },
+    "whole_name_abbreviation": {
+      "note": "The whole degree title is an abbreviation or alternate naming convention, not just the type prefix. Field + level both come out of this step.",
+      "pairs": [
+        { "input": "BBA", "canonicalType": "Bachelor's (level 6)", "field": "Business Administration" },
+        { "input": "BSc Business Administration", "canonicalType": "Bachelor's (level 6)", "field": "Business Administration" },
+        { "input": "MBA", "canonicalType": "Master's (level 7)", "field": "Business Administration" },
+        { "input": "Master of Business Administration", "canonicalType": "Master's (level 7)", "field": "Business Administration" },
+        { "input": "Bachelor of Nursing", "canonicalType": "Bachelor's (level 6)", "field": "Nursing" },
+        { "input": "BSc Nursing", "canonicalType": "Bachelor's (level 6)", "field": "Nursing" },
+        { "input": "LLB", "canonicalType": "Bachelor's (level 6)", "field": "Law" },
+        { "input": "Bachelor of Laws", "canonicalType": "Bachelor's (level 6)", "field": "Law" },
+        { "input": "PhD Computer Science", "canonicalType": "Doctorate (level 8)", "field": "Computer Science" },
+        { "input": "Doctor of Philosophy in Computer Science", "canonicalType": "Doctorate (level 8)", "field": "Computer Science" }
+      ]
+    }
+  }
+}

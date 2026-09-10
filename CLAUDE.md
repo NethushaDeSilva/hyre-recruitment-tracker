@@ -33,6 +33,9 @@ The module leader spent ~37 minutes reviewing all teams. She defined the recruit
 
 Caveat: the transcript we have is an automated draft with `[unclear]` gaps and is not certified verbatim. Treat quoted wording as intent, not as exact legal text.
 
+**1b. The 10 September team meeting with her (equal authority, and it SUPERSEDES earlier decisions where they conflict).**
+A direct meeting with our team. She reversed the interview-scheduling descope, offered a major simplification, and confirmed several Sprint 1 fixes. Where this meeting contradicts anything derived from the Sprint 1 review lecture, **this meeting wins** — it is later and it is specific to us.
+
 **2. Our team's Sprint 1 viva feedback.**
 Specific to us. Two concrete points: candidates should not re-type qualification details that are already in the CV, and interviewer availability is meaningless when tracked only inside our own system.
 
@@ -158,6 +161,16 @@ Audit each of these against the current codebase and report before writing code.
 | 6 | Diagrams done in isolation from development; generated diagrams the student could not explain | **Team task, section 12** |
 | 7 | Daily stand-ups only starting in week 4 or 5 | **Team task, section 12** |
 
+**Confirmed in the 10 September meeting:**
+
+| Point | Her words | Status |
+|---|---|---|
+| CV re-entry removed | *"Candidates needs to add all data from CV again when applying to the job, so that you need to get rid of"* | Confirmed done (WS2) |
+| Initial filtering is **inaccurate** | *"Initial filtering feature is inaccurate, right. That needs to be looked at."* | WS5 rebuild is the fix |
+| Candidate comparison | *"Comparing candidate also not needed."* | Confirmed removed |
+| Scheduling | *"you need to fix the schedule interview feature"* | **Reinstated — WS8** |
+| End-to-end, defined | *"during the demo all your features had gaps in them... without fine tuning and completing a function you have gone to other functions"* | Each feature complete, no gaps |
+
 Our own viva added:
 
 | # | Our specific feedback |
@@ -184,11 +197,10 @@ Strict. Do not start a tier until the tier above is complete, tested, and commit
 - WS5 Initial filtration
 - WS6 Calibration and test evidence
 
+- WS8 Interview scheduling and interviewer availability — **REINSTATED 10 Sep.** See section 9.
+
 **CUT — do not build**
 - WS7 Cross-vacancy live candidate board. The shortlist screen HR needs lives inside WS5.
-
-**DESCOPED — do not build**
-- WS8 Interview scheduling and real availability. Move existing code to a branch and remove it from the build.
 
 **REMOVE**
 - Side-by-side candidate comparison. Delete the component, the route, and the nav entry.
@@ -404,8 +416,8 @@ Prerequisite for everything below. If the vacancy form does not capture these, a
 
 ```
 requirements: {
-  requiredQualification: { level: 6|7|8, field: string | null } | null,
-  requiredSkills: string[],
+  requiredQualification: { level: 6|7|8, field: string | null } | null,   // NULLABLE
+  requiredSkills: string[],          // mandatory, non-empty
   minYearsExperience: number,
   niceToHave: string[]
 }
@@ -413,13 +425,11 @@ requirements: {
 
 Degree levels: 6 = BSc/BEng/BA, 7 = MSc/MEng, 8 = PhD. `field: null` means any discipline.
 
-**`requiredQualification` itself is nullable — a position can have no degree-level minimum.** Real Hyre roles span the whole qualification ladder (GCE O/L through PhD, via the pre-existing `minQualification` field), but 5.2's `level` enum only covers university degrees. Forcing a Diploma- or A-Level-minimum role to pick 6/7/8 would fabricate a requirement that was never stated — worse than having no requirement at all. `requiredQualification: null` is how those roles are represented; see 5.3 for how the engine scores them.
+**`requiredQualification` is nullable, deliberately.** Forcing every position onto the 6/7/8 scale would make a Diploma or A-Level role overstate its real minimum as a degree — fabricated data, and indefensible if questioned. A position publishes on `requiredSkills` plus `minYearsExperience` alone. Sub-degree minimums stay in the existing free-text `minQualification` / EligibilityTag hint, which is unchanged and unrelated to scoring.
 
-**This is unrelated to the existing free-text `minQualification` field** (the one driving the candidate-side "meets bar / below bar" `EligibilityTag` hint, unaffected by WS5). The two are deliberately separate: `minQualification` is a soft, full-ladder hint for a human reviewer; `requiredQualification` is a strict, degree-only input to the scoring engine. Do not derive one from the other.
+**The publish gate is `requiredSkills`, not qualifications.** A position cannot reach `status: 'open'` with empty `requiredSkills` — enforced at the data layer in `assertPublishableRequirements()`, not only on the form.
 
-**Requirements are editable after creation, not set once.** A vacancy is part of a working lifecycle (WS1) — HR opens a position before every applicant is known, and refines what it's actually asking for as the picture clarifies. The publish gate above (`requiredSkills` non-empty) applies identically on every edit, not just at creation — an Open position can never end up with empty `requiredSkills` through either path.
-
-**Editing requirements invalidates every score computed under the old ones.** 5.1's whole premise is a document comparison between the vacancy and the CV — change one side of that comparison and every existing score is a comparison against a vacancy that no longer exists. Those scores are marked `stale`, never silently left looking current and never silently deleted (deleting would lose the audit trail of what was actually compared). A stale score is still visible with its old breakdown for reference; it must never be presented to HR as current. This is exactly what the re-score endpoint (see the WS5 architecture decision on scoring triggers) exists to clear — editing requirements does not itself trigger a re-score.
+**Requirements are editable after creation, not set once.** Editing them **invalidates every score computed under the old requirements**: those scores are marked `stale`, never silently left current and never deleted. The re-score endpoint clears staleness; the edit itself does not.
 
 #### 5.3 Scoring model — 100 points
 
@@ -456,25 +466,41 @@ A hard `Math.min(raw, 40)` would flatten every affected candidate to exactly 40 
 
 **Only a degree-level deficit triggers the cap.** A field-of-study mismatch reduces qualification points proportionally and never caps. There is no hardcoded list of acceptable degree fields — an arbitrary whitelist would auto-penalise a Mathematics or Physics graduate moving into software, which is not defensible.
 
-**No qualification requirement (`requiredQualification: null`)** — the qualifications component is not applicable, not zero. Zero would silently punish every candidate on an axis the vacancy never asked about; not-applicable removes the axis entirely. The remaining three components are rescaled from their natural 75-point ceiling up to 100:
+**When `requiredQualification` is null**, the 25 qualification points have no basis and must not be silently deducted from every candidate. Score out of the remaining 75 and normalise:
 
 ```js
-overallScore = requiredQualification === null
-  ? Math.round(((skillsScore + experienceScore + niceToHaveScore) / 75) * 100)
-  : qualificationsScore + skillsScore + experienceScore + niceToHaveScore;
+overallScore = Math.round(((skillsScore + experienceScore + niceToHaveScore) / 75) * 100);
 ```
 
-`skillsScore`, `experienceScore` and `niceToHaveScore` use the exact same formulas either way — nothing about them changes when qualifications drop out. Only this final aggregation branches, and it is the only place the branch may live. `capApplied` is always `false` when `requiredQualification` is `null`: there is no degree-level deficit to cap because there is no degree-level requirement to be deficient against.
+Chosen over redistributing the 25 points proportionally across skills and experience: redistribution produces recurring decimals (a 62.3-point skills ceiling), which fights the derivable-by-hand requirement directly. Normalising keeps every sub-component formula byte-identical between the qualified and unqualified cases — only the final aggregation branches. `capApplied` is always `false` here; there is nothing to cap.
+
+In the 5.7 output, `breakdown.qualifications` is `{ "applicable": false }` — never `{ score: 0, max: 0 }`, which would read as a candidate scoring zero rather than a criterion not applying.
 
 #### 5.4 Equivalence matching
 
-Two independent thresholds. Both are **derived by calibration in WS6, never chosen**.
+Three layers, in order. Only genuine cross-vocabulary content ever reaches layer 3 — the first two resolve everything else before scoring runs.
 
-- **Skills** — exact match first (case and punctuation normalised), then `@cf/baai/bge-base-en-v1.5` cosine similarity against `SKILL_SIMILARITY_THRESHOLD`.
-- **Qualifications** — degree *level* is a strict structural rule (candidate level ≥ required level). Degree *field* uses embedding similarity against a separate `QUAL_SIMILARITY_THRESHOLD`. Degree titles share heavy surface form, so this distribution sits much higher than the skills one and the two constants are not interchangeable.
-- If the vacancy states no required field, skip field comparison entirely — any degree at or above the required level earns full qualification points.
+**Layer 1 — normalisation.** Pure JS, deterministic, no LLM: case, punctuation, `.js`/suffix stripping, trailing version numbers (`Python 3` → `Python`). Runs at scoring time, on both sides, for free.
+
+**Layer 2 — canonicalisation at extraction.** The extraction model (WS4) expands abbreviations and aliases to one canonical form as it extracts — `K8s` → `Kubernetes`, `MBA` → `Business Administration` (level 7). This is fact-reporting, not judgement (5.1 is unaffected: nothing in the scoring path calls an LLM), the same way normalising `Node.js`/`NodeJS` already is. **It must run on both sides** — CV extraction and vacancy `requiredSkills` at save time — or the exact-match check below silently fails whenever HR types the abbreviation a candidate's CV was already expanded past. Existing positions need re-canonicalising retroactively when this ships; treat that as a one-off migration, not an ongoing job. Layer 2 is **not a runtime step** — by the time scoring runs, both sides are already canonical strings, so what layer 1 checks as an "exact match" already *is* the layer-2 match. There are only two cases at runtime: normalise-and-exact-match, or fall through to layer 3.
+
+**Layer 3 — embedding equivalence.** `@cf/baai/bge-base-en-v1.5` cosine similarity, only for terms that survive layers 1 and 2 without matching. Two independent thresholds, both **derived by calibration in WS6, never chosen**: `SKILL_SIMILARITY_THRESHOLD` and `QUAL_SIMILARITY_THRESHOLD` (qualification *field* only — degree *level* stays the strict structural rule, candidate level ≥ required level, and is never part of this comparison). If the vacancy states no required field, skip field comparison entirely.
+
+This layer is deliberately asked to cover two different relations (decision recorded here, not an accident of how pairs were written):
+- **equivalence** — genuine synonym, same abstraction level ("Client-side" / "Frontend").
+- **category_instance** — a general capability matched by a specific named technology ("Container orchestration" / "Kubernetes"). This relation is **directional in reality and cosine similarity cannot enforce that direction** — a vacancy asking for the general capability, matched by a CV naming the specific tool, is correct; the reverse (vacancy names one specific tool, CV shows only a different tool in the same category) is not, and nothing here tells them apart. Stated as a measured limitation, not silently assumed away.
+
+`SKILL_SIMILARITY_THRESHOLD` is set by exactly one measurement: the **PRIMARY** calibration — keyword vs keyword, short terms both sides, matching the real `skills[]` shape (WS4's schema is a flat array of short terms, never sentences). A **SECONDARY** measurement (phrase vs keyword, the category_instance relation written the way a vacancy might actually phrase a requirement) is run and reported alongside it for documentation of the directionality limitation above — it never feeds the constant. Mixing the two in one calibration run produces a fair-sounding but meaningless number, because a multi-word phrase and a single technical term are structurally different inputs to a sentence embedder regardless of true relatedness (WS6.1).
+
 - **No synonym dictionary.** Hand-written lists cover only the cases the author thought of, which is fabricated coverage.
 - **No LLM escalation for borderline pairs.** It would reintroduce runtime variance exactly where decisions are closest. Choose a conservative threshold and accept measured false negatives — a missed synonym is recoverable by a human reviewer, an unstable score is not.
+- **Credit rule is strictly above threshold, never at-or-above.** The threshold is defined as `max(hardNegatives)` whenever the distributions overlap (the realistic case, 6.1) — an at-or-above rule would let that exact hard negative satisfy its own boundary, a false positive by construction. Strictly-above closes it without an arbitrary epsilon constant.
+
+**The measured finding (WS6.1, two calibration rounds, run against the corrected, uncontaminated pair sets):** for short technical and academic terms, `bge-base-en-v1.5` cannot reliably separate semantic relatedness from lexical similarity. Pairs that are textually near-identical but semantically distinct (`Angular`/`AngularJS`, `Electrical Engineering`/`Electronic Engineering`) score *higher* than pairs that are semantically equivalent but textually unrelated. Any threshold that correctly excludes the former — which it must, or the engine is not defensible — necessarily excludes nearly all of the latter. Measured false-negative rate on true_match at the calibrated threshold: **100% for skills (PRIMARY), 100% for qualifications.** This is not a broken calibration; two rounds of correcting real methodological errors (contaminated hard negatives, a phrase-vs-keyword genre mismatch) converged on the same result, so it is reported as the finding, not tuned further.
+
+**Consequence, stated plainly: layer 1 (normalisation) plus layer 2 (canonicalisation) do nearly all the real matching work. Layer 3 is a rarely-firing fallback that adds little in practice for short single/multi-word technical terms**, and its main documented value is covering the rare genuine cross-vocabulary case layers 1–2 can't, plus giving the category_instance relation *some* signal even though direction can't be enforced. Do not re-tune the threshold to make this number look better — see WS6.1 for why that would be the wrong response to what was actually measured.
+
+**Open decision, deliberately undecided: keep layer 3, or remove it and run on layers 1–2 alone.** The case for removing it: the calibration evidence above, plus 6.4's finding that the embedding call is not run-to-run reproducible — layer 3 is a measured source of score/rank instability contributing an unknown amount of value in return, since it fires so rarely. Fully deterministic normalisation-plus-exact-match is simpler, faster, cheaper, and cannot be unstable. The case for keeping it: it is the only mechanism that catches a genuine cross-vocabulary match layers 1–2 were never designed for, and removing it forecloses that case entirely rather than accepting it as a documented limitation. **This will be decided from measurement, not preference**: `engine.js` logs, per scored application, how many skill/qualification matches came from each layer (normalisation/exact, embedding, no match) and a BORDERLINE count (matches whose similarity sits within a small band of the threshold — the ones exposed to the 6.4 non-reproducibility finding). Once WS6.3 fixtures run against the engine, the embedding layer's real firing rate and BORDERLINE count on real CVs settle this: near-zero firing means remove it, a non-trivial BORDERLINE count means the instability is real and something has to give. Not yet measured — the instrumentation exists, the fixtures that would exercise it do not yet.
 
 **Thresholds must be uncalibrated until measured.** Ship them so the engine refuses to run rather than silently using a placeholder:
 
@@ -492,7 +518,7 @@ export function getThresholds(): SimilarityThresholds {
 }
 ```
 
-Never commit a numeric literal for either threshold.
+Never commit a numeric literal for either threshold — `thresholds.js` loads them from the calibration script's generated output, never a hand-typed constant.
 
 #### 5.5 Embedding economics
 
@@ -509,6 +535,8 @@ Binary verify-or-reject deletes correct inferences. "Built REST APIs in Express"
 | `verified` | Term appears in the CV, word-boundary match after normalisation | Full |
 | `inferred` | Not literally present but semantically supported by nearby text, using embeddings already computed | Reduced |
 | `unverifiable` | No supporting text anywhere | Dropped, logged |
+
+`inferred` reuses the same embedding call and inherits the same measured limitation as 5.4/6.1: cosine similarity over short spans cannot reliably separate genuine support from lexical coincidence. Treat `inferred` as a low-confidence signal worth reduced credit, never as strong as `verified` — which is already exactly what the credit table does, but it's worth knowing the reduced weighting isn't just caution, it's calibrated caution.
 
 Verification rules:
 - **Word-boundary matching, never `.includes()`.** Substring matching passes "R" against any CV containing the letter r, and "Go" against "goals" and "Google". The fabricated entries most likely to survive naive verification are exactly the short ones.
@@ -555,8 +583,6 @@ Deliberately absent:
 - **No numeric score on failure.** A failure has no score at all. Zero is a judgement; a failure is not.
 
 `meta` is not optional — without it, two runs cannot be shown to be comparable, and WS6's whole argument depends on that.
-
-**When the position has no `requiredQualification`**, `breakdown.qualifications` is `{ "applicable": false }` — no `score`/`max`/`levelMet` keys at all, never `{ "score": 0, "max": 0 }`. A `0/0` reads as "assessed, scored zero," which is exactly the fabricated judgement 5.3's not-applicable rule exists to avoid. `overallScore` in this case is the rescaled value from 5.3, not a raw sum.
 
 #### 5.8 Ranking and ties
 
@@ -624,26 +650,38 @@ One combined inference: validate it is a CV *and* extract entities. Splitting th
 
 #### 6.1 Threshold calibration — run this before anything is scored
 
-Two independent calibrations. The engine will not run until both produce numbers.
+This section is scoped to **layer 3 only** (5.4). Abbreviations, aliases and formatting/suffix variants are layer 1/2 concerns — resolved by normalisation and canonicalisation at extraction, never by embeddings — and are tested separately, by construction, not by a similarity threshold (`test-fixtures/calibration-pairs/normalization-canonicalization-pairs.json`).
 
-**Skills.** 45 labelled pairs, three categories of 15:
-- True matches: `React.js`/`React`, `PostgreSQL`/`Postgres`, `AWS`/`Amazon Web Services`, `Node.js`/`Node`
-- True non-matches: `Python`/`Java`, `Docker`/`Figma`, `SQL`/`HTML`
-- Hard negatives: `Java`/`JavaScript`, `C`/`C++`, `React`/`React Native`
+**Skills — two measurements, only one of which sets the constant.**
 
-**Qualifications.** 45 pairs, separate set:
-- True matches: `BSc Computer Science`/`BEng Software Engineering`
-- True non-matches: `BSc Computer Science`/`BA Fine Arts`
-- Hard negatives: `BSc Computer Science`/`BSc Mathematics`, `BSc IT`/`BSc Business Information Systems`
+- **PRIMARY** (`skills-pairs.json`) — keyword vs keyword, short terms both sides, matching the real `skills[]` shape. 45 pairs, three categories of 15. This alone derives `SKILL_SIMILARITY_THRESHOLD`.
+  - True matches (mix of `equivalence` and `category_instance`, per 5.4): `Container orchestration`/`Kubernetes`, `Client-side`/`Frontend`
+  - True non-matches: `Python`/`Java`, `Docker`/`Figma`, `SQL`/`HTML`
+  - Hard negatives: `Java`/`JavaScript`, `C`/`C++`, `Angular`/`AngularJS`
+- **SECONDARY** (`skills-secondary-pairs.json`) — phrase (general capability) vs keyword (named tool), the category_instance relation written the way a vacancy might actually phrase a requirement. Reported alongside PRIMARY, scored against PRIMARY's threshold for illustration only. **Never derives a threshold of its own and never feeds the runtime constant.** Its purpose is solely to document the directionality limitation named in 5.4.
+
+**Qualifications** (`qualifications-pairs.json`). 45 pairs, field-of-study text only — never full degree titles. Degree type/level is resolved separately (5.4 layer 2 / the structural 6-7-8 rule) before this comparison ever runs; feeding full titles in tests type-equivalence, not field-equivalence, and was the root cause of the first failed round below.
+- True matches: `Computer Science`/`Software Engineering`, `Data Science`/`Data Analytics`
+- True non-matches: `Computer Science`/`Fine Arts`
+- Hard negatives: `Computer Science`/`Mathematics`, `Information Technology`/`Business Information Systems`, `Electrical Engineering`/`Electronic Engineering`
+
+**No pair may appear in two categories, in either direction.** A contradictory label (the same two terms marked both true_match and hard_negative) sets the threshold above a true match by construction and guarantees false negatives that are an artefact of labelling, not of the model — audit for this explicitly before running, every time the pair sets change.
 
 **Selection rule.** Run every pair through the embedding model, tabulate the distributions, then:
 
 - If `min(trueMatches) > max(hardNegatives)`, threshold = midpoint of the two.
-- **If they overlap** — the realistic outcome — set the threshold at `max(hardNegatives)` so the hard-negative false-positive rate is zero, and record the resulting false-negative rate as a measured limitation. Do not escalate to an LLM to resolve the ambiguous zone; that would break scoring determinism.
+- **If they overlap** — the realistic outcome — set the threshold at `max(hardNegatives)`. Credit is **strictly above** that value, never at-or-above (5.4) — this keeps the hard-negative false-positive rate at zero without the exact hard negative that defines the threshold trivially satisfying its own boundary. Record the resulting false-negative rate as a measured limitation. Do not escalate to an LLM to resolve the ambiguous zone; that would break scoring determinism.
 
-`Java` vs `JavaScript` is the litmus test. Lexically near-identical, semantically distinct. If the threshold cannot separate that pair, the engine is not defensible.
+Whichever single pair sets `max(hardNegatives)` is binding for the whole threshold — name it explicitly in the write-up, state why it was classified as a hard negative, and note that a different call on that one pair moves the threshold. For qualifications this is `Electrical Engineering`/`Electronic Engineering`: kept as a hard negative because they are distinct programmes with distinct competencies (power/heavy-current vs. circuits/signal processing/embedded), and a false positive here would credit a candidate with a qualification they do not hold — worse than a false negative a human reviewer can catch.
 
-Deliverable: a calibration table with every pair, its measured similarity, and the derived threshold. This is the artifact that proves the number was measured, not guessed.
+`Java` vs `JavaScript` is the skills litmus test. Lexically near-identical, semantically distinct. If the threshold cannot separate that pair, the engine is not defensible.
+
+**Three calibration rounds were run; all three result sets are kept as evidence, not just the last one** (`test-fixtures/calibration-pairs/`):
+- `calibration-results-v1-uncorrected.md` — the first run. True_match pairs for both domains were mostly abbreviations and full degree titles (`AWS`/`Amazon Web Services`, `BSc Computer Science`/`BEng Software Engineering`) rather than layer-3 content, and a labelling contamination existed (the same pair appeared as both true_match and hard_negative under different orderings). Result: 80% skills / 93.3% qualifications false-negative — a measurement of the wrong thing, not of the model.
+- `calibration-results-v2-genre-mismatch.md` — pair sets corrected for contamination and rescoped to genuine layer-3 content, but skills true_match was written as multi-word descriptive phrases (2–5 words) against hard_negative/true_non_match's 1–2 word terms. Result: 100% skills false-negative. Diagnosis: a sentence embedder structurally scores longer, more complex text lower than near-identical short strings, regardless of true relatedness — the genre mismatch between categories, not the model's semantic judgement, was driving the number.
+- `calibration-results.md` (current) — skills true_match rebuilt as PRIMARY (keyword vs keyword, genre-matched to hard_negative/true_non_match) plus SECONDARY (phrase vs keyword, informational). Result: **100% false-negative on skills PRIMARY, 0/15 secondary pairs clear the primary threshold, 100% false-negative on qualifications.** With both known construction errors corrected, this is the finding — see 5.4's "measured finding" and its stated consequence for the engine (normalisation + exact match does nearly all the real work; layer 3 is a rarely-firing fallback).
+
+Deliverable: a calibration table with every pair, its measured similarity, and the derived threshold, for all three rounds. The before-and-after across rounds is the evidence that the sets were tested and corrected, not assumed correct on the first attempt.
 
 #### 6.2 Ground-truth bands — derive before running
 
@@ -691,6 +729,8 @@ Report both, separately. They answer different questions.
 
 Do not claim end-to-end determinism. Extraction is an LLM call; even at temperature 0 with a fixed seed, serverless GPU inference is not bit-reproducible. Claiming σ = 0.00 end-to-end and having it fail when she runs it twice would be far worse than reporting a real number.
 
+**A second, distinct source of end-to-end variance: embedding non-reproducibility.** Not the same thing as extraction variance above — this is the layer-3 equivalence-matching call (5.4), and it was found empirically, not anticipated. WS6.1 re-ran the qualifications calibration twice against the **identical** pair set (no code or data change between runs) and the derived threshold moved: 0.8701 → 0.8782. The pair that binds the threshold (`Electrical Engineering`/`Electronic Engineering`) shifted more than the best true-match pair, which flipped that pair from passing to failing between runs. Consequence for the live engine: CV skills are embedded fresh at scoring time (5.5), so a skill sitting near the threshold can score above it on one run and below it on the next — changing that skill's match status, the application's score, and potentially its rank — with no change to the CV, the vacancy, or the code. This is a real, separate contributor to end-to-end variance, distinct from LLM extraction variance, and it originates in a layer WS6.1 also measured at 100% false-negative (5.4). It is being measured, not assumed away — see the firing-rate and BORDERLINE instrumentation in `engine.js` and the open decision recorded in 5.4.
+
 **Caching must be off for these runs.** A cached response proves the cache works, not that the model is stable. Presenting a cached result as proof of determinism would be dishonest, and she would be right to say so.
 
 #### 6.5 Rank stability — the metric that actually matters
@@ -736,7 +776,7 @@ Test against **Firestore rules**, not the UI. Hiding a route in React is not acc
 
 ---
 
-## 9. Cut and descoped work
+## 9. WS7 (cut) and WS8 (reinstated)
 
 ### WS7 — Cross-vacancy live candidate board *(cut)*
 
@@ -750,59 +790,79 @@ If Altrium's real brief turns out to state the spreadsheet/scattered-hiring prob
 
 ---
 
-### WS8 — Interview scheduling and availability *(descoped)*
+### WS8 — Interview scheduling and interviewer availability *(REINSTATED 10 Sep)*
 
-**Do not write any code for this. It is out of Sprint 2 scope.**
+**This was descoped. She reversed that in the 10 September meeting. It is required.**
 
-The situation:
+> *"Okay, so before you do this, you need to fix the schedule interview feature, right?"* — immediately following *"Score a candidate."*
 
-- We already built stage configuration and interviewer assignment in Sprint 1.
-- Our viva flagged that availability is tracked only inside Hyre, while interviewers are real Altrium employees who may be busy at their actual job while Hyre shows them "available."
-- But in the lecture she explained why scheduling is the hardest part of this scenario — interview type, matching an interviewer with the right capability (DevOps, SE, QA), real availability given they are *"working [on] projects at the moment"*, and different phases depending on seniority (intern, junior, senior). Her count: *"See how many variables."*
-- And teams who half-built it: *"since it is partially developed, it was not considered."*
+> *"But anyhow you need to be able to look into their availability."*
 
-**Decision: descoped from Sprint 2.** Do not build it, do not demo it.
-
-- Move the existing half-built code to a branch (`feature/interview-scheduling`) and remove it from the main build, the routes, and the navigation. Do not leave a dead menu item.
-- Nothing partial appears in the demo.
-
-Record this in the sprint backlog and the retrospective, in these terms:
-
-> *Interview scheduling was descoped from Sprint 2 following Product Owner feedback that partial features are not credited and that effort should not be invested in a feature the team cannot complete end-to-end. The team prioritised completing the CV validation, extraction and initial filtration chain — the problem the Product Owner identified as the core recruitment problem — rather than carrying a partially implemented scheduling feature into a second review.*
-
-That is a deliberate Agile descoping decision made on Product Owner feedback, and it demonstrates the exact lesson she was teaching. Be ready to say it out loud at the viva if asked why scheduling is gone.
-
-**Only reopen this if** Tier 1 is complete, tested, evidenced, and there is genuine time left. The design below is recorded now so it can be explained at the viva whether or not it is built.
+The earlier descoping decision is void. Do not put the descoping statement in the backlog.
 
 ---
 
-#### 8.1 What she actually asked for
+#### 8.0 She offered a major simplification — take it
 
-Her exact words, and the full extent of what she said on availability (09:28–09:46):
+> *"So in order to make things more easier for you, convenient for you, you can scope down your solution and say that, let's say your solution is only considering DevOps interviews... So then you are only concerning about that domain."*
 
-> *"Number two, you need to also find their availability. There should be a mechanism to find availability. Whether that person is available to do that interview on that particular day. Because they are working [on] projects at the moment. People who sit in the interviews."*
+> *"Then in your backend, the possible interviewers only need to be from this DevOps specialization."*
 
-**She never said "calendar."** The requirement is *a mechanism to find availability* — the implementation is our choice. The calendar idea came from our viva feedback, not from her.
+**Scope the entire scheduling feature to one domain: DevOps.** This is not a shortcut we invented; she proposed it unprompted to make the feature completable. Taking it is the correct answer, and it is what makes end-to-end completion realistic in the time available.
 
-The reason it matters: our interviewers are Altrium employees with real jobs. Interviewing is occasional work on top of engineering work. A "free" flag that only reflects what Hyre knows tells a recruiter nothing about whether the person is actually free.
-
-She also named the two other variables in the same passage — capability matching (*"DevOps engineers, software engineers, QAs... for the relevant interview you need to be able to find relevant person"*) and phases by seniority (*"Intern, junior position, senior positions... See how many variables."*) — before saying that teams who half-built scheduling got no credit.
+Consequences:
+- Interviewers in the system are DevOps specialists only.
+- Vacancies that use scheduling are DevOps vacancies.
+- State the scope limitation explicitly in the demo and the documentation, citing her suggestion.
 
 ---
 
-#### 8.2 The mechanism: declared availability with expiry
+#### 8.1 The four variables she named
 
-We cannot read Altrium's internal systems, so we do not pretend to. Interviewers declare their own availability inside Hyre. This is what real ATS products (Greenhouse, Lever) fall back to when calendar sync is not configured — it is a standard design, not a student workaround.
+> *"One is the specialization of the interviewer. Then the availability of the interviewer. If it is an in-person interview, the venue selection, right. And the stages of the interview."*
 
-**The failure mode this creates, and the rule that kills it:**
+**1. Specialization.** Interviewers carry a specialization. Within DevOps, they are further categorised by the level they can interview:
 
-An interviewer declares themselves available in week one, then forgets about it. Three weeks later they are deep in a project. Hyre still shows them free, HR books them, and the candidate's time is wasted. Stale availability is worse than none, because it produces confident wrong answers.
+> *"in that table you can categorize it, like if it is an intern interview, these three can go, likewise... If it is a senior DevOps engineer, these senior DevOps people who are working in [unclear] can go."*
 
-The fix is one rule:
+So the eligible interviewer set is a function of (domain, level). An intern interview draws from one group; a senior DevOps interview draws from a different, smaller group.
+
+**2. Availability.** See 8.2.
+
+**3. Venue.** Only relevant for in-person interviews. Interviews carry a mode (`in_person` | `online`); in-person interviews require a venue selection, online ones do not. Keep this simple — a small set of seeded meeting rooms with double-booking prevention is enough.
+
+**4. Stages, varying by seniority.**
+
+> *"If it is an intern, maybe two interviews enough. HR interview and technical interview. If it is a senior DevOps engineer, maybe it can go up to even five or four stages."*
+
+Stage count and composition are driven by the vacancy's level, not configured identically for every role. Intern: 2 stages. Junior: 3. Senior: 4–5. Make the mapping data-driven, not hardcoded per vacancy.
+
+---
+
+#### 8.2 Availability — the mechanism
+
+Her wording, and the full extent of what she required:
+
+> *"So these people, let's say eight people are there. They are currently working in projects in [unclear]... So they are not always free to do these five interviews. So HR person needs to have some kind of a way to check their availability."*
+
+On the calendar question, a student asked directly whether they need a calendar API:
+
+> Student: *"So it's like we have to get a calendar API for that."*
+> Lecturer: *"You can. So you need to investigate what are the options you have."*
+
+And earlier, on adding a calendar: *"That's one option. But anyhow you need to be able to look into their availability."*
+
+**So a calendar API is permitted, not mandated.** What is mandated is that HR can check availability, and that we have **investigated the options** — she asked for that explicitly. Produce a short written comparison of the options considered (Google Calendar API, Microsoft Graph, declared availability in-app) with the reasoning for the choice. That investigation is itself a deliverable.
+
+**Chosen mechanism: declared availability with expiry**, behind a provider interface so a real calendar can replace it.
+
+Justification for the documentation: interviewers are Altrium employees whose work calendars live in Altrium's systems, which we cannot access. Declaring availability in-app is what real ATS products (Greenhouse, Lever) fall back to when calendar sync is not configured. The provider interface means a real calendar source can be substituted without changing any consuming code.
+
+**The failure mode, and the rule that kills it.**
+
+An interviewer declares themselves available, then forgets. Weeks later they are deep in a project, Hyre still shows them free, HR books them, the candidate's time is wasted. Stale availability is worse than none, because it produces confident wrong answers.
 
 > **The system never infers `available` from silence.**
-
-Three states, and only three:
 
 | State | Meaning | Schedulable |
 |---|---|---|
@@ -810,29 +870,42 @@ Three states, and only three:
 | `unavailable` | Declared unavailable, or on leave | No |
 | `unknown` | Never declared, or the declaration has expired | **No** |
 
-An interviewer who has never logged in is `unknown`. An interviewer whose declaration has lapsed reverts to `unknown` — **never** to `available`. `unknown` is not schedulable and never appears in a slot suggestion.
-
-This is the whole mechanism. Everything below supports it.
+An interviewer who has never logged in is `unknown`. A lapsed declaration reverts to `unknown` — **never** to `available`. `unknown` is never suggested for a slot.
 
 ---
+
+#### 8.2b Remove the existing "Available" pill first
+
+`StageConfigModal.jsx` currently shows a green **"Available"** label for any interviewer with zero Hyre stage assignments. It measures how many pipeline stages the person is ticked onto — nothing about their real schedule. Someone slammed at their actual DevOps job who simply hasn't been assigned in Hyre reads as available.
+
+That is exactly the failure 8.2 exists to prevent, using "no assignment records" as the silent stand-in for "free". It is not stored as truth, but it is **displayed** as truth to HR, which is what matters.
+
+Remove it, or rename it to what it actually measures — "Assigned to N other stages". Do this before any real availability state is introduced, or HR will see two different things both claiming to say whether someone is free.
 
 #### 8.3 Data model
 
 ```
 interviewers/{userId}
   name
-  capabilities: string[]          // 'devops' | 'software-engineering' | 'qa' | ...
-  seniority: 'junior' | 'senior' | 'lead'
+  domain: 'devops'                     // scoped per 8.0
+  levels: ('intern' | 'junior' | 'senior')[]   // which levels they can interview
 
 availability/{userId}
-  slots: [ { dayOfWeek, startTime, endTime } ]   // recurring weekly declaration
+  slots: [ { dayOfWeek, startTime, endTime } ]      // recurring weekly
   exceptions: [ { date, type: 'leave' | 'blocked', reason } ]
   declaredAt: timestamp
-  validUntil: timestamp            // declaredAt + VALIDITY_WINDOW
-  state: 'available' | 'unavailable' | 'unknown'   // derived, never stored as truth
+  validUntil: timestamp                              // declaredAt + 14 days
+
+interviews/{interviewId}
+  applicationId, vacancyId, stageIndex
+  interviewerId
+  mode: 'in_person' | 'online'
+  venueId | null
+  scheduledAt
+  status: 'pending_confirmation' | 'confirmed' | 'declined' | 'completed'
 ```
 
-`state` is **computed at read time**, never trusted from storage:
+`state` is **computed at read time, never stored**:
 
 ```js
 function availabilityState(record, now) {
@@ -843,67 +916,62 @@ function availabilityState(record, now) {
 }
 ```
 
-Computing it on read means a lapsed declaration cannot linger as stale truth because a background job failed to run.
+Computing on read means a lapsed declaration cannot linger as stale truth because a background job failed.
 
-**Validity window: 14 days.** Chosen deliberately — long enough that interviewers are not nagged weekly, short enough that a declaration cannot survive a change of project assignment. Record the reasoning; an arbitrary number invites the question.
+**Validity window: 14 days.** Chosen deliberately — long enough not to nag interviewers weekly, short enough that a declaration cannot survive a change of project assignment. Record the reasoning; an arbitrary number invites the question.
 
 ---
 
 #### 8.4 Confirm before commit
 
-Expiry reduces staleness but cannot eliminate it. A declaration made yesterday can be wrong today. So a booking is never final on the strength of a declaration alone:
+Expiry reduces staleness; it cannot eliminate it. So a booking is never final on a declaration alone:
 
 1. HR selects a slot from the interviewer's declared availability.
-2. The interview is created with status `pending_confirmation`.
-3. The interviewer is notified and must **accept** or **decline**.
+2. The interview is created as `pending_confirmation`.
+3. The interviewer is notified and must accept or decline.
 4. Only on acceptance does it become `confirmed`.
-5. A decline returns the slot to HR with the interviewer marked `unavailable` for that date.
+5. A decline returns the slot to HR and marks the interviewer unavailable for that date.
 
-An acceptance today is fresher evidence than a declaration from twelve days ago. This is how real scheduling systems work, and it converts a stale-data problem into a confirmation step.
+An acceptance today is fresher evidence than a declaration from twelve days ago. This converts a stale-data problem into a confirmation step.
 
 ---
 
 #### 8.5 Freshness must be visible
 
-HR must never be shown availability without knowing how old it is.
-
-- Every interviewer displays when their availability was last updated: "Updated 2 hours ago" versus "Updated 16 days ago" are different claims.
+- Every interviewer shows when their availability was last updated. "Updated 2 hours ago" and "Updated 16 days ago" are different claims.
 - Anything older than 7 days is visually flagged as ageing.
-- `unknown` interviewers appear in the list but are clearly non-schedulable, with a "Request availability" action rather than being hidden. Hiding them would make HR think the person does not exist.
-- A prompt to interviewers to refresh their availability as expiry approaches.
+- `unknown` interviewers appear in the list but are clearly non-schedulable, with a "Request availability" action. Hiding them would make HR think the person does not exist.
 
 ---
 
-#### 8.6 Interviewer selection: AI suggests, a human decides
+#### 8.6 Selection: the system suggests, a human decides
 
-Given the eligible pool — correct capability for the interview type, correct seniority for the vacancy phase, and `available` state — the system can rank suitable interviewers and recommend a set.
+Given the eligible pool — correct domain, correct level for the vacancy's seniority, `available` state, no venue clash — the system ranks suitable interviewers and recommends them.
 
-**It must not assign them automatically.**
-
-This is not a scope decision, it is a correctness one. Removing the human from "who interviews this candidate" removes accountability from a hiring decision. When an assignment goes wrong, someone has to be answerable, and "the model chose" is not an answer that survives a viva question. AI proposing a ranked shortlist of eligible interviewers with reasons is defensible; AI deciding is not.
-
-Same principle as WS5: the engine reports, the human decides.
+**It must not assign automatically.** Removing the human from "who interviews this candidate" removes accountability from a hiring decision, and "the system chose" is not an answer that survives a viva question. Same principle as WS5: the engine reports, the human decides.
 
 ---
 
-#### 8.7 The stated limitation
+#### 8.7 End-to-end, or not at all
 
-This must appear in the sprint documentation, in these terms:
+She was explicit about why Sprint 1 failed:
 
-> *Declared availability with expiry and confirmation is a mitigation, not a complete solution. Fully accurate availability requires integration with Altrium's internal calendar system, which is outside the scope of this project. The design therefore routes all availability reads through an `AvailabilityProvider` interface so that a real calendar source can replace declared availability without changing any consuming code.*
+> *"During the demo all your features had gaps in them... without fine tuning and completing a function you have gone to other functions. So your product has many functions. But mainly they are partially completed."*
 
-Saying this plainly is stronger than implying the problem is solved. She has already caught one team presenting a feature as working when it was not.
+> *"Features needs to be end-to-end completed, all inclusive."*
 
-If built, the provider interface is:
+For WS8 that means the whole chain works with no gaps: shortlisted candidate → stages determined by vacancy level → eligible interviewers filtered by domain, level and availability → slot selected → venue if in-person → interviewer confirms → interview appears for both parties → outcome recorded.
 
-- `AvailabilityProvider.getAvailability(userId, dateRange)` → returns state plus slots.
-- `DeclaredAvailabilityProvider` — the implementation above. Runs in the demo, using real declarations from seeded interviewer accounts, not fabricated calendar data.
-- `GoogleCalendarProvider` — real free/busy, wired but inactive, proving the design accepts a real source.
-- Swapping providers changes one line.
+If any link cannot be finished, the feature is worth nothing. This is the second attempt at it.
 
-Also required if built: capability matched to interview type, phases differing by vacancy seniority, and no double-booking across both Hyre interviews and declared exceptions.
+---
 
-Half-building this again is the one outcome worse than either building it or cutting it.
+#### 8.8 Stated limitation
+
+Include in the documentation:
+
+> *Declared availability with expiry and confirmation is a mitigation, not a complete solution. Fully accurate availability requires integration with Altrium's internal calendar system, which is outside the scope of this project. All availability reads go through an `AvailabilityProvider` interface so a real calendar source can replace declared availability without changing consuming code. Scheduling is scoped to the DevOps domain, as suggested by the Product Owner, so the feature could be completed end-to-end.*
+
 
 ---
 
@@ -984,6 +1052,18 @@ Her diagnosis of the failing pattern, in order:
 
 Sprint 2 must run the other way round: conceptualize, review as a team, then build. If diagrams are being drawn after the code, the team is still in waterfall.
 
+### 12.2b — Named in the 10 September meeting
+
+Three specific corrections, all graded, none of them code:
+
+- **The sprint goal is not a list of features.** *"So, sprint goal is not basically writing down the features, right? So, goal is when you develop those features, what can [unclear]."* The Sprint 2 goal states what the features achieve, not what they are.
+- **Order the backlog.** *"Backlog, you need to organize, right, from first feature to last feature."*
+- **The diagrams have notational errors.** *"Diagrams mostly have notational errors, right, so you need to look into them."* And when asked whether all three reviewed them together before submitting: *"You need to review together, right."* Reviewing together is not optional advice — she asked the question because the errors showed nobody had.
+
+Also stated: the final report uses a **document template** containing the Sprint 1 document, the Sprint 2 document and further components. She said she would **put up the instructions by the following Tuesday** — check for them.
+
+**Individual assignment (separate from this project):** a skill assessment / skill audit table with scores and justifications. Skills are drawn from the requirements stated in the **10 vacancies**. Skills may be categorised, and a category may carry one score and one justification rather than one per skill. She stated no maximum number.
+
 ### 12.3 — Stand-ups from week one
 
 She noticed teams that only started daily stand-ups in week four or five, near the submission. Start them on day one of Sprint 2 and keep a record. The record is evidence.
@@ -1019,7 +1099,7 @@ She noticed teams that only started daily stand-ups in week four or five, near t
 
 - **Get Altrium's actual brief and re-read it.** The stated problems currently in this file are second-hand. Her marking rule is that the product must address at least one problem *the scenario actually states*. Confirm the real list and confirm which one WS5 addresses.
 - **Get the Sprint 2 deadline** from the correct submission link. No date was recoverable from the lecture recording. She said she will not look for submissions in the wrong link, and late is late.
-- **WS8 is settled: descoped.** No further decision needed. Record the descoping statement in the backlog and retrospective.
+- **WS8 is reinstated** as of the 10 Sep meeting. The descoping statement is void — do not put it in the backlog.
 
 ---
 
@@ -1032,6 +1112,6 @@ She noticed teams that only started daily stand-ups in week four or five, near t
 4. Before each workstream: state the plan and the files that will change. Wait for confirmation.
 5. Small commits, one logical change each, in my name only.
 6. Do not refactor unrelated code.
-7. Do not build WS7 or WS8. Both are out of scope.
+7. Do not build WS7. WS8 is back in scope as of 10 Sep — see section 9.
 8. If a requirement here is ambiguous, technically wrong, or conflicts with the codebase, say so and stop rather than guessing.
 9. Do not add features not listed in this file. An extra half-finished feature is worth less than nothing.

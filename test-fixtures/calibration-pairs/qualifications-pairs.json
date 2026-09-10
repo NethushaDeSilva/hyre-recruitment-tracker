@@ -1,0 +1,63 @@
+{
+  "description": "WS6.1 qualification-field calibration set, v2 (corrected). Pairs are FIELD-OF-STUDY TEXT ONLY, not full degree titles. Degree TYPE (BSc/BEng/MSc/MBA/LLB/PhD etc.) is resolved separately: level (6/7/8) by the existing structural rule (5.4), type-equivalence (BEng vs BSc for the same field, MBA vs Master of Business Administration, etc.) by canonicalisation at extraction — see normalization-canonicalization-pairs.json. v1 fed full degree titles into this comparison, which mostly tested type-equivalence rather than field-equivalence and produced a 93.3% false-negative rate; this set corrects that.",
+  "categories": {
+    "true_match": "Same or substitutable field of study — a recruiter would credit either for the same role. Similarity should be HIGH.",
+    "true_non_match": "Genuinely unrelated fields. Similarity should be LOW.",
+    "hard_negative": "Same broad discipline family, different specific field a recruiter would NOT treat as substitutable. BSc Computer Science/BSc Mathematics and BSc IT/BSc Business Information Systems are the litmus tests (6.1)."
+  },
+  "labellingNotes": [
+    "Computer Science / Software Engineering -> true_match: heavy curriculum overlap; job postings for general programming/backend roles routinely accept either.",
+    "Information Technology / Computing -> true_match: near-synonym umbrella terms. Information Technology / Business Information Systems stays hard_negative: BIS leans business/management, a real substance difference for a technical IT role.",
+    "Data Science / Data Analytics -> true_match: commonly interchangeable programme names in current curricula. Data Science / Computer Science stays hard_negative: CS gives programming foundations but no guaranteed statistics/ML depth a Data Science-titled vacancy is actually asking for -- borderline, resolved conservatively (recruiter would want to verify, not auto-credit).",
+    "Biology / Biomedical Science stays hard_negative for the same reason as Data Science / Computer Science: Biomedical Science leans clinical/lab-diagnostic, a real substance difference from general Biology."
+  ],
+  "pairs": [
+    { "a": "Computer Science", "b": "Software Engineering", "category": "true_match" },
+    { "a": "Information Technology", "b": "Computing", "category": "true_match" },
+    { "a": "Accounting", "b": "Accountancy", "category": "true_match" },
+    { "a": "Data Science", "b": "Data Analytics", "category": "true_match" },
+    { "a": "Business Administration", "b": "Business Management", "category": "true_match" },
+    { "a": "Marketing", "b": "Digital Marketing", "category": "true_match" },
+    { "a": "Psychology", "b": "Behavioural Science", "category": "true_match" },
+    { "a": "Nursing", "b": "Clinical Nursing", "category": "true_match" },
+    { "a": "Biology", "b": "Biological Sciences", "category": "true_match" },
+    { "a": "Economics", "b": "Applied Economics", "category": "true_match" },
+    { "a": "Public Health", "b": "Community Health", "category": "true_match" },
+    { "a": "Mechanical Engineering", "b": "Manufacturing Engineering", "category": "true_match" },
+    { "a": "Graphic Design", "b": "Visual Communication", "category": "true_match" },
+    { "a": "Human Resource Management", "b": "People Management", "category": "true_match" },
+    { "a": "Environmental Science", "b": "Environmental Studies", "category": "true_match" },
+
+    { "a": "Computer Science", "b": "Fine Arts", "category": "true_non_match" },
+    { "a": "Nursing", "b": "History", "category": "true_non_match" },
+    { "a": "Mechanical Engineering", "b": "Music", "category": "true_non_match" },
+    { "a": "Law", "b": "Biology", "category": "true_non_match" },
+    { "a": "Business Administration", "b": "Physics", "category": "true_non_match" },
+    { "a": "Mathematics", "b": "Theatre Studies", "category": "true_non_match" },
+    { "a": "Chemistry", "b": "Journalism", "category": "true_non_match" },
+    { "a": "English Literature", "b": "Civil Engineering", "category": "true_non_match" },
+    { "a": "Psychology", "b": "Electrical Engineering", "category": "true_non_match" },
+    { "a": "Fine Arts", "b": "Data Science", "category": "true_non_match" },
+    { "a": "Agriculture", "b": "Philosophy", "category": "true_non_match" },
+    { "a": "Physics", "b": "Marketing", "category": "true_non_match" },
+    { "a": "Nutrition", "b": "Graphic Design", "category": "true_non_match" },
+    { "a": "Aerospace Engineering", "b": "Sociology", "category": "true_non_match" },
+    { "a": "Veterinary Science", "b": "Political Science", "category": "true_non_match" },
+
+    { "a": "Computer Science", "b": "Mathematics", "category": "hard_negative" },
+    { "a": "Information Technology", "b": "Business Information Systems", "category": "hard_negative" },
+    { "a": "Civil Engineering", "b": "Mechanical Engineering", "category": "hard_negative" },
+    { "a": "Computer Science", "b": "Information Technology", "category": "hard_negative" },
+    { "a": "Physics", "b": "Mathematics", "category": "hard_negative" },
+    { "a": "Accounting", "b": "Finance", "category": "hard_negative" },
+    { "a": "Marketing", "b": "Business Administration", "category": "hard_negative" },
+    { "a": "Biology", "b": "Biomedical Science", "category": "hard_negative" },
+    { "a": "Psychology", "b": "Sociology", "category": "hard_negative" },
+    { "a": "Data Science", "b": "Computer Science", "category": "hard_negative" },
+    { "a": "Electrical Engineering", "b": "Electronic Engineering", "category": "hard_negative" },
+    { "a": "Economics", "b": "Business Administration", "category": "hard_negative" },
+    { "a": "Chemistry", "b": "Chemical Engineering", "category": "hard_negative" },
+    { "a": "Nursing", "b": "Public Health", "category": "hard_negative" },
+    { "a": "Law", "b": "Criminology", "category": "hard_negative" }
+  ]
+}

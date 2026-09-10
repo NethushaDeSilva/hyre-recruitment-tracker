@@ -1,0 +1,716 @@
+{
+  "calibratedAt": "2026-09-10T09:37:37.496Z",
+  "model": "@cf/baai/bge-base-en-v1.5",
+  "skillThreshold": 0.8803687307862392,
+  "qualThreshold": 0.8782373319923322,
+  "skills": {
+    "derived": {
+      "threshold": 0.8803687307862392,
+      "selectionRule": "max(hardNegatives) — distributions overlapped",
+      "separated": false,
+      "stats": {
+        "trueMatch": {
+          "min": 0.5909581160150054,
+          "max": 0.8046115388447305,
+          "n": 15
+        },
+        "trueNonMatch": {
+          "min": 0.4603326398826663,
+          "max": 0.7680772463176045,
+          "n": 15
+        },
+        "hardNegative": {
+          "min": 0.5431951675444262,
+          "max": 0.8803687307862392,
+          "n": 15
+        }
+      },
+      "falseNegativeRate": 1,
+      "falseNegativeCount": 15,
+      "hardNegativeFalsePositiveRate": 0
+    },
+    "pairs": [
+      {
+        "a": "Container orchestration",
+        "b": "Kubernetes",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.7275659362993817
+      },
+      {
+        "a": "Version control",
+        "b": "Git",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.7514592910526963
+      },
+      {
+        "a": "Infrastructure automation",
+        "b": "Terraform",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.6220536374693264
+      },
+      {
+        "a": "Data caching",
+        "b": "Redis",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.5909581160150054
+      },
+      {
+        "a": "Build automation",
+        "b": "Jenkins",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.6572971378073356
+      },
+      {
+        "a": "Document database",
+        "b": "MongoDB",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.8046115388447305
+      },
+      {
+        "a": "Deep learning",
+        "b": "TensorFlow",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.7828614989126764
+      },
+      {
+        "a": "Cloud hosting",
+        "b": "AWS",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.7182986538247712
+      },
+      {
+        "a": "Frontend framework",
+        "b": "React",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.6750933964722485
+      },
+      {
+        "a": "Backend runtime",
+        "b": "Node.js",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.6595156605393061
+      },
+      {
+        "a": "Load balancing",
+        "b": "Nginx",
+        "category": "true_match",
+        "relation": "category_instance",
+        "similarity": 0.671897823753177
+      },
+      {
+        "a": "Client-side",
+        "b": "Frontend",
+        "category": "true_match",
+        "relation": "equivalence",
+        "similarity": 0.733738248166944
+      },
+      {
+        "a": "Server-side",
+        "b": "Backend",
+        "category": "true_match",
+        "relation": "equivalence",
+        "similarity": 0.7343683188239699
+      },
+      {
+        "a": "Testing",
+        "b": "Quality assurance",
+        "category": "true_match",
+        "relation": "equivalence",
+        "similarity": 0.7048644887255083
+      },
+      {
+        "a": "Bug fixing",
+        "b": "Debugging",
+        "category": "true_match",
+        "relation": "equivalence",
+        "similarity": 0.7530304174569341
+      },
+      {
+        "a": "Python",
+        "b": "Java",
+        "category": "true_non_match",
+        "similarity": 0.7680772463176045
+      },
+      {
+        "a": "Docker",
+        "b": "Figma",
+        "category": "true_non_match",
+        "similarity": 0.5619407947515478
+      },
+      {
+        "a": "SQL",
+        "b": "HTML",
+        "category": "true_non_match",
+        "similarity": 0.6933990736199683
+      },
+      {
+        "a": "Kubernetes",
+        "b": "Photoshop",
+        "category": "true_non_match",
+        "similarity": 0.5068639521469513
+      },
+      {
+        "a": "React",
+        "b": "Excel",
+        "category": "true_non_match",
+        "similarity": 0.5868825535367833
+      },
+      {
+        "a": "AWS",
+        "b": "Illustrator",
+        "category": "true_non_match",
+        "similarity": 0.5564692666045806
+      },
+      {
+        "a": "MongoDB",
+        "b": "CSS",
+        "category": "true_non_match",
+        "similarity": 0.5673471221657511
+      },
+      {
+        "a": "TensorFlow",
+        "b": "InDesign",
+        "category": "true_non_match",
+        "similarity": 0.5203655906173654
+      },
+      {
+        "a": "Git",
+        "b": "PowerPoint",
+        "category": "true_non_match",
+        "similarity": 0.5373236742528632
+      },
+      {
+        "a": "Linux",
+        "b": "Salesforce",
+        "category": "true_non_match",
+        "similarity": 0.58511906694617
+      },
+      {
+        "a": "GraphQL",
+        "b": "Microsoft Word",
+        "category": "true_non_match",
+        "similarity": 0.5399027665949473
+      },
+      {
+        "a": "Jenkins",
+        "b": "Canva",
+        "category": "true_non_match",
+        "similarity": 0.4603326398826663
+      },
+      {
+        "a": "Redis",
+        "b": "Outlook",
+        "category": "true_non_match",
+        "similarity": 0.5693742742446805
+      },
+      {
+        "a": "Terraform",
+        "b": "Keynote",
+        "category": "true_non_match",
+        "similarity": 0.5568528849809962
+      },
+      {
+        "a": "Swift",
+        "b": "Bookkeeping",
+        "category": "true_non_match",
+        "similarity": 0.5093686481109905
+      },
+      {
+        "a": "Java",
+        "b": "JavaScript",
+        "category": "hard_negative",
+        "similarity": 0.8022287887094458
+      },
+      {
+        "a": "C",
+        "b": "C++",
+        "category": "hard_negative",
+        "similarity": 0.7009299843778761
+      },
+      {
+        "a": "React",
+        "b": "React Native",
+        "category": "hard_negative",
+        "similarity": 0.7958046113270466
+      },
+      {
+        "a": "C++",
+        "b": "C#",
+        "category": "hard_negative",
+        "similarity": 0.7252925206275136
+      },
+      {
+        "a": "Angular",
+        "b": "AngularJS",
+        "category": "hard_negative",
+        "similarity": 0.8803687307862392
+      },
+      {
+        "a": "Node.js",
+        "b": "Deno",
+        "category": "hard_negative",
+        "similarity": 0.5431951675444262
+      },
+      {
+        "a": "Vue",
+        "b": "Nuxt",
+        "category": "hard_negative",
+        "similarity": 0.6751351260007765
+      },
+      {
+        "a": "MySQL",
+        "b": "PostgreSQL",
+        "category": "hard_negative",
+        "similarity": 0.809885258157237
+      },
+      {
+        "a": "Docker",
+        "b": "Kubernetes",
+        "category": "hard_negative",
+        "similarity": 0.7258811111883647
+      },
+      {
+        "a": "Webpack",
+        "b": "Vite",
+        "category": "hard_negative",
+        "similarity": 0.5571942444339457
+      },
+      {
+        "a": "Redux",
+        "b": "MobX",
+        "category": "hard_negative",
+        "similarity": 0.5801144234921854
+      },
+      {
+        "a": "Jest",
+        "b": "Mocha",
+        "category": "hard_negative",
+        "similarity": 0.5543649149413811
+      },
+      {
+        "a": "TensorFlow",
+        "b": "PyTorch",
+        "category": "hard_negative",
+        "similarity": 0.705205536074104
+      },
+      {
+        "a": "Swift",
+        "b": "Objective-C",
+        "category": "hard_negative",
+        "similarity": 0.679079549513138
+      },
+      {
+        "a": "Kotlin",
+        "b": "Java",
+        "category": "hard_negative",
+        "similarity": 0.6832586808470357
+      }
+    ]
+  },
+  "qualifications": {
+    "derived": {
+      "threshold": 0.8782373319923322,
+      "selectionRule": "max(hardNegatives) — distributions overlapped",
+      "separated": false,
+      "stats": {
+        "trueMatch": {
+          "min": 0.722312351685354,
+          "max": 0.8759562261134598,
+          "n": 15
+        },
+        "trueNonMatch": {
+          "min": 0.4846892184187231,
+          "max": 0.7345336900061792,
+          "n": 15
+        },
+        "hardNegative": {
+          "min": 0.6389377676783661,
+          "max": 0.8782373319923322,
+          "n": 15
+        }
+      },
+      "falseNegativeRate": 1,
+      "falseNegativeCount": 15,
+      "hardNegativeFalsePositiveRate": 0
+    },
+    "pairs": [
+      {
+        "a": "Computer Science",
+        "b": "Software Engineering",
+        "category": "true_match",
+        "similarity": 0.722312351685354
+      },
+      {
+        "a": "Information Technology",
+        "b": "Computing",
+        "category": "true_match",
+        "similarity": 0.7512733855195683
+      },
+      {
+        "a": "Accounting",
+        "b": "Accountancy",
+        "category": "true_match",
+        "similarity": 0.8484389895027711
+      },
+      {
+        "a": "Data Science",
+        "b": "Data Analytics",
+        "category": "true_match",
+        "similarity": 0.7980942494445825
+      },
+      {
+        "a": "Business Administration",
+        "b": "Business Management",
+        "category": "true_match",
+        "similarity": 0.8520419772742032
+      },
+      {
+        "a": "Marketing",
+        "b": "Digital Marketing",
+        "category": "true_match",
+        "similarity": 0.8067434034210348
+      },
+      {
+        "a": "Psychology",
+        "b": "Behavioural Science",
+        "category": "true_match",
+        "similarity": 0.7319312796683866
+      },
+      {
+        "a": "Nursing",
+        "b": "Clinical Nursing",
+        "category": "true_match",
+        "similarity": 0.8360266326392775
+      },
+      {
+        "a": "Biology",
+        "b": "Biological Sciences",
+        "category": "true_match",
+        "similarity": 0.8636617755158896
+      },
+      {
+        "a": "Economics",
+        "b": "Applied Economics",
+        "category": "true_match",
+        "similarity": 0.7987798651319822
+      },
+      {
+        "a": "Public Health",
+        "b": "Community Health",
+        "category": "true_match",
+        "similarity": 0.8203992663431224
+      },
+      {
+        "a": "Mechanical Engineering",
+        "b": "Manufacturing Engineering",
+        "category": "true_match",
+        "similarity": 0.8118796144831499
+      },
+      {
+        "a": "Graphic Design",
+        "b": "Visual Communication",
+        "category": "true_match",
+        "similarity": 0.7286329602826135
+      },
+      {
+        "a": "Human Resource Management",
+        "b": "People Management",
+        "category": "true_match",
+        "similarity": 0.8446139494160074
+      },
+      {
+        "a": "Environmental Science",
+        "b": "Environmental Studies",
+        "category": "true_match",
+        "similarity": 0.8759562261134598
+      },
+      {
+        "a": "Computer Science",
+        "b": "Fine Arts",
+        "category": "true_non_match",
+        "similarity": 0.5780381035059918
+      },
+      {
+        "a": "Nursing",
+        "b": "History",
+        "category": "true_non_match",
+        "similarity": 0.5681671117306314
+      },
+      {
+        "a": "Mechanical Engineering",
+        "b": "Music",
+        "category": "true_non_match",
+        "similarity": 0.5353753229998183
+      },
+      {
+        "a": "Law",
+        "b": "Biology",
+        "category": "true_non_match",
+        "similarity": 0.697554826340262
+      },
+      {
+        "a": "Business Administration",
+        "b": "Physics",
+        "category": "true_non_match",
+        "similarity": 0.6076589434523274
+      },
+      {
+        "a": "Mathematics",
+        "b": "Theatre Studies",
+        "category": "true_non_match",
+        "similarity": 0.5581652718429555
+      },
+      {
+        "a": "Chemistry",
+        "b": "Journalism",
+        "category": "true_non_match",
+        "similarity": 0.5923315924509768
+      },
+      {
+        "a": "English Literature",
+        "b": "Civil Engineering",
+        "category": "true_non_match",
+        "similarity": 0.4846892184187231
+      },
+      {
+        "a": "Psychology",
+        "b": "Electrical Engineering",
+        "category": "true_non_match",
+        "similarity": 0.59635348496199
+      },
+      {
+        "a": "Fine Arts",
+        "b": "Data Science",
+        "category": "true_non_match",
+        "similarity": 0.5456009754075756
+      },
+      {
+        "a": "Agriculture",
+        "b": "Philosophy",
+        "category": "true_non_match",
+        "similarity": 0.5627359926092131
+      },
+      {
+        "a": "Physics",
+        "b": "Marketing",
+        "category": "true_non_match",
+        "similarity": 0.630067706924433
+      },
+      {
+        "a": "Nutrition",
+        "b": "Graphic Design",
+        "category": "true_non_match",
+        "similarity": 0.6178213730870195
+      },
+      {
+        "a": "Aerospace Engineering",
+        "b": "Sociology",
+        "category": "true_non_match",
+        "similarity": 0.5395981325063192
+      },
+      {
+        "a": "Veterinary Science",
+        "b": "Political Science",
+        "category": "true_non_match",
+        "similarity": 0.7345336900061792
+      },
+      {
+        "a": "Computer Science",
+        "b": "Mathematics",
+        "category": "hard_negative",
+        "similarity": 0.72141827680751
+      },
+      {
+        "a": "Information Technology",
+        "b": "Business Information Systems",
+        "category": "hard_negative",
+        "similarity": 0.804382340007686
+      },
+      {
+        "a": "Civil Engineering",
+        "b": "Mechanical Engineering",
+        "category": "hard_negative",
+        "similarity": 0.720523366877821
+      },
+      {
+        "a": "Computer Science",
+        "b": "Information Technology",
+        "category": "hard_negative",
+        "similarity": 0.7131688977748742
+      },
+      {
+        "a": "Physics",
+        "b": "Mathematics",
+        "category": "hard_negative",
+        "similarity": 0.7583584617368451
+      },
+      {
+        "a": "Accounting",
+        "b": "Finance",
+        "category": "hard_negative",
+        "similarity": 0.7722408300399052
+      },
+      {
+        "a": "Marketing",
+        "b": "Business Administration",
+        "category": "hard_negative",
+        "similarity": 0.6651115678154775
+      },
+      {
+        "a": "Biology",
+        "b": "Biomedical Science",
+        "category": "hard_negative",
+        "similarity": 0.8437665640717512
+      },
+      {
+        "a": "Psychology",
+        "b": "Sociology",
+        "category": "hard_negative",
+        "similarity": 0.7358978472248183
+      },
+      {
+        "a": "Data Science",
+        "b": "Computer Science",
+        "category": "hard_negative",
+        "similarity": 0.7707689638053048
+      },
+      {
+        "a": "Electrical Engineering",
+        "b": "Electronic Engineering",
+        "category": "hard_negative",
+        "similarity": 0.8782373319923322
+      },
+      {
+        "a": "Economics",
+        "b": "Business Administration",
+        "category": "hard_negative",
+        "similarity": 0.643234010830191
+      },
+      {
+        "a": "Chemistry",
+        "b": "Chemical Engineering",
+        "category": "hard_negative",
+        "similarity": 0.786813335819441
+      },
+      {
+        "a": "Nursing",
+        "b": "Public Health",
+        "category": "hard_negative",
+        "similarity": 0.6389377676783661
+      },
+      {
+        "a": "Law",
+        "b": "Criminology",
+        "category": "hard_negative",
+        "similarity": 0.6712791290453513
+      }
+    ]
+  },
+  "skillsSecondary": {
+    "governsThreshold": false,
+    "clears": 0,
+    "total": 15,
+    "pairs": [
+      {
+        "a": "Relational database management",
+        "b": "PostgreSQL",
+        "relation": "category_instance",
+        "similarity": 0.7402202863115707
+      },
+      {
+        "a": "Container orchestration",
+        "b": "Kubernetes",
+        "relation": "category_instance",
+        "similarity": 0.7275659362993817
+      },
+      {
+        "a": "Infrastructure as code",
+        "b": "Terraform",
+        "relation": "category_instance",
+        "similarity": 0.6000333686758764
+      },
+      {
+        "a": "Distributed version control",
+        "b": "Git",
+        "relation": "category_instance",
+        "similarity": 0.7260017461065666
+      },
+      {
+        "a": "Client-side scripting language",
+        "b": "JavaScript",
+        "relation": "category_instance",
+        "similarity": 0.76030339801754
+      },
+      {
+        "a": "Server-side JavaScript runtime",
+        "b": "Node.js",
+        "relation": "category_instance",
+        "similarity": 0.6575939636029514
+      },
+      {
+        "a": "In-memory data caching",
+        "b": "Redis",
+        "relation": "category_instance",
+        "similarity": 0.5808158674412892
+      },
+      {
+        "a": "Continuous integration pipelines",
+        "b": "Jenkins",
+        "relation": "category_instance",
+        "similarity": 0.6014429921669066
+      },
+      {
+        "a": "NoSQL document storage",
+        "b": "MongoDB",
+        "relation": "category_instance",
+        "similarity": 0.7673195149817864
+      },
+      {
+        "a": "Deep learning model training",
+        "b": "TensorFlow",
+        "relation": "category_instance",
+        "similarity": 0.7383728989133856
+      },
+      {
+        "a": "Cloud compute provisioning",
+        "b": "AWS",
+        "relation": "category_instance",
+        "similarity": 0.711086550349894
+      },
+      {
+        "a": "Building and consuming RESTful APIs",
+        "b": "API development",
+        "relation": "equivalence",
+        "similarity": 0.7760890632116005
+      },
+      {
+        "a": "Writing automated test suites",
+        "b": "Test automation",
+        "relation": "equivalence",
+        "similarity": 0.8727022144060554
+      },
+      {
+        "a": "Optimizing SQL query performance",
+        "b": "Database performance tuning",
+        "relation": "equivalence",
+        "similarity": 0.848116632366019
+      },
+      {
+        "a": "Troubleshooting production issues",
+        "b": "Live system debugging",
+        "relation": "equivalence",
+        "similarity": 0.736051538188769
+      }
+    ]
+  }
+}

@@ -8,6 +8,7 @@
     "dev:functions": "wrangler pages dev public --port 8788",
     "build": "vite build",
     "preview": "vite preview",
+    "calibrate": "node scripts/calibrate-thresholds.mjs",
     "test": "vitest run"
   },
   "dependencies": {

@@ -852,11 +852,27 @@ On the calendar question, a student asked directly whether they need a calendar 
 
 And earlier, on adding a calendar: *"That's one option. But anyhow you need to be able to look into their availability."*
 
-**So a calendar API is permitted, not mandated.** What is mandated is that HR can check availability, and that we have **investigated the options** — she asked for that explicitly. Produce a short written comparison of the options considered (Google Calendar API, Microsoft Graph, declared availability in-app) with the reasoning for the choice. That investigation is itself a deliverable.
+**She was more specific than "permitted" — later in the same meeting:**
+
+> *"Ideal mechanism is a calendar. There are [unclear] APIs available."*
+> *"Let's say eight people are there. Each people's commitments are mentioned in different colors, likewise."*
+> *"Then the HR person can pick a slot there, [unclear] is free."*
+
+She named a calendar **view** as the ideal mechanism — a week grid, one colour per interviewer, HR picking a free slot directly off it. That's a UI requirement, not a mandate to sync an external calendar: nothing in this wording requires the underlying data to come from Google or Microsoft rather than Hyre's own declared availability. 8.2a below is that view, built on the data model this section decides.
+
+**She also, deliberately, did not demand a perfect solution:**
+
+> *"This option has limitations, right. But with the time period you can see whether to go ahead with something like this."*
+
+An explicit acknowledgement that whatever ships here is a mitigation within a time-boxed project, not a claim of full real-calendar integration. State it exactly this way in the sprint write-up and at the viva — it's her framing, not an excuse supplied after the fact.
+
+**So a calendar API is permitted, not mandated.** What is mandated is that HR can check availability through something that presents the way she described, and that we have **investigated the options** — she asked for that explicitly. See 8.8 for the comparison table; that investigation is itself a deliverable.
 
 **Chosen mechanism: declared availability with expiry**, behind a provider interface so a real calendar can replace it.
 
 Justification for the documentation: interviewers are Altrium employees whose work calendars live in Altrium's systems, which we cannot access. Declaring availability in-app is what real ATS products (Greenhouse, Lever) fall back to when calendar sync is not configured. The provider interface means a real calendar source can be substituted without changing any consuming code.
+
+**This is precisely why the interface exists, not a hedge added after the fact.** `AvailabilityProvider` was designed so that a `GoogleCalendarProvider` — real per-user OAuth, `calendar.freebusy` scope, live busy blocks — can replace `DeclaredAvailabilityProvider` later by changing only the provider implementation. Neither the calendar view (8.2a) nor the selection logic (8.6) that consumes availability data would change at all. The `GoogleCalendarProvider` design — OAuth flow, token handling, the freebusy query, failure states, and the privacy analysis — is fully worked out in **8.8**. It is documented, not implemented: a scoping decision made deliberately against the time remaining for WS5/WS6, not a gap nobody looked at.
 
 **The failure mode, and the rule that kills it.**
 
@@ -871,6 +887,23 @@ An interviewer declares themselves available, then forgets. Weeks later they are
 | `unknown` | Never declared, or the declaration has expired | **No** |
 
 An interviewer who has never logged in is `unknown`. A lapsed declaration reverts to `unknown` — **never** to `available`. `unknown` is never suggested for a slot.
+
+---
+
+#### 8.2a The calendar view
+
+The primary UI for 8.2's availability data, matching what she described — a week grid, not a list.
+
+- **Week view** — one calendar week at a time.
+- **Eligible interviewers only** — filtered by (domain, level) for the vacancy's seniority, per 8.1. Reuses the existing stage-eligibility logic in `stages.js` rather than a second copy of "who is allowed here" (see the build plan for exactly what that reuse looks like).
+- **Each interviewer colour-coded** — one consistent colour per interviewer across the whole view, so a recruiter can track one person's commitments at a glance, matching *"each people's commitments are mentioned in different colors."*
+- **Commitments shown, all in that interviewer's colour:**
+  - existing Hyre interviews (`interviews/{interviewId}` where `interviewerId` matches and status is `pending_confirmation` or `confirmed` — a slot that still holds)
+  - declared unavailable blocks and leave (`availability/{userId}.exceptions`)
+  - provider-sourced busy times, where available — the `AvailabilityProvider` interface (8.8) means this becomes real the moment a real calendar is plugged in; empty until then, never faked
+- **Free gaps read as free** — no marks, visually open. HR clicks one to propose it.
+- **Selecting a slot creates the interview as `pending_confirmation`** (8.4). The calendar view is an entry point into the existing confirm-before-commit flow, never a parallel booking path that could skip it.
+- **`unknown` interviewers are a distinct hatched/grey state, not blank space.** An interviewer who never declared, or whose declaration lapsed, must never look like an open lane on the grid — that is exactly the silent-inference failure 8.2's core rule exists to prevent. Hatched/grey, with a "Request availability" affordance, matching 8.5.
 
 ---
 
@@ -966,11 +999,44 @@ If any link cannot be finished, the feature is worth nothing. This is the second
 
 ---
 
-#### 8.8 Stated limitation
+#### 8.8 Options investigated, and the stated limitation
+
+She asked directly for an investigation of the calendar-API options, not just a decision (8.2) — the investigation is itself a deliverable, not a footnote to the choice already made. Seeded interviewers were later removed entirely: every interviewer is a real person with a real Google account, which reopened the Google option and made it worth investigating properly rather than dismissing on an infrastructure-access assumption that turned out not to apply.
+
+| Option | What it gives you | What it requires | Verdict |
+|---|---|---|---|
+| **Google Calendar API** (per-user OAuth, `calendar.freebusy` scope) | Real, live free/busy blocks from an interviewer's own calendar. Full design below — this is not a rejected option, it's a deferred one. | Nothing from Altrium. Each interviewer authorises Hyre against their own Google account — no Workspace admin, no domain-wide delegation, no IT approval. Correcting an earlier assumption in this document: domain-wide delegation was rightly ruled out for lack of Altrium access, but per-user OAuth was never blocked by that — it needs nothing from Altrium at all. | **Deferred, not rejected.** Technically viable and fully speced (below). Not built because WS5's scoring engine — "the thing being marked" — was still unbuilt when this was investigated, and 4.2's "never build a partial feature" rule cuts against starting a second, larger workstream before the graded core is complete. Stretch upgrade behind `AvailabilityProvider` once WS5/WS6 are done and evidenced. |
+| **Microsoft Graph** (Outlook/365, delegated `Calendars.Read`) | Same category as Google — free/busy for a Microsoft account, via per-user delegated consent, no tenant admin required for this narrow use | An Azure AD app registration and a second, parallel OAuth integration | Investigated at the same category level as Google, not built out to the same technical depth — every interviewer on this team has a Google account, so a second provider would duplicate the OAuth-plumbing effort in §8.8's estimate below for zero additional coverage. Same status as Google: viable later behind `AvailabilityProvider`, not pursued now. |
+| **In-app declared availability** (chosen for Sprint 2) | Interviewer self-declares weekly slots + exceptions inside Hyre; fully testable end-to-end with data we control | Nothing external | **Chosen.** What real ATS products (Greenhouse, Lever) fall back to when calendar sync isn't configured — an honest approximation, not a disguised claim of live-calendar accuracy. The 14-day expiry (8.3) and confirm-before-commit step (8.4) are the mitigations a real calendar wouldn't need but declared data does. Zero OAuth risk, guaranteed completable end-to-end in the time available — the deciding factor against the graded core still being unbuilt. |
+
+All three sit behind one `AvailabilityProvider` interface — swapping in Google or Microsoft Graph later touches only the provider implementation, never the calendar view (8.2a) or the selection logic (8.6) that consumes it.
+
+##### 8.8.1 GoogleCalendarProvider — the deferred design, documented for when it's built
+
+**OAuth flow.** Authorization Code flow, `access_type=offline`, `prompt=consent` (forces a refresh token on every connect). Scope is exactly `https://www.googleapis.com/auth/calendar.freebusy` — the narrowest Google scope that exists for this, purpose-built to return busy/free intervals and nothing else. Cloudflare Pages Functions act as the confidential OAuth client (they can hold a client secret server-side and call `fetch()` to Google — "no Node server" rules out a persistent process, not server-side code): `/api/auth/google/start` redirects to Google, `/api/auth/google/callback` exchanges the code for tokens. OAuth consent screen: External, **Testing** status — never submitted for verification, since `calendar.freebusy` is a sensitive, not restricted, scope and Testing mode covers up to 100 explicitly-added test users, comfortably more than a 4-person team.
+
+**Token handling.** Refresh + access tokens live in `calendarTokens/{userId}`, a collection with Firestore rules `allow read, write: if false` for every client — only the Admin SDK inside the Pages Function (service-account authenticated, bypasses rules entirely) can touch it. The client secret and the Firebase Admin service-account credentials are Cloudflare secrets (`wrangler pages secret put`), never `.env`, never `VITE_`-prefixed, never in the client bundle. Access tokens (~1hr) are refreshed server-side before each use; a refresh failure (revoked, or a possible shorter testing-mode lifetime — confirm the actual figure in the Console when this is built, don't assume it) is treated as equivalent to disconnection, never retried into a stale success.
+
+**Freebusy query.** `POST https://www.googleapis.com/calendar/v3/freeBusy` with `items:[{id:"primary"}]`, using the calling interviewer's own token. **Correction to an earlier framing of this option:** per-user OAuth cannot batch multiple interviewers into one Google API call — that only works with domain-wide delegation, which is off the table. "Batching" here means the aggregating Pages Function firing one concurrent `Promise.all` of per-interviewer calls per week-view load, returning one merged response to the client — batched from the browser's perspective, not from Google's.
+
+**Three real states, feeding 8.2a's week view directly:** `connected` (live `busy[]` rendered as solid blocks in the interviewer's colour), `unknown` (never connected, or token dead — hatched/grey, exactly 8.2's existing rule), `declared-unavailable/leave` (the in-app exception layer, rendered as a distinct stripe pattern *on top of* either of the other two, since an explicit declaration is stronger evidence than an inferred calendar state). This is a drop-in extension of 8.2a's existing three-state design, not a new one.
+
+**Failure handling — every path resolves to unknown or flagged, never to free:** a rate limit or dead token on one interviewer's call degrades only that row (other interviewers' concurrent calls are unaffected); a full Google outage degrades the whole view to a "not live" banner falling back to declared exceptions and existing Hyre interviews only. This is 8.2's core rule — never infer `available` from missing information — extended to cover API and network failure as one more form of "we don't know," alongside silence.
+
+**Privacy — the exact, defensible claim:** *"Hyre can see that an interviewer is busy from 2–3pm on Tuesday. It cannot see what that meeting is, who it's with, where it is, or which calendar it's on."* This is literal, not a policy promise: `freeBusy.query` is purpose-built to return only start/end intervals, and the `calendar.freebusy` scope means Google's API itself rejects any attempt to call `events.list` or `events.get` with that token — enforced by Google, not by our own restraint. An event another attendee marked "Private" still reports correctly as a busy block with no further detail leaking. Nothing beyond busy/free timestamps is ever exposed, and this is safe to state exactly this way to the team and in the viva.
+
+**Effort estimate, for whoever picks this up post-WS6:**
+
+| Bucket | Estimate | Why |
+|---|---|---|
+| OAuth plumbing (Console config, start/callback Functions, token storage + rules, refresh logic) | 1.5–2.5 days | Highest-risk chunk for a first OAuth integration — small code volume, but redirect-URI and consent-screen friction eats real time |
+| Freebusy integration (provider implementation, aggregating Function, failure-state mapping) | ~1 day | Simple once OAuth plumbing works |
+| Calendar view UI changes (three-state rendering already exists from the declared-availability build — this is swapping the data source, not building the grid again) | 0.5–1 day | The view was built once, against the interface, on purpose |
+| **Total** | **~3–4.5 days** | Only worth spending after WS5 + WS6 are complete and evidenced — see the reasoning in the table above |
 
 Include in the documentation:
 
-> *Declared availability with expiry and confirmation is a mitigation, not a complete solution. Fully accurate availability requires integration with Altrium's internal calendar system, which is outside the scope of this project. All availability reads go through an `AvailabilityProvider` interface so a real calendar source can replace declared availability without changing consuming code. Scheduling is scoped to the DevOps domain, as suggested by the Product Owner, so the feature could be completed end-to-end.*
+> *Declared availability with expiry and confirmation is what shipped for Sprint 2 — a mitigation, not a complete solution, and an explicit scoping decision rather than a gap. Real Google Calendar integration was investigated in full (OAuth flow, token handling, the freebusy query, failure states, and a privacy analysis showing the system can see only busy/free timestamps and nothing else) and found technically viable through per-user consent, requiring no access to Altrium's infrastructure at all. It was deferred, not rejected, because the scoring engine — the graded core of this project — took priority on the time available. All availability reads go through an `AvailabilityProvider` interface so `GoogleCalendarProvider` can replace declared availability later without changing the calendar view or the selection logic that consumes it. Scheduling is scoped to the DevOps domain, as suggested by the Product Owner, so the feature could be completed end-to-end.*
 
 
 ---

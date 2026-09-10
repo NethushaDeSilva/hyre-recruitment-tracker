@@ -112,6 +112,52 @@ describe("scoreApplications — batch", () => {
   });
 });
 
+describe("scoreApplication — WS6.4 scoring-stage stability", () => {
+  it("produces byte-identical output across 100 runs on one static CandidateProfile (σ = 0.00)", async () => {
+    // Mixed layer 1 (React, BSc Computer Science — exact after normalisation)
+    // and layer 3 (Container orchestration/Kubernetes — embedding) matches,
+    // and an experience shortfall (3 of 4 years) so the non-linear formula is
+    // exercised too. The claim under test is determinism, not any particular
+    // score — a representative candidate, not a trivial all-layer-1 one.
+    // "React.js" needs a vector too even though it resolves at layer 1 — once
+    // "Container orchestration" has no layer-1 match, matchTermSet embeds the
+    // whole candidate skill list to find its best layer-3 match. [0, 1] is
+    // orthogonal to REF so it can't accidentally outscore the intended
+    // Kubernetes match.
+    const embedTexts = mockEmbed({
+      "Container orchestration": REF, Kubernetes: unit(0.95), "React.js": [0, 1],
+      GraphQL: [0, 1], // no candidate skill actually covers it — stays "missing" from niceToHave
+    });
+    const requirements = {
+      requiredQualification: { level: 6, field: "Computer Science" },
+      requiredSkills: ["React", "Container orchestration"],
+      minYearsExperience: 4,
+      niceToHave: ["GraphQL"],
+    };
+    const candidate = {
+      candidateId: "CAND-STABILITY-01",
+      skills: ["React.js", "Kubernetes"],
+      education: [{ degree: "BSc Computer Science" }],
+      totalYearsExperience: 3,
+      extractedText:
+        "BSc Computer Science graduate. Built React.js applications and deployed workloads on Kubernetes across multiple clusters.",
+    };
+
+    const runs = [];
+    for (let i = 0; i < 100; i++) {
+      runs.push(await scoreApplication(candidate, requirements, { embedTexts, now: NOW }));
+    }
+
+    const first = JSON.stringify(runs[0]);
+    expect(runs.every((r) => JSON.stringify(r) === first)).toBe(true);
+
+    const scores = runs.map((r) => r.overallScore);
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const variance = scores.reduce((sum, s) => sum + (s - mean) ** 2, 0) / scores.length;
+    expect(Math.sqrt(variance)).toBe(0);
+  });
+});
+
 describe("sortApplications", () => {
   it("orders by overallScore desc, then core-skills score desc, then candidateId ascending; unscored sorts last", () => {
     const make = (candidateId, overallScore, coreScore) => ({

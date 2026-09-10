@@ -2,15 +2,14 @@
 // stages. Recruitment is a multi-stage filter: each stage is owned by a role
 // (HR screening → Department review → interviews → Final interview), and only the
 // owning role (or Management) can advance/reject a candidate in that stage.
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, Sparkles } from "lucide-react";
+import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search } from "lucide-react";
 import { useHyreData, advanceStage, rejectCandidate, bulkReject } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
 import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
-import AiFilter from "@/components/AiFilter";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/Badge";
@@ -40,23 +39,8 @@ export default function PositionDetail() {
   // board search (HR only) — live, filters by name/skills/role/company/field.
   // Manual qualification/experience filters were removed in favour of AI Mode.
   const [q, setQ] = useState("");
-  // UI chrome: the header shrinks as you scroll the board (reclaims space), and
-  // the AI screening panel lives in a popover opened by the "AI Mode" button.
+  // UI chrome: the header shrinks as you scroll the board (reclaims space).
   const [collapsed, setCollapsed] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  const aiWrapRef = useRef(null);
-  useEffect(() => {
-    if (!aiOpen) return;
-    // While a candidate's pop-out is open on top, clicks inside it (or Escape,
-    // which nothing else here handles) must NOT dismiss the AI popover behind
-    // it — the whole point is that the AI-filtered shortlist survives underneath
-    // and reappears, still intact, once that pop-out closes.
-    const onDown = (e) => { if (detail) return; if (aiWrapRef.current && !aiWrapRef.current.contains(e.target)) setAiOpen(false); };
-    const onKey = (e) => { if (detail) return; if (e.key === "Escape") setAiOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
-  }, [aiOpen, detail]);
   // Collapse past 44px of board scroll, expand back under 16px (hysteresis stops flicker).
   const onBoardScroll = (e) => {
     const y = e.currentTarget.scrollTop;
@@ -194,10 +178,9 @@ export default function PositionDetail() {
         )}
       </div>
 
-      {/* search — HR only. Filtering is AI-driven now (✨ AI Mode), so this is a
-          single wide search bar with the AI Mode toggle at its end. */}
+      {/* search — HR only. */}
       {isHR && (
-        <div ref={aiWrapRef} className={`relative z-30 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
+        <div className={`relative z-30 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
           <div className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
             <Search size={15} className="shrink-0 text-muted-foreground" />
             <input
@@ -206,25 +189,7 @@ export default function PositionDetail() {
               placeholder="Search name, skills…"
               className="w-full bg-transparent text-foreground placeholder:text-[#94A3B8] focus:outline-none"
             />
-            <button
-              onClick={() => setAiOpen((o) => !o)}
-              title="Screen candidates with AI"
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors ${aiOpen ? "border-primary bg-primary text-primary-foreground" : "border-primary/40 bg-primary/[0.06] text-primary hover:bg-primary/10"}`}
-            >
-              <Sparkles size={13} /> AI Mode
-            </button>
           </div>
-
-          {/* AI screening popover — drops under the search bar on AI Mode. Opening a
-              candidate from the ranked list does NOT close this (no setAiOpen(false)
-              here) — it stays mounted with its results intact underneath the pop-out
-              (which renders at a higher z-index), so closing the pop-out reveals the
-              same shortlist again instead of forcing a re-search. */}
-          {aiOpen && (
-            <div className="absolute left-0 top-full z-40 mt-2 w-full sm:max-w-[680px]">
-              <AiFilter candidates={cands} onOpen={setDetail} onClose={() => setAiOpen(false)} />
-            </div>
-          )}
         </div>
       )}
 

@@ -1,5 +1,5 @@
 // Hyre — WS3 CV validation gate, as a Cloudflare Pages Function at
-// /api/validate-cv (same pattern as /api/screen — Workers AI, no API key).
+// /api/validate-cv (same pattern as /api/parse-cv — Workers AI, no API key).
 //
 // The client has ALREADY run the cheap checks (length, image-only) before
 // ever calling this — this endpoint's only job is the AI classification pass:

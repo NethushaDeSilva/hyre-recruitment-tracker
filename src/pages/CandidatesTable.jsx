@@ -2,8 +2,8 @@
 // sortable, filterable table. This is the "CV details in a table" the brief asks
 // for: filter by position, stage, qualification, experience or free-text search,
 // sort by any column, and download/view each CV.
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, SlidersHorizontal, X } from "lucide-react";
 import { useHyreData, advanceStage } from "@/data/store";
 import { stageLabelOf, resolveStage, nextStage, canActOnStageFor, visiblePositions } from "@/lib/stages";
 import { useAuth } from "@/context/AuthContext";
@@ -17,20 +17,10 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useToast } from "@/components/ui/ToastProvider";
 import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl } from "@/lib/file";
-import AiFilter from "@/components/AiFilter";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
 import EligibilityTag from "@/components/EligibilityTag";
 import { HoverScrollText } from "@/components/ui/HoverScrollText";
 import { cn } from "@/lib/utils";
-
-// AI Score column pill colour — same thresholds as AiFilter's own scorePill,
-// so a candidate reads the same whether you're looking at the popover or the table.
-const aiScorePill = (s) =>
-  s >= 75
-    ? "bg-[#16A34A]/12 text-[#16A34A] dark:text-[#4ADE80]"
-    : s >= 50
-    ? "bg-[#E0A422]/15 text-[#B4801A] dark:text-[#F5D77E]"
-    : "bg-[#DC2626]/10 text-[#DC2626] dark:text-[#F87171]";
 
 // Ordinal rank so qualification / experience / stage sort meaningfully, not A–Z.
 const rank = (list, v) => {
@@ -61,21 +51,6 @@ export default function CandidatesTable() {
   const [view, setView] = useState("all"); // all | active | hired | pool
   const [selected, setSelected] = useState(null);
   const [checked, setChecked] = useState(() => new Set()); // ticked candidate ids for bulk actions
-  // AI Mode — same screening panel as the position board, scoped to every
-  // candidate visible on this (cross-position) page. Results are kept here too
-  // (not just inside the popover) so the score can show as a column in the table.
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiResults, setAiResults] = useState(null); // { summary, ranked: [{id, score, verdict, reason}] }
-  const aiWrapRef = useRef(null);
-  useEffect(() => {
-    if (!aiOpen) return;
-    const onDown = (e) => { if (selected) return; if (aiWrapRef.current && !aiWrapRef.current.contains(e.target)) setAiOpen(false); };
-    const onKey = (e) => { if (selected) return; if (e.key === "Escape") setAiOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDown); document.removeEventListener("keydown", onKey); };
-  }, [aiOpen, selected]);
-  const aiScoreById = useMemo(() => new Map((aiResults?.ranked || []).map((r) => [r.id, r])), [aiResults]);
 
   const titleFor = (id) => positions.find((p) => p.id === id)?.title || "—";
   const positionFor = (id) => positions.find((p) => p.id === id) || null; // for the detail modal's Move-to-next-stage
@@ -269,7 +244,7 @@ export default function CandidatesTable() {
       {/* filters */}
       <Card className="relative z-30 mt-4 p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <div ref={aiWrapRef} className="relative min-w-[220px] flex-1">
+          <div className="min-w-[220px] flex-1">
             <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
               <Search size={15} className="shrink-0 text-muted-foreground" />
               <input
@@ -278,25 +253,7 @@ export default function CandidatesTable() {
                 placeholder="Search name, email, skills…"
                 className="w-full bg-transparent text-foreground placeholder:text-[#94A3B8] focus:outline-none"
               />
-              <button
-                onClick={() => setAiOpen((o) => !o)}
-                title="Screen candidates with AI"
-                className={cn(
-                  "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold transition-colors",
-                  aiOpen ? "border-primary bg-primary text-primary-foreground" : "border-primary/40 bg-primary/[0.06] text-primary hover:bg-primary/10"
-                )}
-              >
-                <Sparkles size={13} /> AI Mode
-              </button>
             </div>
-
-            {/* AI screening popover — scores everyone currently visible on this
-                page (across positions); results also populate the AI Score column. */}
-            {aiOpen && (
-              <div className="absolute left-0 top-full z-40 mt-2 w-full sm:max-w-[680px]">
-                <AiFilter candidates={candidates} onOpen={setSelected} onClose={() => setAiOpen(false)} onResults={setAiResults} />
-              </div>
-            )}
           </div>
           <Select value={position} onChange={(e) => setPosition(e.target.value)} className="w-auto min-w-[150px]">
             <option value="">All positions</option>
@@ -452,14 +409,6 @@ export default function CandidatesTable() {
                             <div className="flex items-center gap-2">
                               <HoverScrollText text={titleFor(a.positionId)} className="min-w-0 max-w-[45%] shrink font-medium text-foreground" />
                               <StageBadge stageId={a.stage} />
-                              {aiScoreById.has(a.id) && (
-                                <span
-                                  className={cn("shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold", aiScorePill(aiScoreById.get(a.id).score))}
-                                  title={aiScoreById.get(a.id).reason}
-                                >
-                                  {aiScoreById.get(a.id).score}%
-                                </span>
-                              )}
                               <EligibilityTag candidateQual={c.highestQualification} minQual={minQualFor(a.positionId)} />
                             </div>
                             {a.stage === "rejected" && a.rejection?.reason && (

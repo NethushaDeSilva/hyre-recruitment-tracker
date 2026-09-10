@@ -20,6 +20,7 @@ import { downloadDataUrl } from "@/lib/file";
 import AiFilter from "@/components/AiFilter";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
 import EligibilityTag from "@/components/EligibilityTag";
+import { HoverScrollText } from "@/components/ui/HoverScrollText";
 import { cn } from "@/lib/utils";
 
 // AI Score column pill colour — same thresholds as AiFilter's own scorePill,
@@ -348,10 +349,24 @@ export default function CandidatesTable() {
       {/* table */}
       <Card className="mt-5 overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[1050px] table-fixed text-sm">
+            {/* Every column has an explicit width, Position included — with
+                table-fixed + w-full, all-explicit widths scale proportionally
+                to fill the row, so no single column can balloon and crowd out
+                the rest the way an unconstrained column would. */}
+            <colgroup>
+              <col className="w-10" />
+              <col className="w-[200px]" />
+              <col className="w-[100px]" />
+              <col className="w-[300px]" />
+              <col className="w-[130px]" />
+              <col className="w-[100px]" />
+              <col className="w-[100px]" />
+              <col className="w-[80px]" />
+            </colgroup>
             <thead className="border-b border-border bg-background text-[13px]">
               <tr>
-                <th className="w-10 px-4 py-3">
+                <th className="px-4 py-3">
                   <input
                     type="checkbox"
                     checked={pageAllChecked}
@@ -365,16 +380,15 @@ export default function CandidatesTable() {
                 <Th label="Position" k="position" />
                 <Th label="Qualification" k="qualification" />
                 <Th label="Experience" k="experience" />
-                <th className="px-4 py-3 text-left font-semibold text-foreground">Location</th>
                 <Th label="Applied" k="appliedAt" />
                 <th className="px-4 py-3 text-left font-semibold text-foreground">CV</th>
               </tr>
             </thead>
             <tbody ref={bodyRef}>
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">Loading candidates…</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">Loading candidates…</td></tr>
               ) : groupedRows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">No candidates match these filters.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No candidates match these filters.</td></tr>
               ) : (
                 pageGroups.map((c) => (
                   <tr
@@ -397,9 +411,9 @@ export default function CandidatesTable() {
                     <td className="px-4 py-3 align-top">
                       <div className="flex items-center gap-2.5">
                         <Avatar name={displayName(c)} color={c.avatarColor} size={34} />
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate font-semibold text-foreground">{displayName(c)}</span>
+                            <HoverScrollText text={displayName(c)} className="min-w-0 flex-1 text-sm font-semibold text-foreground" />
                             {c.source === "Role change" && (
                               <span className="shrink-0 rounded bg-[#EEF2FF] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4F46E5] dark:bg-[#4F46E5]/15 dark:text-[#A5B4FC]" title={`Internal role change from ${c.fromRole || "current role"}${c.fromEmployeeId ? ` (${c.fromEmployeeId})` : ""}`}>
                                 Role change
@@ -411,20 +425,23 @@ export default function CandidatesTable() {
                               </span>
                             )}
                           </div>
-                          <div className="truncate text-xs text-muted-foreground">{c.email || "—"}</div>
+                          <HoverScrollText text={c.email || "—"} className="text-xs text-muted-foreground" />
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <span className="font-mono text-xs font-semibold text-muted-foreground">{c.candidateId || "—"}</span>
+                      <HoverScrollText text={c.candidateId || "—"} className="font-mono text-xs font-semibold text-muted-foreground" />
                     </td>
                     {/* One self-contained "chip" per application — title, eligibility,
                         stage and AI score all live together, so wrapping or a longer
                         title never desyncs which stage/score belongs to which position
-                        (the old separate-columns layout let them drift apart). The
-                        Applied column below lists dates in the same order so it still
-                        lines up with these top to bottom. */}
-                    <td className="min-w-[220px] px-4 py-3 align-top text-muted-foreground">
+                        (the old separate-columns layout let them drift apart). Never
+                        wraps to a second line — the title shrinks and, if it still
+                        doesn't fit, reveals itself on hover instead — so every chip is
+                        exactly one line tall and the whole column aligns level, row to
+                        row. The Applied column lists dates in the same order so it
+                        still lines up with these top to bottom. */}
+                    <td className="px-4 py-3 align-top text-muted-foreground">
                       <div className="space-y-1.5">
                         {c.applications.map((a) => (
                           <div
@@ -432,22 +449,18 @@ export default function CandidatesTable() {
                             onClick={(e) => { e.stopPropagation(); setSelected(a); }}
                             className="rounded-md border border-border/60 bg-background px-2.5 py-1.5 transition-colors hover:border-primary/40"
                           >
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className="max-w-[150px] truncate font-medium text-foreground" title={titleFor(a.positionId)}>
-                                {titleFor(a.positionId)}
-                              </span>
+                            <div className="flex items-center gap-2">
+                              <HoverScrollText text={titleFor(a.positionId)} className="min-w-0 max-w-[45%] shrink font-medium text-foreground" />
                               <StageBadge stageId={a.stage} />
-                              <div className="ml-auto flex items-center gap-1.5">
-                                {aiScoreById.has(a.id) && (
-                                  <span
-                                    className={cn("rounded px-1.5 py-0.5 text-[11px] font-bold", aiScorePill(aiScoreById.get(a.id).score))}
-                                    title={aiScoreById.get(a.id).reason}
-                                  >
-                                    {aiScoreById.get(a.id).score}%
-                                  </span>
-                                )}
-                                <EligibilityTag candidateQual={c.highestQualification} minQual={minQualFor(a.positionId)} />
-                              </div>
+                              {aiScoreById.has(a.id) && (
+                                <span
+                                  className={cn("shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold", aiScorePill(aiScoreById.get(a.id).score))}
+                                  title={aiScoreById.get(a.id).reason}
+                                >
+                                  {aiScoreById.get(a.id).score}%
+                                </span>
+                              )}
+                              <EligibilityTag candidateQual={c.highestQualification} minQual={minQualFor(a.positionId)} />
                             </div>
                             {a.stage === "rejected" && a.rejection?.reason && (
                               <div className="mt-1 text-[11px] font-medium text-[#DC2626]">{a.rejection.reason}</div>
@@ -456,9 +469,10 @@ export default function CandidatesTable() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 align-top text-muted-foreground">{c.highestQualification || "—"}</td>
+                    <td className="px-4 py-3 align-top text-muted-foreground">
+                      <HoverScrollText text={c.highestQualification || "—"} />
+                    </td>
                     <td className="px-4 py-3 align-top text-muted-foreground">{c.experience || "—"}</td>
-                    <td className="px-4 py-3 align-top text-muted-foreground">{c.location || "—"}</td>
                     <td className="px-4 py-3 align-top text-muted-foreground">
                       <div className="space-y-1.5">
                         {c.applications.map((a) => (

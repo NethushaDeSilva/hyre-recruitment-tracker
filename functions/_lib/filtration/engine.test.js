@@ -9,12 +9,11 @@ function mockEmbed(table) {
 }
 const unit = (cosineValue) => [cosineValue, Math.sqrt(1 - cosineValue * cosineValue)];
 const REF = [1, 0];
-const NOW = () => new Date("2026-09-10T12:00:00Z");
 
 describe("scoreApplication — guard", () => {
   it("throws ScoringError rather than returning a fabricated score when requiredSkills is empty", async () => {
     const embedTexts = async () => { throw new Error("should not be called"); };
-    await expect(scoreApplication({ skills: [] }, { requiredSkills: [] }, { embedTexts, now: NOW }))
+    await expect(scoreApplication({ skills: [] }, { requiredSkills: [] }, { embedTexts }))
       .rejects.toBeInstanceOf(ScoringError);
   });
 });
@@ -34,7 +33,7 @@ describe("scoreApplication — fully normalised match, zero embedding calls", ()
       totalYearsExperience: 5,
       extractedText: "BSc Computer Science graduate, experienced in React.js and Node.js, building GraphQL APIs.",
     };
-    const result = await scoreApplication(candidate, requirements, { embedTexts, now: NOW });
+    const result = await scoreApplication(candidate, requirements, { embedTexts });
 
     expect(result.capApplied).toBe(false);
     expect(result.overallScore).toBe(90); // 25 (qual) + 45 (skills) + 20 (experience) + 0 (nice-to-have)
@@ -44,7 +43,9 @@ describe("scoreApplication — fully normalised match, zero embedding calls", ()
     expect(result.breakdown.experience).toEqual({ score: 20, max: 20, candidateYears: 5, requiredYears: 3 });
     expect(result.instrumentation.layers).toEqual({ normalisation: 3, embedding: 0, none: 0 });
     expect(result.instrumentation.borderline).toBe(0);
-    expect(result.meta.scoredAt).toBe("2026-09-10T12:00:00.000Z");
+    // No `meta` here by design — the engine is pure and has no clock or model
+    // identity of its own; filtration-ai.test.js covers meta assembly.
+    expect(result.meta).toBeUndefined();
   });
 });
 
@@ -58,7 +59,7 @@ describe("scoreApplication — embedding fallback and the null-qualification res
       totalYearsExperience: 2,
       extractedText: "Deployed workloads using Kubernetes across multiple clusters.",
     };
-    const result = await scoreApplication(candidate, requirements, { embedTexts, now: NOW });
+    const result = await scoreApplication(candidate, requirements, { embedTexts });
 
     expect(result.breakdown.qualifications).toEqual({ applicable: false });
     expect(result.breakdown.coreSkills.matched[0].layer).toBe("embedding");
@@ -83,7 +84,7 @@ describe("scoreApplication — unverifiable qualification is flagged for review,
       totalYearsExperience: 0,
       extractedText: "Skilled in React. No formal qualifications listed here.",
     };
-    const result = await scoreApplication(candidate, requirements, { embedTexts, now: NOW });
+    const result = await scoreApplication(candidate, requirements, { embedTexts });
 
     expect(result.breakdown.qualifications.score).toBe(0);
     expect(result.breakdown.qualifications.matched).toEqual([]);
@@ -102,7 +103,7 @@ describe("scoreApplications — batch", () => {
     const requirements = { requiredQualification: null, requiredSkills: ["React"], minYearsExperience: 0, niceToHave: [] };
     const good = { candidateId: "CAND-1", skills: ["React"], education: [], totalYearsExperience: 0, extractedText: "React developer." };
     const broken = null; // simulates a malformed/missing candidate record
-    const results = await scoreApplications([good, broken], requirements, { embedTexts, now: NOW });
+    const results = await scoreApplications([good, broken], requirements, { embedTexts });
 
     expect(results).toHaveLength(2);
     expect(results[0].status).toBe("scored");
@@ -145,7 +146,7 @@ describe("scoreApplication — WS6.4 scoring-stage stability", () => {
 
     const runs = [];
     for (let i = 0; i < 100; i++) {
-      runs.push(await scoreApplication(candidate, requirements, { embedTexts, now: NOW }));
+      runs.push(await scoreApplication(candidate, requirements, { embedTexts }));
     }
 
     const first = JSON.stringify(runs[0]);

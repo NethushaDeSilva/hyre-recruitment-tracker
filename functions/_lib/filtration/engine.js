@@ -21,8 +21,11 @@ import {
   creditWeightForStatus,
 } from "./scoring.js";
 import { getThresholds } from "./thresholds.js";
-import { EMBEDDING_MODEL } from "../embeddings.js";
 
+// The version identifier stamped into meta.engineVersion — by the CALLER, not
+// here (see the note on scoreApplication's return below). Exported so
+// filtration-ai.js and the client's staleness check both read the same
+// literal rather than each hand-typing a copy that could drift apart.
 export const ENGINE_VERSION = "1.0.0";
 
 export class ScoringError extends Error {}
@@ -67,16 +70,22 @@ async function scoreSkillList(requiredList, candidateSkills, extractedText, weig
  * the vacancy has no structured requirements to score against — 10.1's
  * "block scoring with a clear message" rule.
  *
+ * Returns overallScore/capApplied/breakdown/instrumentation only — no
+ * `meta`. Provenance (model IDs, thresholds, engineVersion, scoredAt) is
+ * assembled by the CALLER (filtration-ai.js) after this returns, never in
+ * here: this function has no clock and no knowledge of which embedding model
+ * `embedTexts` happens to be backed by, which is what "pure" means for it.
+ *
  * @param {object} candidate - CandidateProfile (WS4 schema): skills[],
  *   education[], totalYearsExperience, extractedText
  * @param {object} requirements - vacancy requirements (5.2)
- * @param {{ embedTexts: Function, now?: () => Date }} deps
+ * @param {{ embedTexts: Function }} deps
  */
 export async function scoreApplication(candidate, requirements, deps) {
   if (!requirements || !Array.isArray(requirements.requiredSkills) || !requirements.requiredSkills.length) {
     throw new ScoringError("Vacancy has no structured requirements to score against.");
   }
-  const { embedTexts, now = () => new Date() } = deps;
+  const { embedTexts } = deps;
   const { SKILL_SIMILARITY_THRESHOLD, QUAL_SIMILARITY_THRESHOLD } = getThresholds();
 
   const candidateSkills = candidate.skills || [];
@@ -153,14 +162,6 @@ export async function scoreApplication(candidate, requirements, deps) {
       coreSkills: { score: core.score, max: core.max, matched: core.matched, missing: core.missing },
       experience,
       preferredSkills: { score: preferred.score, max: preferred.max, matched: preferred.matched, missing: preferred.missing },
-    },
-    meta: {
-      extractionModel: candidate.extractionModel || null,
-      embeddingModel: EMBEDDING_MODEL,
-      skillThreshold: SKILL_SIMILARITY_THRESHOLD,
-      qualThreshold: QUAL_SIMILARITY_THRESHOLD,
-      engineVersion: ENGINE_VERSION,
-      scoredAt: now().toISOString(),
     },
     // Not part of 5.7's output schema — this is the counter WS6.1's open
     // decision (5.4) depends on: how many matches per application came from

@@ -42,7 +42,7 @@ const toPayload = (c) => ({
   coverNote: c.coverNote,
 });
 
-export default function AiFilter({ candidates = [], onOpen, onClose }) {
+export default function AiFilter({ candidates = [], onOpen, onClose, onResults }) {
   const [criteria, setCriteria] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -94,7 +94,9 @@ export default function AiFilter({ candidates = [], onOpen, onClose }) {
         if (!res.ok || !Array.isArray(data.ranked)) {
           throw new Error(data.error || "The AI screening service didn't return a result. Please try again.");
         }
-        setResults({ summary: data.summary || "", ranked: data.ranked });
+        const next = { summary: data.summary || "", ranked: data.ranked };
+        setResults(next);
+        onResults?.(next);
         clearTimeout(timer);
         setLoading(false);
         return;
@@ -185,7 +187,7 @@ export default function AiFilter({ candidates = [], onOpen, onClose }) {
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-[13px] font-bold text-foreground">Best matches ({results.ranked.length})</span>
-            <button onClick={() => setResults(null)} className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
+            <button onClick={() => { setResults(null); onResults?.(null); }} className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
               <X size={13} /> Clear
             </button>
           </div>

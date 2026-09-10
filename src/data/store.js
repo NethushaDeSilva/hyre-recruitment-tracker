@@ -533,78 +533,10 @@ export function syncAuth(user) {
     subscribeIdentityStream("id:all", null);
     subscribeStream("app:all", "applications", "application", null);
     subscribeStream("emp:all", "employees", "employee", null);
-    // Only recruiters may write positions — seed from a recruiter session.
-    if (user.role === "HR" || user.role === "Management") seedIfEmpty();
-  }
-}
-
-// One-time seed: if the positions collection is empty, write the demo data with
-// READABLE document ids (candidates/CAND-0001 as identities, employees/…), and
-// seed the counters so live writes continue the sequence. Only ever runs against
-// a brand-new, empty database.
-async function seedIfEmpty() {
-  try {
-    const existing = await getDocs(collection(db, "positions"));
-    if (!existing.empty) return;
-    // Positions get readable ids (short code + per-code sequence, e.g. NE-01); keep a
-    // seed-id → readable-id map so candidate/employee positionId refs stay correct.
-    const posIdMap = new Map();
-    const seqByCode = new Map();
-    for (const p of SEED_POSITIONS) {
-      const code = positionCode(p.title);
-      const seq = (seqByCode.get(code) || 0) + 1;
-      seqByCode.set(code, seq);
-      posIdMap.set(p.id, makePositionId(p.title, seq));
-    }
-    await Promise.all(
-      SEED_POSITIONS.map((p) =>
-        setDoc(doc(db, "positions", posIdMap.get(p.id)), {
-          title: p.title, department: p.department, description: p.description,
-          status: p.status, stages: p.stages, minQualification: p.minQualification || "",
-          requirements: p.requirements || null, createdAt: new Date(p.createdAt),
-        })
-      )
-    );
-    const posByIdSeed = new Map(SEED_POSITIONS.map((p) => [p.id, p]));
-    let candNum = 1;
-    let empNum = EMPLOYEE_SEQ_START;
-    const writes = [];
-    for (const c of SEED_CANDIDATES) {
-      const candidateId = fmtCandidateId(candNum++);
-      const emailKey = normalizeEmail(c.email) || `noemail_${c.id}`;
-      writes.push(setDoc(doc(db, "candidates", emailKey), {
-        email: emailKey, candidateId, name: c.name, avatarColor: c.avatarColor,
-        highestQualification: c.highestQualification || "", experience: c.experience || "",
-        createdAt: new Date(c.appliedAt),
-      }));
-      const positionId = posIdMap.get(c.positionId) || c.positionId;
-      if (c.stage === "hired") {
-        const pos = posByIdSeed.get(c.positionId) || {};
-        const deptName = pos.department || "";
-        const title = pos.title || c.appliedRole || "";
-        const employeeId = makeEmployeeId(deptName, title, empNum++);
-        writes.push(setDoc(doc(db, "employees", employeeId), {
-          personId: emailKey, candidateId, name: c.name, email: emailKey, avatarColor: c.avatarColor,
-          highestQualification: c.highestQualification || "", experience: c.experience || "",
-          positionId, appliedRole: c.appliedRole, employeeId, employeeDept: deptName, employeeRole: title,
-          hiredAt: new Date(c.appliedAt), appliedAt: new Date(c.appliedAt),
-        }));
-      } else {
-        writes.push(addDoc(collection(db, "applications"), {
-          personId: emailKey, email: emailKey, positionId, stage: c.stage,
-          appliedRole: c.appliedRole, appliedAt: new Date(c.appliedAt), source: "Added by HR",
-          history: [{ type: "apply", from: null, to: "applied", at: at(c.appliedAt), by: "HR", byRole: "" }],
-        }));
-      }
-    }
-    await Promise.all(writes);
-    // Seed the counters so live applications/hires continue the sequences.
-    await setDoc(doc(db, "counters", "candidates"), { next: candNum });
-    await setDoc(doc(db, "counters", "employees"), { next: empNum });
-  } catch (err) {
-    console.error("Seed failed:", err);
-    loading = false;
-    commit();
+    // No auto-seed here: a brand-new Firestore starts genuinely empty. HR posts
+    // real positions and candidates apply with real CVs — see CLAUDE.md, "no
+    // dummy data" — an empty positions collection is the correct clean state,
+    // not a signal to write demo data into it.
   }
 }
 

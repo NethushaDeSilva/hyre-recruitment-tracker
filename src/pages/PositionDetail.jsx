@@ -4,20 +4,18 @@
 // owning role (or Management) can advance/reject a candidate in that stage.
 import { useState, useRef, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, SlidersHorizontal, Sparkles, Link2, Copy } from "lucide-react";
+import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, Sparkles } from "lucide-react";
 import { useHyreData, advanceStage, rejectCandidate, bulkReject } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
 import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
 import AiFilter from "@/components/AiFilter";
-import { QUALIFICATIONS, EXPERIENCE_RANGES } from "@/lib/application";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDate, displayName } from "@/lib/format";
-import CheckDropdown from "@/components/CheckDropdown";
 import AddCandidateModal from "@/components/AddCandidateModal";
 import RejectModal from "@/components/RejectModal";
 import StageConfigModal from "@/components/StageConfigModal";
@@ -39,18 +37,13 @@ export default function PositionDetail() {
   const [reviewFor, setReviewFor] = useState(null);    // candidate id showing the inline "review first" hint on its card
   // Applied-stage bulk select (HR only) — tick applicants and move them together.
   const [picked, setPicked] = useState(() => new Set());
-  // board filters (HR only) — search is live; the multi-select qualification /
-  // experience filters take effect when Apply is pressed.
+  // board search (HR only) — live, filters by name/skills/role/company/field.
+  // Manual qualification/experience filters were removed in favour of AI Mode.
   const [q, setQ] = useState("");
-  const [qualDraft, setQualDraft] = useState([]);
-  const [expDraft, setExpDraft] = useState([]);
-  const [qualActive, setQualActive] = useState([]);
-  const [expActive, setExpActive] = useState([]);
   // UI chrome: the header shrinks as you scroll the board (reclaims space), and
   // the AI screening panel lives in a popover opened by the "AI Mode" button.
   const [collapsed, setCollapsed] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const aiWrapRef = useRef(null);
   useEffect(() => {
     if (!aiOpen) return;
@@ -103,21 +96,16 @@ export default function PositionDetail() {
   const orphanStages = [...new Set(cands.map((c) => c.stage))].filter((s) => s !== "rejected" && !position.stages.includes(s));
   const columns = [...position.stages, ...orphanStages, ...(cands.some((c) => c.stage === "rejected") ? ["rejected"] : [])];
 
-  // apply the board filters (live search + the applied multi-selects) to the set
+  // apply the live board search to the set
   const needle = q.trim().toLowerCase();
-  const anyFilter = q.trim() || qualActive.length || expActive.length;
+  const anyFilter = needle.length > 0;
   const filtered = cands.filter((c) => {
-    if (qualActive.length && !qualActive.includes(c.highestQualification)) return false;
-    if (expActive.length && !expActive.includes(c.experience)) return false;
     if (needle) {
       const hay = `${displayName(c)} ${c.email} ${c.skills} ${c.currentRole} ${c.currentCompany} ${c.fieldOfStudy}`.toLowerCase();
       if (!hay.includes(needle)) return false;
     }
     return true;
   });
-  const applyFilters = () => { setQualActive(qualDraft); setExpActive(expDraft); };
-  const filtersDirty = JSON.stringify(qualDraft) !== JSON.stringify(qualActive) || JSON.stringify(expDraft) !== JSON.stringify(expActive);
-  const clearFilters = () => { setQ(""); setQualDraft([]); setExpDraft([]); setQualActive([]); setExpActive([]); };
 
   // Move flow. Applied is a plain move; any stage after it needs the acting user's
   // comment + score first (enforced in store.advanceStage). If it's missing we open
@@ -193,9 +181,6 @@ export default function PositionDetail() {
         </div>
         {canConfigure && (
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button variant="ghost" onClick={() => setShareOpen((o) => !o)}>
-              <Link2 size={16} /> Share
-            </Button>
             <Button variant="ghost" onClick={() => setEditOpen(true)}>
               <Pencil size={16} /> Edit position
             </Button>
@@ -209,36 +194,11 @@ export default function PositionDetail() {
         )}
       </div>
 
-      {/* application link — how candidates reach this position without ever
-          touching the internal board (WS1 step 3). */}
-      {shareOpen && (
-        <div className="mt-3 space-y-2 rounded-lg border border-border bg-background p-3.5 text-sm">
-          {[
-            { icon: Link2, label: "Application link", value: `${window.location.origin}/jobs?position=${position.id}` },
-          ].map(({ icon: Icon, label, value }) => (
-            <div key={label} className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
-                <Icon size={14} className="shrink-0" />
-                <span className="shrink-0 font-semibold text-foreground">{label}:</span>
-                <span className="truncate font-mono text-xs">{value}</span>
-              </div>
-              <button
-                onClick={() => { navigator.clipboard.writeText(value); toast.success(`${label} copied.`); }}
-                className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                title={`Copy ${label.toLowerCase()}`}
-              >
-                <Copy size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* search + filters — HR only. The search bar is long; the ✨ AI Mode button
-          on it opens the AI screening panel in a popover (no permanent big box). */}
+      {/* search — HR only. Filtering is AI-driven now (✨ AI Mode), so this is a
+          single wide search bar with the AI Mode toggle at its end. */}
       {isHR && (
-        <div ref={aiWrapRef} className={`relative z-30 flex flex-wrap items-center gap-2.5 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
-          <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
+        <div ref={aiWrapRef} className={`relative z-30 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
+          <div className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
             <Search size={15} className="shrink-0 text-muted-foreground" />
             <input
               value={q}
@@ -254,16 +214,6 @@ export default function PositionDetail() {
               <Sparkles size={13} /> AI Mode
             </button>
           </div>
-          <CheckDropdown label="Qualifications" options={QUALIFICATIONS} value={qualDraft} onChange={setQualDraft} className="min-w-[170px]" />
-          <CheckDropdown label="Experience" options={EXPERIENCE_RANGES} value={expDraft} onChange={setExpDraft} className="min-w-[150px]" />
-          <Button onClick={applyFilters} disabled={!filtersDirty}>
-            Apply
-          </Button>
-          {anyFilter && (
-            <button onClick={clearFilters} className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary">
-              <SlidersHorizontal size={14} /> Clear
-            </button>
-          )}
 
           {/* AI screening popover — drops under the search bar on AI Mode. Opening a
               candidate from the ranked list does NOT close this (no setAiOpen(false)

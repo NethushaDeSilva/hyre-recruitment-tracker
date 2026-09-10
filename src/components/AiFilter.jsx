@@ -65,14 +65,17 @@ export default function AiFilter({ candidates = [], onOpen, onClose, onResults }
     }
   }, []);
 
-  // Screen only people still in play — skip rejected and already-hired.
-  const pool = candidates.filter((c) => c.stage !== "rejected" && c.stage !== "hired");
+  // AI screening is Applied-stage only. Once HR has moved someone into HR
+  // Screening, Department Review, an interview stage, or a final decision,
+  // a human has already made a judgement call on them — AI Mode must never
+  // re-touch that. It only ever helps triage the raw, unreviewed inbound pile.
+  const pool = candidates.filter((c) => c.stage === "applied");
   const byId = new Map(candidates.map((c) => [c.id, c]));
 
   const run = async (text) => {
     const q = (text ?? criteria).trim();
     if (!q) return setError("Type the skills, criteria or rules you're looking for first.");
-    if (!pool.length) return setError("There are no active candidates to screen in this position.");
+    if (!pool.length) return setError("There are no candidates in Applied to screen — AI Mode only screens the Applied stage.");
     setLoading(true);
     setError("");
     setResults(null);
@@ -138,7 +141,7 @@ export default function AiFilter({ candidates = [], onOpen, onClose, onResults }
       <div className="flex items-start justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-bold text-foreground">
           <Sparkles size={16} className="text-primary" /> AI screening
-          <span className="font-medium text-muted-foreground">— describe your ideal candidate or the rules to apply; AI reasons over everyone and ranks the best.</span>
+          <span className="font-medium text-muted-foreground">— describe your ideal candidate or the rules to apply; AI reasons over everyone in Applied and ranks the best.</span>
         </div>
         {onClose && (
           <button onClick={onClose} className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="Close AI screening">

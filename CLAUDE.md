@@ -454,7 +454,7 @@ function experienceScore(candidateYrs, requiredYrs) {
 
 Note this returns a flat 20 for anyone at or above the requirement — 3 years and 15 years score identically. That is deliberate: the vacancy stated a minimum, not a preference.
 
-**Skills** — state the exact per-skill credit rule in code and keep it the only place it is defined. Exact match earns full credit; an embedding match at or above threshold earns full credit; below threshold earns nothing. Skills score is the proportion of required skills matched, times 45.
+**Skills** — state the exact per-skill credit rule in code and keep it the only place it is defined. Exact match (after normalisation, 5.4 layer 1) earns full credit; an embedding match strictly above threshold earns full credit (5.4 — never at-or-above); at or below threshold earns nothing. Skills score is the proportion of required skills matched, times 45.
 
 **Degree-level deficit cap** — scaled, never clamped:
 

@@ -1,16 +1,16 @@
 // Hyre — text embeddings via Cloudflare Workers AI, same-origin.
-// Powers WS6.1 threshold calibration (scripts/calibrate-thresholds.mjs) and,
-// later, WS5's live skill/qualification equivalence matching (5.4/5.5) — the
-// SAME model call, so calibration measures the exact distribution scoring
-// will run against at runtime.
+// Powers WS6.1 threshold calibration (scripts/calibrate-thresholds.mjs).
+// The WS5 scoring engine calls runEmbeddings() directly, in-process — this
+// route exists for calibration (a plain Node script, no Workers AI binding
+// of its own) and any other out-of-Worker caller, not for the engine's own
+// runtime path. Both go through the same shared function, so calibration
+// measures the exact call scoring makes.
 //
 // Contract:
 //   POST { text: string[] }   (batch, max 100 strings per call, 2000 chars each)
 //   -> { embeddings: number[][] }   (768-dim vectors, same order as input)
 
-const MODEL = "@cf/baai/bge-base-en-v1.5";
-const MAX_TEXTS = 100;
-const MAX_CHARS = 2000;
+import { runEmbeddings } from "../_lib/embeddings.js";
 
 export async function onRequestPost({ request, env }) {
   let body;
@@ -21,19 +21,12 @@ export async function onRequestPost({ request, env }) {
   }
 
   const input = Array.isArray(body.text) ? body.text : [body.text];
-  const clean = input
-    .filter((t) => typeof t === "string" && t.trim())
-    .slice(0, MAX_TEXTS)
-    .map((t) => t.trim().slice(0, MAX_CHARS));
-
-  if (!clean.length) return json({ error: "No text to embed." }, 400);
+  if (!input.some((t) => typeof t === "string" && t.trim())) {
+    return json({ error: "No text to embed." }, 400);
+  }
 
   try {
-    const result = await env.AI.run(MODEL, { text: clean });
-    const embeddings = result?.data;
-    if (!Array.isArray(embeddings) || embeddings.length !== clean.length) {
-      return json({ error: "Embedding model returned an unexpected shape." }, 502);
-    }
+    const embeddings = await runEmbeddings(env, input);
     return json({ embeddings }, 200);
   } catch (e) {
     return json({ error: e.message || "Embedding model call failed." }, 502);

@@ -21,11 +21,16 @@ import StageConfigModal from "@/components/StageConfigModal";
 import OpenPositionModal from "@/components/OpenPositionModal";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
 import EligibilityTag from "@/components/EligibilityTag";
+import ShortlistPanel from "@/components/ShortlistPanel";
 
 export default function PositionDetail() {
   const { id } = useParams();
   const { user } = useAuth();
-  const { positions, candidates, loading } = useHyreData();
+  const { positions, candidates, scores, loading } = useHyreData();
+  // Board = the pipeline Kanban. Shortlist (WS5 5.8) = Applied-stage
+  // applications ranked by score — "the screen that turns 100 CVs into a
+  // workable list." HR only, matching the rest of this toolbar's scoping.
+  const [view, setView] = useState("board");
   const [addOpen, setAddOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -37,7 +42,6 @@ export default function PositionDetail() {
   // Applied-stage bulk select (HR only) — tick applicants and move them together.
   const [picked, setPicked] = useState(() => new Set());
   // board search (HR only) — live, filters by name/skills/role/company/field.
-  // Manual qualification/experience filters were removed in favour of AI Mode.
   const [q, setQ] = useState("");
   // UI chrome: the header shrinks as you scroll the board (reclaims space).
   const [collapsed, setCollapsed] = useState(false);
@@ -178,10 +182,10 @@ export default function PositionDetail() {
         )}
       </div>
 
-      {/* search — HR only. */}
+      {/* search + Board/Shortlist toggle — HR only. */}
       {isHR && (
-        <div className={`relative z-30 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
-          <div className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
+        <div className={`relative z-30 flex flex-wrap items-center gap-2.5 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
+          <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
             <Search size={15} className="shrink-0 text-muted-foreground" />
             <input
               value={q}
@@ -190,12 +194,34 @@ export default function PositionDetail() {
               className="w-full bg-transparent text-foreground placeholder:text-[#94A3B8] focus:outline-none"
             />
           </div>
+          <div className="flex shrink-0 items-center rounded-md border border-border bg-card p-0.5 text-xs font-bold">
+            {[["board", "Board"], ["shortlist", `Shortlist (${cands.filter((c) => c.stage === "applied").length})`]].map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setView(id)}
+                className={`rounded px-3 py-1.5 transition-colors ${view === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* board — the ONE scroll region. Its up–down scroll drives the header
+      {isHR && view === "shortlist" ? (
+        <div className={`min-h-0 flex-1 overflow-auto pb-2 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-4"}`}>
+          <ShortlistPanel
+            position={position}
+            applications={cands.filter((c) => c.stage === "applied")}
+            scores={scores}
+            onOpenCandidate={setDetail}
+            onEditPosition={() => setEditOpen(true)}
+          />
+        </div>
+      ) : (
+      /* board — the ONE scroll region. Its up–down scroll drives the header
           collapse above (more room for candidates), while its left–right scrollbar
-          stays pinned at the bottom and scrolls ALL columns together. */}
+          stays pinned at the bottom and scrolls ALL columns together. */
       <div onScroll={onBoardScroll} className={`flex min-h-0 flex-1 items-start gap-4 overflow-auto overscroll-contain pb-2 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-4"}`}>
         {columns.map((stageId) => {
           const stage = resolveStage(position, stageId);
@@ -348,6 +374,7 @@ export default function PositionDetail() {
           );
         })}
       </div>
+      )}
 
       <AddCandidateModal open={addOpen} onClose={() => setAddOpen(false)} position={position} />
       <StageConfigModal open={configOpen} position={position} onClose={() => setConfigOpen(false)} />

@@ -443,6 +443,8 @@ Degree levels: 6 = BSc/BEng/BA, 7 = MSc/MEng, 8 = PhD. `field: null` means any d
 
 **Every number the engine outputs must be derivable from a formula stated here.** If a score cannot be reproduced by hand from these rules, that is a bug.
 
+**Rounding — every `score` field is `Math.round()`, JS's round-half-up.** A component landing on an exact `.5` (e.g. 5 of 6 core skills matched, `45 × 5/6 = 37.5`) rounds **up** — 38, not 37. Stated explicitly because it is the one place a correct-by-hand derivation can disagree with the engine on a tie: rounding half down is the more common convention outside JS and gets a different, wrong answer on exactly these boundary cases.
+
 **Experience** — non-linear, so a large deficit is penalised harder than a small one:
 
 ```js

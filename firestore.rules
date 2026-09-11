@@ -88,7 +88,13 @@ service cloud.firestore {
     //  update: recruiters may edit details/stages and change status (close/reopen)
     //  delete: recruiters (HR owns the pipeline post role-swap; Management retained)
     match /positions/{id} {
-      allow read: if signedIn();
+      // Staff manage every status (draft/open/closed); anyone else may only
+      // read an Open vacancy directly by id — otherwise a candidate who knows
+      // or guesses a draft/closed position's id can read it despite never
+      // seeing it in any listing (WS1: "draft and closed never leak" — a
+      // client-side query filter alone doesn't enforce that, this does; CLAUDE.md
+      // 6.7 R6).
+      allow read: if isStaff() || (signedIn() && resource.data.status == 'Open');
       allow create: if isRecruiter();
       allow update: if isRecruiter()
         // Any staff member may close out a requisition as part of hiring a

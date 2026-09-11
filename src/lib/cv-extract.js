@@ -34,10 +34,9 @@ function resolveApiBase(envValue, fallbackPath, label) {
 const VALIDATE_URL = resolveApiBase(import.meta.env.VITE_CV_VALIDATE_URL, "/api/validate-cv", "VITE_CV_VALIDATE_URL");
 
 const MIN_CHARS = 200;
-const MAX_CHARS = 20000;
-// What actually gets sent to the Worker/model — plenty for a classification
-// call, keeps latency and token cost down versus sending the full 20k cap.
-const AI_EXCERPT_CHARS = 6000;
+// No upper bound — 5.9: "Long documents are truncated, never rejected." What
+// gets SENT to the model is still budget-limited (truncateForModel), but the
+// full extracted text is always what's checked, stored, and returned here.
 
 // Keep this list in sync with ALL_SECTIONS in functions/api/validate-cv.js —
 // the two run independently (client heuristic vs. server fallback) but should
@@ -93,13 +92,17 @@ async function extractPdfText(file) {
 
   let text = "";
   // Cap pages read — a 50-page CV is a real case to handle, but we only need
-  // enough text to validate + classify, not the whole document.
+  // enough text to validate + classify, not the whole document. This is a
+  // read-time performance guard only, unrelated to 5.9's truncation (which
+  // never rejects a long CV) — it just stops pulling MORE pages once there's
+  // already far more text than any legitimate CV needs.
+  const PDF_READ_STOP_CHARS = 40000;
   const pagesToRead = Math.min(doc.numPages, 30);
   for (let i = 1; i <= pagesToRead; i++) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
     text += content.items.map((it) => it.str || "").join(" ") + "\n";
-    if (text.length > MAX_CHARS * 2) break; // already plenty, stop early
+    if (text.length > PDF_READ_STOP_CHARS) break; // already plenty, stop early
   }
   return { kind: "ok", text: text.trim() };
 }
@@ -132,10 +135,12 @@ async function extractCvText(file) {
 const RETRY_BACKOFF_MS = 700;
 
 async function requestValidation(text, sectionsFound) {
+  // Full text — the Worker truncates authoritatively (truncateForModel, 5.9)
+  // and reports truncationApplied/truncationStrategy back in the response.
   const res = await fetch(VALIDATE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: text.slice(0, AI_EXCERPT_CHARS), sectionsFound }),
+    body: JSON.stringify({ text, sectionsFound }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -243,7 +248,7 @@ export async function parseCvContent(text) {
     const res = await fetch(PARSE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.slice(0, AI_EXCERPT_CHARS) }),
+      body: JSON.stringify({ text }), // full text — the Worker truncates authoritatively (5.9)
     });
     if (!res.ok) {
       console.error(`[cv-extract] parse-cv returned HTTP ${res.status}`);
@@ -355,15 +360,6 @@ export async function validateCvContent(file) {
         missingSections: [],
       };
     }
-    if (text.length > MAX_CHARS) {
-      return {
-        outcome: "blocked",
-        stage: "too-long",
-        reason: "This file has an unusual amount of text for a CV. Please upload just your CV.",
-        missingSections: [],
-      };
-    }
-
     // Section heuristics don't block on their own — they're recorded and
     // passed to the Worker as context (and used as its offline fallback).
     const { found } = checkSections(text);
@@ -394,6 +390,10 @@ export async function validateCvContent(file) {
       confidence,
       reason: ai.reason || "",
       text, // handed to parseCvContent() below — WS4 reuses this extraction, never re-parses the file
+      // 5.9 — whether the Worker had to truncate what it sent the model. The
+      // full `text` above is unaffected; this only describes the model call.
+      truncationApplied: !!ai.truncationApplied,
+      truncationStrategy: ai.truncationStrategy || null,
     };
   } catch (err) {
     // Any unexpected exception anywhere above — never let it read as a pass.

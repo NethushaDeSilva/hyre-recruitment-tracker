@@ -14,7 +14,7 @@
 //   ->   { isCv: bool, confidence: 0..1, reason: string,
 //          missingSections: string[], fallback?: true }
 
-import { classifyCv, MODEL } from "../_lib/cv-ai.js";
+import { classifyCv, MODEL, truncateForModel } from "../_lib/cv-ai.js";
 
 // Only these origins may call this endpoint. This is the REAL gate — checked
 // before any model call runs, not just a response header. CORS headers below
@@ -54,8 +54,6 @@ export async function onRequestGet({ request, env }) {
   return json({ ok: bound, model: MODEL }, bound ? 200 : 503, cors);
 }
 
-const MAX_TEXT_CHARS = 6000;
-
 export async function onRequestPost({ request, env }) {
   const origin = request.headers.get("Origin");
   // A present Origin that isn't ours is refused outright — no model call runs.
@@ -72,14 +70,19 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Invalid JSON body" }, 400, cors);
   }
 
-  const text = String(body.text || "").trim().slice(0, MAX_TEXT_CHARS);
+  const raw = String(body.text || "").trim();
   const sectionsFound = Array.isArray(body.sectionsFound)
     ? body.sectionsFound.filter((s) => typeof s === "string").slice(0, 10)
     : [];
-  if (!text) return json({ error: "Missing 'text'." }, 400, cors);
+  if (!raw) return json({ error: "Missing 'text'." }, 400, cors);
+
+  // 5.9 — a long CV is never rejected for length; only what's sent to the
+  // model is budget-truncated. sectionsFound was already computed by the
+  // client against the FULL text, not this truncated copy.
+  const { text, truncationApplied, truncationStrategy } = truncateForModel(raw);
 
   const result = await classifyCv(env, text, sectionsFound);
-  return json(result, 200, cors);
+  return json({ ...result, truncationApplied, truncationStrategy }, 200, cors);
 }
 
 function json(obj, status, cors) {

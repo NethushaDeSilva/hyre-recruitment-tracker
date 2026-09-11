@@ -315,6 +315,10 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
           ? {
               needsReview: !!scanResult.needsReview,
               cvValidation: { confidence: scanResult.confidence ?? null, reason: scanResult.reason || "", checkedAt: Date.now() },
+              // 5.9 — whether the Worker had to truncate this CV before the
+              // model saw it. Surfaced to HR (CandidateDetailModal) so a long
+              // CV never silently loses detail with no record of it.
+              cvTruncation: { applied: !!scanResult.truncationApplied, strategy: scanResult.truncationStrategy || null },
             }
           : {}),
         ...(cvFile && parsedProfile

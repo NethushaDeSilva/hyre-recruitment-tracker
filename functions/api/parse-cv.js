@@ -27,10 +27,8 @@
 //                              certifications[], languages[] } }
 //   -> { ok: false } on repeated model failure
 
-import { parseCvProfile, MODEL } from "../_lib/cv-ai.js";
+import { parseCvProfile, MODEL, truncateForModel } from "../_lib/cv-ai.js";
 import { computeTotalYearsExperience } from "../_lib/filtration/computeExperience.js";
-
-const MAX_TEXT_CHARS = 6000;
 
 const ALLOWED_ORIGINS = new Set([
   "https://hyre-hiring.pages.dev",
@@ -73,15 +71,18 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, error: "Invalid JSON body" }, 400, cors);
   }
 
-  const text = String(body.text || "").trim().slice(0, MAX_TEXT_CHARS);
-  if (!text) return json({ ok: false, error: "Missing 'text'." }, 400, cors);
+  const raw = String(body.text || "").trim();
+  if (!raw) return json({ ok: false, error: "Missing 'text'." }, 400, cors);
+
+  // 5.9 — same budget-truncation as validate-cv.js, never a length rejection.
+  const { text, truncationApplied, truncationStrategy } = truncateForModel(raw);
 
   const profile = await parseCvProfile(env, text);
-  if (!profile) return json({ ok: false }, 200, cors); // caller leaves the profile unparsed — never a guess
+  if (!profile) return json({ ok: false, truncationApplied, truncationStrategy }, 200, cors); // caller leaves the profile unparsed — never a guess
 
   const totalYearsExperience = computeTotalYearsExperience(profile.experience, new Date());
 
-  return json({ ok: true, profile: { ...profile, totalYearsExperience } }, 200, cors);
+  return json({ ok: true, profile: { ...profile, totalYearsExperience }, truncationApplied, truncationStrategy }, 200, cors);
 }
 
 function json(obj, status, cors) {

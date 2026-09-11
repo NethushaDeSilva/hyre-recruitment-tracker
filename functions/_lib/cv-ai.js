@@ -24,7 +24,6 @@ const SECTION_MARKERS = [
 ];
 
 export const MIN_CHARS = 200;
-export const MAX_CHARS = 20000;
 
 /** Same section heuristic as cv-extract.js's client-side checkSections(). */
 export function checkSections(text) {
@@ -33,11 +32,35 @@ export function checkSections(text) {
   return found;
 }
 
-/** Same cheap length thresholds WS3 applies before ever calling the model. */
+/** Same cheap length threshold WS3 applies before ever calling the model. A
+ * long CV is a valid CV (5.9: "Long documents are truncated, never
+ * rejected") — there is deliberately no upper bound here anymore. */
 export function cheapTextChecks(text) {
   if (text.length < MIN_CHARS) return { ok: false, stage: "too-short", reason: "This file has very little text to check." };
-  if (text.length > MAX_CHARS) return { ok: false, stage: "too-long", reason: "This file has an unusual amount of text for a CV." };
   return { ok: true };
+}
+
+// 5.9 — content-aware truncation is section-priority (retain Summary/Skills/
+// Experience/Education in full, prune Publications/References/Hobbies first)
+// and is NOT built. What's implemented is the fallback tier 5.9 specifies for
+// when no sections are detected: keep the first and last halves of the
+// budget, excise the middle. Deliberately not a blind head-slice — on a long
+// CV the education/skills sections are often near the end, which a head-slice
+// would silently drop entirely. Section-priority truncation is deferred; this
+// is recorded as a stated limitation, not hidden — every truncated call
+// reports `truncationApplied`/`truncationStrategy` rather than silently
+// dropping content.
+export const TRUNCATION_BUDGET = 15000;
+export const TRUNCATION_HALF = 7500;
+
+/** Pure and deterministic — same input length always truncates the same way. */
+export function truncateForModel(text, budget = TRUNCATION_BUDGET, half = TRUNCATION_HALF) {
+  if (text.length <= budget) return { text, truncationApplied: false, truncationStrategy: null };
+  return {
+    text: text.slice(0, half) + text.slice(-half),
+    truncationApplied: true,
+    truncationStrategy: "HEAD_TAIL_FALLBACK",
+  };
 }
 
 const CLASSIFY_SCHEMA = {

@@ -452,6 +452,13 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           </div>
         )}
 
+        {c.cvTruncation?.applied && (
+          <div className="flex items-start gap-2 rounded-lg border border-[#F0DFA6] bg-[#FBF1DC] p-3 text-[13px] text-[#8A6314] dark:border-[#5a4a1a] dark:bg-[#3a2f0f] dark:text-[#F5D77E]">
+            <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+            <span>This CV was unusually long, so only the beginning and end were read in full — content from the middle may be missing from what was checked and extracted.</span>
+          </div>
+        )}
+
         {/* WS4 — full structured CV extraction, alongside the derived summary above */}
         {c.education?.length > 0 && (
           <div className="space-y-1.5">

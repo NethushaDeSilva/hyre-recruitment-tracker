@@ -99,7 +99,12 @@ export default function ScoreBreakdown({ score }) {
               {qual.matched?.length > 0 && <> — {qual.matched.join(", ")}</>}
               {qual.fieldSimilarity != null && <> · field similarity {qual.fieldSimilarity.toFixed(3)}</>}
             </p>
-            {qual.needsReview && (
+            {qual.needsReview && qual.reviewReason === "field-not-extracted" && (
+              <p className="flex items-center gap-1 text-[12px] font-semibold text-[#B91C1C]">
+                <AlertTriangle size={12} /> Qualification field not extracted — review. The level was met, but no field of study was found to compare against this requirement — this may be a parse gap, not a genuine mismatch.
+              </p>
+            )}
+            {qual.needsReview && qual.reviewReason === "unverifiable" && (
               <p className="flex items-center gap-1 text-[12px] font-semibold text-[#B91C1C]">
                 <AlertTriangle size={12} /> Flagged: "{qual.flaggedQualification}" isn't grounded in the CV text — treated as an extraction failure, not a silently dropped field.
               </p>

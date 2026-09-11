@@ -67,8 +67,21 @@ const PARSE_SCHEMA = {
         type: "array",
         items: {
           type: "object",
-          properties: { degree: { type: "string" }, institution: { type: "string" }, year: { type: "string" } },
-          required: ["degree", "institution", "year"],
+          // Split into TWO separate facts, not one combined "degree" string.
+          // Squashing "BSc (Hons) Computer Science" into one string left the
+          // model free to drop the field of study when it templated the
+          // award-type portion — a real bug, not a hypothetical one (a
+          // candidate scored 0/25 on a degree they held, because our parser
+          // silently lost "Computer Science" from the string). awardType and
+          // field are now two independently-required schema slots, so there
+          // is no longer a single string for either to get lost inside of.
+          properties: {
+            awardType: { type: "string" }, // e.g. "BSc (Hons)", "Master of Science", "PhD" — never the field of study
+            field: { type: "string" },     // e.g. "Computer Science" — empty string if the CV genuinely states none
+            institution: { type: "string" },
+            year: { type: "string" },
+          },
+          required: ["awardType", "field", "institution", "year"],
         },
       },
       experience: {
@@ -135,7 +148,14 @@ export async function parseCvProfile(env, text) {
     "Respond with STRICT JSON only matching the given schema — no prose, no markdown.";
   const user =
     `CV text:\n"""\n${text}\n"""\n\n` +
-    "Extract: fullName, email, phone, location, education (degree/institution/year per entry), " +
+    "Extract: fullName, email, phone, location, " +
+    "education (per entry: awardType — the qualification TYPE only, e.g. \"BSc (Hons)\", " +
+    "\"Master of Science\", \"Higher National Diploma\", \"PhD\" — and field — the subject or " +
+    "field of study, e.g. \"Computer Science\", kept SEPARATE from awardType even when the CV " +
+    "states them together as one phrase like \"BSc (Hons) Computer Science\". " +
+    "Use an empty string for field ONLY if the CV genuinely does not state a field of study " +
+    "for that qualification (e.g. an MBA or a PhD with no named field) — never omit or merge it " +
+    "into awardType instead; also institution/year per entry), " +
     "experience (title/company/startDate/endDate/summary per entry, most recent first — " +
     "startDate/endDate as written, e.g. \"2019-03\", \"March 2019\", or \"Present\" if ongoing; " +
     "do not calculate durations yourself), skills, certifications, languages.";
@@ -184,8 +204,9 @@ function normalizeParse(obj) {
     email: str(obj.email),
     phone: str(obj.phone),
     location: nullableStr(obj.location),
-    education: education.map((e) => ({ degree: str(e?.degree), institution: str(e?.institution), year: nullableStr(e?.year) }))
-      .filter((e) => e.degree || e.institution),
+    education: education.map((e) => ({
+      awardType: str(e?.awardType), field: nullableStr(e?.field), institution: str(e?.institution), year: nullableStr(e?.year),
+    })).filter((e) => e.awardType || e.institution),
     experience: experience.map((e) => ({
       title: str(e?.title), company: str(e?.company),
       startDate: nullableStr(e?.startDate), endDate: nullableStr(e?.endDate), summary: str(e?.summary),

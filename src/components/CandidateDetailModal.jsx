@@ -31,6 +31,12 @@ function Row({ label, value }) {
 
 const stageLabel = (id) => stageLabelOf(id);
 
+// Current WS4 shape splits awardType/field apart (a combined "degree" string
+// let extraction lose the field entirely — see CLAUDE.md WS4). Legacy
+// candidates parsed before that fix only have `degree`, which still renders
+// correctly here.
+const degreeLabel = (e) => (e.awardType ? `${e.awardType}${e.field ? ` in ${e.field}` : ""}` : e.degree || "");
+
 const RECOMMENDATIONS = [
   { id: "advance", label: "Advance", tone: "#16A34A" },
   { id: "hold", label: "Hold", tone: "#A9781A" },
@@ -453,7 +459,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
             <ul className="space-y-1">
               {c.education.map((e, i) => (
                 <li key={i} className="text-sm text-foreground">
-                  {e.degree}{e.institution ? ` — ${e.institution}` : ""}{e.year ? ` (${e.year})` : ""}
+                  {degreeLabel(e)}{e.institution ? ` — ${e.institution}` : ""}{e.year ? ` (${e.year})` : ""}
                 </li>
               ))}
             </ul>

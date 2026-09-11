@@ -89,11 +89,55 @@ describe("scoreApplication — unverifiable qualification is flagged for review,
     expect(result.breakdown.qualifications.score).toBe(0);
     expect(result.breakdown.qualifications.matched).toEqual([]);
     expect(result.breakdown.qualifications.needsReview).toBe(true);
+    expect(result.breakdown.qualifications.reviewReason).toBe("unverifiable");
     expect(result.breakdown.qualifications.flaggedQualification).toBe("BSc Computer Science");
     // Level was structurally met (BSc = level 6 >= required 6) independent of the
     // grounding failure — the cap must not fire for a reason unrelated to level.
     expect(result.capApplied).toBe(false);
     expect(result.overallScore).toBe(65); // 0 (qual, withdrawn) + 45 (skills) + 20 (experience, min 0) + 0
+  });
+});
+
+describe("scoreApplication — qualification field not extracted is flagged for review, never a silent zero", () => {
+  it("flags rather than scores when the level is met but no education entry carries any field at all", async () => {
+    const embedTexts = async () => { throw new Error("should not be called — nothing to embed a field against"); };
+    const requirements = { requiredQualification: { level: 6, field: "Computer Science" }, requiredSkills: ["React"], minYearsExperience: 0, niceToHave: [] };
+    const candidate = {
+      skills: ["React"],
+      // Real WS4 shape: awardType correctly classifies as level 6, but the
+      // extraction genuinely returned no field — exactly the bug this fix
+      // targets, except now it's an honest signal instead of a silent 0/25.
+      education: [{ awardType: "BSc (Hons)", field: null, institution: "University of Moratuwa", year: "2020" }],
+      totalYearsExperience: 0,
+      extractedText: "Skilled in React.",
+    };
+    const result = await scoreApplication(candidate, requirements, { embedTexts });
+
+    expect(result.breakdown.qualifications.score).toBe(0);
+    expect(result.breakdown.qualifications.levelMet).toBe(true);
+    expect(result.breakdown.qualifications.needsReview).toBe(true);
+    expect(result.breakdown.qualifications.reviewReason).toBe("field-not-extracted");
+    // No flaggedQualification here — unlike "unverifiable", there's no
+    // specific matched claim to point at; the whole point is nothing matched.
+    expect(result.breakdown.qualifications.flaggedQualification).toBeUndefined();
+    expect(result.capApplied).toBe(false); // level met — the cap must not fire for an unrelated reason
+    expect(result.instrumentation.layers.embedding).toBe(0); // no embedding call was made — nothing to compare
+  });
+
+  it("does not flag when the field genuinely doesn't apply (level not met — the cap path handles it)", async () => {
+    const embedTexts = async () => { throw new Error("should not be called"); };
+    const requirements = { requiredQualification: { level: 8, field: "Computer Science" }, requiredSkills: ["React"], minYearsExperience: 0, niceToHave: [] };
+    const candidate = {
+      skills: ["React"],
+      education: [{ awardType: "BSc (Hons)", field: null, institution: "", year: "" }],
+      totalYearsExperience: 0,
+      extractedText: "Skilled in React.",
+    };
+    const result = await scoreApplication(candidate, requirements, { embedTexts });
+
+    expect(result.breakdown.qualifications.levelMet).toBe(false);
+    expect(result.breakdown.qualifications.needsReview).toBeUndefined();
+    expect(result.capApplied).toBe(true); // level genuinely not met — this is what the cap is for
   });
 });
 

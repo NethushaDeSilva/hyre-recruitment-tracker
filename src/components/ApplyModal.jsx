@@ -532,8 +532,10 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
                   />
                 </Field>
                 <div className="flex flex-wrap gap-1.5 text-xs">
-                  {parsedProfile.education?.[0]?.degree && (
-                    <span className="rounded-full bg-secondary px-2.5 py-1 font-medium text-foreground">{parsedProfile.education[0].degree}</span>
+                  {parsedProfile.education?.[0]?.awardType && (
+                    <span className="rounded-full bg-secondary px-2.5 py-1 font-medium text-foreground">
+                      {parsedProfile.education[0].awardType}{parsedProfile.education[0].field ? ` in ${parsedProfile.education[0].field}` : ""}
+                    </span>
                   )}
                   {parsedProfile.totalYearsExperience > 0 && (
                     <span className="rounded-full bg-secondary px-2.5 py-1 font-medium text-foreground">{parsedProfile.totalYearsExperience} yrs experience</span>

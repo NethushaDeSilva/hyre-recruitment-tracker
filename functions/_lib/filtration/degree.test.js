@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyDegree } from "./degree.js";
+import { classifyDegree, classifyAwardType } from "./degree.js";
 
 describe("classifyDegree", () => {
   it("splits <TYPE> <FIELD> into level and field", () => {
@@ -28,5 +28,23 @@ describe("classifyDegree", () => {
   it("returns unrecognised rather than guessing for an unknown prefix", () => {
     expect(classifyDegree("Diploma in Accounting")).toEqual({ level: null, field: null, recognised: false });
     expect(classifyDegree("")).toEqual({ level: null, field: null, recognised: false });
+  });
+});
+
+describe("classifyAwardType", () => {
+  it("classifies an award-type-only string (no field text mixed in)", () => {
+    expect(classifyAwardType("BSc (Hons)")).toEqual({ level: 6, recognised: true });
+    expect(classifyAwardType("Master of Science")).toEqual({ level: 7, recognised: true });
+    expect(classifyAwardType("PhD")).toEqual({ level: 8, recognised: true });
+    expect(classifyAwardType("Doctor of Philosophy")).toEqual({ level: 8, recognised: true });
+  });
+  it("matches level indicators anywhere in the string, not just at the start", () => {
+    expect(classifyAwardType("Bachelor of Engineering (Hons)")).toEqual({ level: 6, recognised: true });
+    expect(classifyAwardType("MBA")).toEqual({ level: 7, recognised: true });
+  });
+  it("returns unrecognised rather than guessing for an unknown or empty award type", () => {
+    expect(classifyAwardType("Higher National Diploma")).toEqual({ level: null, recognised: false });
+    expect(classifyAwardType("")).toEqual({ level: null, recognised: false });
+    expect(classifyAwardType(null)).toEqual({ level: null, recognised: false });
   });
 });

@@ -44,7 +44,7 @@ describe("weightedSkillsScore", () => {
 
 describe("classifyCandidateEducation / levelMetFor", () => {
   const education = [{ degree: "BSc Computer Science" }, { degree: "MSc Data Science" }];
-  it("classifies every entry and keeps the source string", () => {
+  it("classifies every entry (legacy squashed-string shape) and keeps the source string", () => {
     const classified = classifyCandidateEducation(education);
     expect(classified).toEqual([
       { level: 6, field: "Computer Science", recognised: true, source: "BSc Computer Science" },
@@ -56,6 +56,15 @@ describe("classifyCandidateEducation / levelMetFor", () => {
     expect(levelMetFor(classified, 6)).toBe(true);
     expect(levelMetFor(classified, 7)).toBe(true);
     expect(levelMetFor(classified, 8)).toBe(false);
+  });
+
+  it("current WS4 shape: awardType and field extracted separately, never conflated", () => {
+    const classified = classifyCandidateEducation([{ awardType: "BSc (Hons)", field: "Computer Science", institution: "UoM", year: "2020" }]);
+    expect(classified).toEqual([{ level: 6, field: "Computer Science", recognised: true, source: "BSc (Hons)" }]);
+  });
+  it("current WS4 shape: an honestly-null field stays null, never guessed at", () => {
+    const classified = classifyCandidateEducation([{ awardType: "PhD", field: null, institution: "", year: "" }]);
+    expect(classified).toEqual([{ level: 8, field: null, recognised: true, source: "PhD" }]);
   });
 });
 

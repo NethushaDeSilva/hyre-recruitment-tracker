@@ -360,7 +360,7 @@ Target schema:
   "phone": "string",
   "location": "string | null",
   "education": [
-    { "degree": "string", "institution": "string", "year": "string | null" }
+    { "awardType": "string", "field": "string | null", "institution": "string", "year": "string | null" }
   ],
   "experience": [
     { "title": "string", "company": "string",
@@ -378,6 +378,7 @@ Rules:
 
 - JSON only, no prose, no markdown fences. Parse defensively, retry once.
 - **Never invent data.** Missing field → `null` or `[]`. A hallucinated qualification is a hiring liability and is treated as a bug, not a rounding error.
+- **`awardType` and `field` are separate, independently-required schema slots — never one combined "degree" string.** A real, observed bug: when both lived in one string, extraction returned `"BSc (Hons)"` for a candidate whose CV said "BSc (Hons) Computer Science," dropping the field entirely, and the candidate scored 0/25 for a degree they held. Splitting the schema removes the string the model could lose a field inside of. `field: null` is only valid when the CV genuinely states none (5.6) — and when it's null while a vacancy requires one, WS5 shows "qualification field not extracted — review," never a silent 0/25 (a parse gap and a genuine mismatch must look different to HR).
 - Store the full extracted text alongside the structured data — WS5 needs it.
 - If the CV's email differs from the typed email, keep the typed one as primary, store the other as `emailFromCv`, flag the mismatch.
 - Confirmation screen after parsing: *"Here's what we read from your CV."* The candidate can correct errors. This is a review of finished work, **not a form to fill in** — do not reintroduce the typing burden WS2 removed.

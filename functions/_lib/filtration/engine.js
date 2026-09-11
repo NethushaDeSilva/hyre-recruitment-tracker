@@ -113,27 +113,46 @@ export async function scoreApplication(candidate, requirements, deps) {
     const classified = classifyCandidateEducation(candidate.education);
     const levelMet = levelMetFor(classified, requirements.requiredQualification.level);
     let fieldMatch = null;
+    // No classified entry has ANY field data at all — nothing to compare the
+    // required field against. This could be a genuinely field-less
+    // qualification (an MBA/PhD entry, or a CV that honestly states none) or
+    // an extraction gap; there is no way to tell which from here, so per 5.6
+    // it is flagged for review below rather than silently scored as a
+    // non-match. No embedding call either — there is nothing to embed against.
+    let fieldNotExtracted = false;
     if (requirements.requiredQualification.field) {
       const fields = classified.filter((c) => c.field).map((c) => c.field);
-      fieldMatch = await matchTermSet([requirements.requiredQualification.field], fields, {
-        embedTexts, threshold: QUAL_SIMILARITY_THRESHOLD,
-      });
-      qualCounters = fieldMatch.counters;
+      if (!fields.length) {
+        fieldNotExtracted = true;
+      } else {
+        fieldMatch = await matchTermSet([requirements.requiredQualification.field], fields, {
+          embedTexts, threshold: QUAL_SIMILARITY_THRESHOLD,
+        });
+        qualCounters = fieldMatch.counters;
+      }
     }
     qual = qualificationScore(requirements.requiredQualification, { levelMet, fieldMatch, classifiedEducation: classified });
 
     // 5.6: "an invented qualification is more serious than an invented
     // skill. Treat an unverifiable qualification as an extraction failure
-    // requiring review, not a silently dropped field." A credited degree
-    // must actually appear in the CV text WS4 stored — if it doesn't, the
-    // credit is withdrawn AND the candidate is flagged, distinct from a
-    // qualification that was simply never matched in the first place.
+    // requiring review, not a silently dropped field." Two distinct review
+    // reasons, both ending in the same needsReview/score:0 treatment:
+    //   - "field-not-extracted": the level was met but there's no field data
+    //     to compare against the requirement at all (checked first — there's
+    //     nothing here for the grounding check below to even look at).
+    //   - "unverifiable": a field WAS matched, but the matched degree text
+    //     isn't grounded in the CV — the credit is withdrawn and flagged.
     let needsReview = false;
+    let reviewReason = null;
     let flaggedQualification = null;
-    if (qual.matched.length) {
+    if (levelMet && requirements.requiredQualification.field && fieldNotExtracted) {
+      needsReview = true;
+      reviewReason = "field-not-extracted";
+    } else if (qual.matched.length) {
       const qualCheck = await verifyTerm(qual.matched[0], extractedText, { embedTexts, threshold: QUAL_SIMILARITY_THRESHOLD });
       if (qualCheck.status === "unverifiable") {
         needsReview = true;
+        reviewReason = "unverifiable";
         flaggedQualification = qual.matched[0];
         qual = { ...qual, score: 0, matched: [] };
       }
@@ -141,7 +160,10 @@ export async function scoreApplication(candidate, requirements, deps) {
 
     qualBreakdown = {
       score: qual.score, max: qual.max, levelMet: qual.levelMet, fieldSimilarity: qual.fieldSimilarity, matched: qual.matched,
-      ...(needsReview ? { needsReview: true, flaggedQualification } : {}),
+      ...(needsReview ? { needsReview: true, reviewReason } : {}),
+      // Only present when there's an actual matched claim to point at —
+      // "field-not-extracted" has no specific claim, just an absence.
+      ...(flaggedQualification ? { flaggedQualification } : {}),
     };
   }
 

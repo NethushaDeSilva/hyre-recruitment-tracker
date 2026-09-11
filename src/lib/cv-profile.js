@@ -31,8 +31,15 @@ const QUALIFICATION_RULES = [
   ["Professional Certification", /certif/i],
 ];
 
+// Current WS4 shape splits awardType/field apart (see CLAUDE.md WS4 — a
+// combined "degree" string let extraction lose the field entirely). Legacy
+// candidates parsed before that fix only have `degree`, so this rebuilds the
+// same kind of combined text for the qualification-dropdown matcher below,
+// which was always designed to read a whole title, either way.
+const degreeText = (e) => (e.awardType ? `${e.awardType}${e.field ? ` ${e.field}` : ""}` : e.degree || "");
+
 function matchQualification(education) {
-  const text = (education || []).map((e) => e.degree || "").join(" ");
+  const text = (education || []).map(degreeText).join(" ");
   if (!text.trim()) return "";
   for (const [label, re] of QUALIFICATION_RULES) if (re.test(text)) return label;
   return "";
@@ -43,11 +50,14 @@ export function profileToCandidateFields(profile) {
   if (!profile) return {};
   const experience = profile.experience || [];
   const currentJob = experience.find((e) => !e.endDate) || experience[0] || null;
+  const firstEd = profile.education?.[0];
   return {
     name: profile.fullName || "",
     location: profile.location || "",
     highestQualification: matchQualification(profile.education),
-    fieldOfStudy: profile.education?.[0]?.degree || "",
+    // Prefer the genuinely-extracted field of study; fall back to the whole
+    // (legacy) degree string only for candidates parsed before this split.
+    fieldOfStudy: firstEd ? (firstEd.field || degreeText(firstEd)) : "",
     experience: bucketExperience(profile.totalYearsExperience),
     totalYearsExperience: profile.totalYearsExperience || 0,
     currentRole: currentJob?.title || "",

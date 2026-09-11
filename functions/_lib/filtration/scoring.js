@@ -5,7 +5,7 @@
 // what's matched and how much each match is worth; this file only turns
 // those decisions into points.
 
-import { classifyDegree } from "./degree.js";
+import { classifyDegree, classifyAwardType } from "./degree.js";
 
 // 5.6: 'verified' earns full credit, 'inferred' earns reduced credit,
 // 'unverifiable' earns none. CLAUDE.md names the three tiers but not an
@@ -47,7 +47,20 @@ export function weightedSkillsScore(creditWeights, requiredCount, weight) {
  * overall cap below, not by zeroing the field credit here.
  */
 export function classifyCandidateEducation(education) {
-  return (education || []).map((e) => ({ ...classifyDegree(e.degree), source: e.degree }));
+  return (education || []).map((e) => {
+    // Current WS4 shape: awardType and field extracted as two separate,
+    // honest facts (never one squashed string the model could lose a field
+    // inside of — see cv-ai.js). "awardType" in e distinguishes this from
+    // the legacy shape below, including when field itself is null.
+    if (e && typeof e === "object" && "awardType" in e) {
+      const { level, recognised } = classifyAwardType(e.awardType);
+      return { level, field: e.field ?? null, recognised, source: e.awardType || "" };
+    }
+    // Legacy shape (candidates parsed before this fix): one combined degree
+    // string, split by regex. Existing candidates must keep scoring exactly
+    // as before (CLAUDE.md section 2) — this path is unchanged.
+    return { ...classifyDegree(e.degree), source: e.degree };
+  });
 }
 
 export function levelMetFor(classifiedEducation, requiredLevel) {

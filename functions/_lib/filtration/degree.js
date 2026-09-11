@@ -49,3 +49,29 @@ export function classifyDegree(raw) {
   }
   return { level: null, field: null, recognised: false };
 }
+
+// Level-only lookup for the current WS4 shape, where the extraction model
+// returns awardType and field as two separate, honest facts (never one
+// squashed string for the model to lose a field inside of — see cv-ai.js).
+// Matches anywhere in the string (not anchored) since awardType can carry
+// trailing qualifiers like "(Hons)" that a whole-string match would miss.
+const AWARD_LEVEL = [
+  { re: /\bphd\b|doctor of philosophy|doctorate/i, level: 8 },
+  { re: /\bm\.?sc\b|\bm\.?eng\b|\bm\.?a\b|\bmba\b|\bllm\b|master'?s?\s+(of|degree|in)|master of/i, level: 7 },
+  { re: /\bb\.?sc\b|\bb\.?eng\b|\bb\.?a\b|\bbba\b|\bbbs\b|\bllb\b|bachelor'?s?\s+(of|degree|in)|bachelor of/i, level: 6 },
+];
+
+/**
+ * @param {string} raw - e.g. "BSc (Hons)", "Master of Science", "PhD" — the
+ *   qualification TYPE only, never mixed with a field of study (that's a
+ *   separate extracted fact — see cv-ai.js's PARSE_SCHEMA).
+ * @returns {{ level: 6|7|8|null, recognised: boolean }}
+ */
+export function classifyAwardType(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return { level: null, recognised: false };
+  for (const { re, level } of AWARD_LEVEL) {
+    if (re.test(s)) return { level, recognised: true };
+  }
+  return { level: null, recognised: false };
+}

@@ -14,7 +14,7 @@
 // is never re-uploaded or re-typed on a second application, while every other
 // screen that already reads `candidates` keeps working unmodified.
 import { useSyncExternalStore } from "react";
-import { collection, doc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
 import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta } from "@/lib/stages";
 import { departmentCode } from "@/lib/departments";
@@ -125,6 +125,7 @@ const SEED_CANDIDATES = [
 const mockIdentities = new Map(); // personId -> identity fields
 const mockApplications = []; // { id, personId, positionId, stage, ... } — pipeline-only
 let mockEmployeesList = []; // flattened, joined snapshots (same shape as before)
+const mockScores = new Map(); // applicationId -> applicationScores doc (WS5)
 
 function seedMock() {
   let candNum = CANDIDATE_SEQ_START - 60; // 1
@@ -161,6 +162,7 @@ function recomputeMock() {
     ...mockApplications.map((a) => joinFlat(mockIdentities.get(a.personId), a)),
     ...mockEmployeesList,
   ].sort((a, b) => a.appliedAt - b.appliedAt);
+  scores = new Map(mockScores);
 }
 
 // --- reactive snapshot store ---
@@ -168,15 +170,16 @@ let positions = firebaseReady ? [] : SEED_POSITIONS;
 let candidates = [];
 let employees = []; // hired people — Firebase: the /employees collection; mock: derived below
 let notifications = []; // in-app notifications addressed to the signed-in user
+let scores = new Map(); // WS5 — applicationId -> applicationScores doc; staff-only, empty for a Candidate
 let loading = firebaseReady; // true until the first Firestore data arrives
 if (!firebaseReady) {
   seedMock();
   recomputeMock();
 }
-let snapshot = { positions, candidates, employees, notifications, loading };
+let snapshot = { positions, candidates, employees, notifications, scores, loading };
 const listeners = new Set();
 function commit() {
-  snapshot = { positions, candidates, employees, notifications, loading };
+  snapshot = { positions, candidates, employees, notifications, scores, loading };
   listeners.forEach((l) => l());
 }
 function subscribe(cb) {
@@ -400,6 +403,7 @@ function joinFlat(identity, app) {
 let unsubPositions = null;
 let unsubCandidateFns = []; // identity + application + employee listeners to tear down
 let unsubNotifications = null;
+let unsubScores = null; // WS5 — staff only, mirrors the applicationScores read rule
 let authKey = null; // uid|role|email — avoid needless resubscribes on profile edits
 // Every stream lands in one of these two bags, tagged by name, and we recompute
 // the merged/joined views whenever any stream updates.
@@ -433,6 +437,8 @@ function teardownData() {
   unsubPositions = null;
   if (unsubNotifications) unsubNotifications();
   unsubNotifications = null;
+  if (unsubScores) unsubScores();
+  unsubScores = null;
   unsubCandidateFns.forEach((fn) => fn());
   unsubCandidateFns = [];
   streams.clear();
@@ -455,6 +461,7 @@ export function syncAuth(user) {
     positions = [];
     candidates = [];
     notifications = [];
+    scores = new Map();
     loading = false;
     commit();
     return;
@@ -517,6 +524,10 @@ export function syncAuth(user) {
   };
 
   if (user.role === "Candidate") {
+    // WS5/R3 — a candidate gets no scores subscription at all (matches the
+    // staff-only read rule exactly), and any scores held over from a
+    // previous staff session in this tab must not linger in memory.
+    scores = new Map();
     // Scoped: only this person's OWN identity + rows — by uid and by verified
     // email — across /candidates (identity), /applications (their applications)
     // and /employees (their job, once hired).
@@ -537,6 +548,18 @@ export function syncAuth(user) {
     // real positions and candidates apply with real CVs — see CLAUDE.md, "no
     // dummy data" — an empty positions collection is the correct clean state,
     // not a signal to write demo data into it.
+
+    // WS5 — applicationScores is staff-only (see firestore.rules); a Candidate
+    // never subscribes to it at all, matching the read rule exactly rather
+    // than relying on the rule alone to hide an attempted read.
+    unsubScores = onSnapshot(
+      collection(db, "applicationScores"),
+      (snap) => {
+        scores = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }]));
+        commit();
+      },
+      (err) => console.error("applicationScores listener:", err)
+    );
   }
 }
 
@@ -701,18 +724,79 @@ export async function updatePosition(id, {
   // Requirements changed under applications that were scored against the OLD
   // ones — those scores were computed against a document comparison that no
   // longer exists (5.1: the vacancy IS one half of that comparison). Mark them
-  // stale rather than silently leaving a number HR would otherwise trust.
-  // Nothing to mark yet in practice (WS5 hasn't scored anything, so no
-  // application carries a `score` field today) — this only starts touching
-  // real documents the moment scoring exists, at which point it has to
-  // already be correct rather than bolted on afterward.
+  // stale rather than silently leaving a number HR would otherwise trust. The
+  // edit itself only flips the flag — it never clears it and never re-scores;
+  // that's rescoreVacancy()'s job (5.2: "the re-score endpoint clears
+  // staleness; the edit itself does not"). Scores live in applicationScores,
+  // not on applications (see firestore.rules / CLAUDE.md 6.7 — R3).
   if (requirementsChanged && firebaseReady) {
-    const appsSnap = await getDocs(query(collection(db, "applications"), where("positionId", "==", id)));
-    const scored = appsSnap.docs.filter((d) => d.data().score);
-    await Promise.all(scored.map((d) => updateDoc(d.ref, { "score.stale": true })));
+    const scoresSnap = await getDocs(query(collection(db, "applicationScores"), where("positionId", "==", id)));
+    await Promise.all(scoresSnap.docs.map((d) => updateDoc(d.ref, { stale: true })));
   }
 
   return { id, ...current, ...data };
+}
+
+/**
+ * WS5 5.2 — explicitly re-score every application for one vacancy: after
+ * requirements were edited (existing scores already marked stale above),
+ * after a threshold recalibration, or after an engineVersion bump. Never
+ * automatic — HR triggers this from the shortlist screen. This function does
+ * the Firestore reads/writes; the actual scoring runs in the stateless
+ * /api/rescore-vacancy Function, sharing one embedding cache across every
+ * candidate (5.5).
+ */
+export async function rescoreVacancy(positionId) {
+  if (!firebaseReady) return { ok: false, error: "Not available in demo mode." };
+  const position = positions.find((p) => p.id === positionId);
+  if (!position) return { ok: false, error: "Position not found." };
+  if (!position.requirements) return { ok: false, error: "This vacancy has no structured requirements set." };
+
+  const appsSnap = await getDocs(query(collection(db, "applications"), where("positionId", "==", positionId)));
+  const apps = appsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  if (!apps.length) return { ok: true, scored: 0, failed: 0 };
+
+  // Each application's scorable profile lives on its IDENTITY doc, not the
+  // application itself (WS1's split) — fetch every distinct person once.
+  const personIds = [...new Set(apps.map((a) => a.personId).filter(Boolean))];
+  const identityDocs = await Promise.all(personIds.map((pid) => getDoc(doc(db, "candidates", pid))));
+  const identityById = new Map(identityDocs.filter((s) => s.exists()).map((s) => [s.id, s.data()]));
+
+  const candidatesPayload = apps.map((a) => {
+    const idn = identityById.get(a.personId) || {};
+    return {
+      candidateId: a.id, // tag results back to the APPLICATION id, not the person id
+      skills: (idn.skills || "").split(",").map((s) => s.trim()).filter(Boolean),
+      education: idn.education || [],
+      totalYearsExperience: idn.totalYearsExperience || 0,
+      extractedText: idn.cvExtractedText || "",
+    };
+  });
+
+  const res = await fetch("/api/rescore-vacancy", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ candidates: candidatesPayload, requirements: position.requirements }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.ok) {
+    return { ok: false, error: data?.error || `HTTP ${res.status}` };
+  }
+
+  let scored = 0;
+  let failed = 0;
+  await Promise.all(
+    data.results.map((r) => {
+      const ref = doc(db, "applicationScores", r.candidateId);
+      if (r.status === "scored") {
+        scored++;
+        return setDoc(ref, { positionId, status: "scored", stale: false, ...r.result });
+      }
+      failed++;
+      return setDoc(ref, { positionId, status: "failed", stale: false, error: r.error, scoredAt: new Date().toISOString() });
+    })
+  );
+  return { ok: true, scored, failed };
 }
 
 // Fields that belong to the PERSON (shared across every application they ever
@@ -758,7 +842,17 @@ async function upsertIdentityInTx(tx, email, seed) {
   return { key, candidateId };
 }
 
-export async function addCandidate({ name = "", email, positionId, appliedRole, ...extra }) {
+/**
+ * @param {object} [score] - a WS5 result already computed by the caller (via
+ *   scoreOneApplication / /api/score-application) BEFORE this call — scoring
+ *   never happens inside this function, it only writes what it's given.
+ *   Written into applicationScores/{applicationId} in the SAME transaction as
+ *   the application create, so a score is never visible without its
+ *   application or vice versa. Omit entirely when there's nothing to score
+ *   (e.g. HR's quick add, which collects no CV) or scoring failed/was
+ *   skipped — never write a placeholder.
+ */
+export async function addCandidate({ name = "", email, positionId, appliedRole, score = null, ...extra }) {
   // Split the payload: identity-shaped fields persist once on the person;
   // everything else is specific to THIS application.
   const identitySeed = {};
@@ -797,6 +891,11 @@ export async function addCandidate({ name = "", email, positionId, appliedRole, 
       const appRef = doc(collection(db, "applications"));
       applicationId = appRef.id;
       tx.set(appRef, { ...appData, personId, email: emailKey, submittedByUid });
+      if (score) {
+        tx.set(doc(db, "applicationScores", applicationId), {
+          positionId, status: "scored", stale: false, ...score,
+        });
+      }
     });
     return { id: applicationId, personId, candidateId, ...appData, email: emailKey, submittedByUid, appliedAt: Date.now() };
   }
@@ -815,6 +914,7 @@ export async function addCandidate({ name = "", email, positionId, appliedRole, 
   }
   const app = { id: uid("app"), personId, email: personId, submittedByUid: identitySeed.submittedByUid || "", ...appData, appliedAt: Date.now() };
   mockApplications.push(app);
+  if (score) mockScores.set(app.id, { positionId, status: "scored", stale: false, ...score });
   recomputeMock();
   commit();
   return { ...app, candidateId: identity.candidateId };

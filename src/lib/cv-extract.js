@@ -258,6 +258,56 @@ export async function parseCvContent(text) {
   }
 }
 
+// --- WS5: score automatically once WS4 parsing completes -------------------
+
+const SCORE_URL = resolveApiBase(import.meta.env.VITE_CV_SCORE_URL, "/api/score-application", "VITE_CV_SCORE_URL");
+
+/** Confirm the scoring Worker (WS5) is actually deployed and reachable. */
+export async function healthCheckScorer() {
+  return pingEndpoint(SCORE_URL, "Application scoring");
+}
+
+/**
+ * WS5 — score a freshly-parsed candidate profile against a vacancy's
+ * requirements. Never throws. The candidate never triggers this directly —
+ * it's called automatically right after WS4 parsing succeeds, as one more
+ * link in the same validate -> parse -> score chain.
+ *
+ * Per 10.1, a scoring failure is never a fabricated score and never silent —
+ * both non-scored outcomes are returned, not thrown, so the caller can still
+ * complete the application either way:
+ *   { ok: true, result }                    — scored
+ *   { ok: false, reason: "no-requirements" } — vacancy has no structured requirements yet
+ *   { ok: false, reason: "failed", error }   — scoring failed; "not scored — retry", never a zero
+ */
+export async function scoreCvAgainst(profile, extractedText, requirements) {
+  if (!requirements) return { ok: false, reason: "no-requirements" };
+  try {
+    const res = await fetch(SCORE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        candidate: {
+          skills: profile.skills || [],
+          education: profile.education || [],
+          totalYearsExperience: profile.totalYearsExperience || 0,
+          extractedText: extractedText || "",
+        },
+        requirements,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok && !data) {
+      console.error(`[cv-extract] score-application returned HTTP ${res.status}`);
+      return { ok: false, reason: "failed", error: `HTTP ${res.status}` };
+    }
+    return data; // already shaped {ok, result} or {ok:false, reason, error} by the route
+  } catch (err) {
+    console.error("[cv-extract] score-application call failed:", err.message);
+    return { ok: false, reason: "failed", error: err.message };
+  }
+}
+
 function joinNicely(list) {
   if (list.length <= 1) return list[0] || "";
   if (list.length === 2) return `${list[0]} or ${list[1]}`;

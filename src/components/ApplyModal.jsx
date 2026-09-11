@@ -14,7 +14,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Field, Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { uploadCv, fileToDataUrl, validateCvFile, humanSize, MAX_CV_BYTES, ACCEPTED_CV_TYPES } from "@/lib/file";
-import { validateCvContent, parseCvContent, healthCheckCvValidator, joinNicely } from "@/lib/cv-extract";
+import { validateCvContent, parseCvContent, scoreCvAgainst, healthCheckCvValidator, joinNicely } from "@/lib/cv-extract";
 import { profileToCandidateFields } from "@/lib/cv-profile";
 import { applyToPosition, logCvRejection, useHyreData } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
@@ -289,6 +289,18 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
       const cvEmail = (parsedProfile?.email || "").trim().toLowerCase();
       const emailMismatch = !!(cvEmail && cvEmail !== typedEmail);
 
+      // WS5 — score automatically once WS4 parsing completes; no button, no
+      // extra step. Scoped to a freshly-parsed CV this session — a carried-
+      // over CV from an earlier application isn't re-scored here, since there's
+      // no fresh parsedProfile to score with; HR's re-score picks that up later.
+      let score = null;
+      if (cvFile && parsedProfile && position?.requirements) {
+        const scored = await scoreCvAgainst(parsedProfile, scanResult?.text || "", position.requirements);
+        // scored.ok === false leaves the application unscored on purpose (10.1):
+        // "not scored — retry" on the shortlist, never a fabricated zero here.
+        if (scored.ok) score = scored.result;
+      }
+
       await applyToPosition({
         email: form.email.trim(),
         phone: form.phone.trim(),
@@ -313,6 +325,7 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
               ...(emailMismatch ? { emailFromCv: parsedProfile.email, emailMismatch: true } : {}),
             }
           : {}),
+        ...(score ? { score } : {}),
       });
       close();
       onApplied?.(position);

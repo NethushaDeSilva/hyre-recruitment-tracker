@@ -3,7 +3,7 @@
 // (HR screening → Department review → interviews → Final interview), and only the
 // owning role (or Management) can advance/reject a candidate in that stage.
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search } from "lucide-react";
 import { useHyreData, advanceStage, rejectCandidate, bulkReject } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
@@ -25,6 +25,8 @@ import ShortlistPanel from "@/components/ShortlistPanel";
 
 export default function PositionDetail() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const stageFilter = searchParams.get("stage"); // e.g. ?stage=applied — "N at Applied" link from the Positions grid
   const { user } = useAuth();
   const { positions, candidates, scores, loading } = useHyreData();
   // Board = the pipeline Kanban. Shortlist (WS5 5.8) = Applied-stage
@@ -83,6 +85,11 @@ export default function PositionDetail() {
   // stage was later removed from the configured pipeline — so nobody is orphaned.
   const orphanStages = [...new Set(cands.map((c) => c.stage))].filter((s) => s !== "rejected" && !position.stages.includes(s));
   const columns = [...position.stages, ...orphanStages, ...(cands.some((c) => c.stage === "rejected") ? ["rejected"] : [])];
+  // ?stage= (the "N at Applied" link on the Positions grid) filters the board
+  // down to just that one column — same board, same per-column bulk actions,
+  // just fewer columns rendered. Falls back to every column if the param
+  // doesn't name a real one here.
+  const visibleColumns = stageFilter && columns.includes(stageFilter) ? [stageFilter] : columns;
 
   // apply the live board search to the set
   const needle = q.trim().toLowerCase();
@@ -219,11 +226,18 @@ export default function PositionDetail() {
           />
         </div>
       ) : (
-      /* board — the ONE scroll region. Its up–down scroll drives the header
+      <>
+      {stageFilter && visibleColumns.length === 1 && (
+        <div className="mt-3 flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
+          Filtered to <span className="font-bold text-foreground">{resolveStage(position, visibleColumns[0]).label}</span>
+          <button onClick={() => setSearchParams({})} className="font-semibold text-primary hover:underline">Show all stages</button>
+        </div>
+      )}
+      {/* board — the ONE scroll region. Its up–down scroll drives the header
           collapse above (more room for candidates), while its left–right scrollbar
-          stays pinned at the bottom and scrolls ALL columns together. */
+          stays pinned at the bottom and scrolls ALL columns together. */}
       <div onScroll={onBoardScroll} className={`flex min-h-0 flex-1 items-start gap-4 overflow-auto overscroll-contain pb-2 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-4"}`}>
-        {columns.map((stageId) => {
+        {visibleColumns.map((stageId) => {
           const stage = resolveStage(position, stageId);
           const inStage = filtered.filter((c) => c.stage === stageId);
           const ownerLabel = stage.owner ? ROLE_LABELS[stage.owner] : null;
@@ -374,6 +388,7 @@ export default function PositionDetail() {
           );
         })}
       </div>
+      </>
       )}
 
       <AddCandidateModal open={addOpen} onClose={() => setAddOpen(false)} position={position} />

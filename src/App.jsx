@@ -25,6 +25,7 @@ const Positions = lazy(() => import("@/pages/Positions"));
 const PositionDetail = lazy(() => import("@/pages/PositionDetail"));
 const CandidatesTable = lazy(() => import("@/pages/CandidatesTable"));
 const Employees = lazy(() => import("@/pages/Employees"));
+const Rejected = lazy(() => import("@/pages/Rejected"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
 const MyApplications = lazy(() => import("@/pages/MyApplications"));
 const Profile = lazy(() => import("@/pages/Profile"));
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="/positions/:id" element={<RequireRole roles={STAFF}><PositionDetail /></RequireRole>} />
             <Route path="/candidates" element={<RequireRole roles={RECRUITERS}><CandidatesTable /></RequireRole>} />
             <Route path="/employees" element={<RequireRole roles={RECRUITERS}><Employees /></RequireRole>} />
+            <Route path="/rejected" element={<RequireRole roles={RECRUITERS}><Rejected /></RequireRole>} />
 
             {/* candidate — the applicant portal */}
             <Route path="/jobs" element={<RequireRole roles={[ROLES.CANDIDATE]}><Jobs /></RequireRole>} />

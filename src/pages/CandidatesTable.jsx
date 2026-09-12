@@ -1,80 +1,89 @@
-// Candidates table (HR / Management) — every applicant across all positions in a
-// sortable, filterable table. This is the "CV details in a table" the brief asks
-// for: filter by position, stage, qualification, experience or free-text search,
-// sort by any column, and download/view each CV.
+// Candidates table (HR / Management) — every ACTIVE applicant across all
+// positions in a sortable table. Hired candidates live on Employees; rejected
+// candidates live on Rejected — this table only ever holds people still in
+// the pipeline. Filter by position or free-text search, sort by any column,
+// download/view each CV.
 import { useEffect, useMemo, useState } from "react";
-import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, SlidersHorizontal, X } from "lucide-react";
-import { useHyreData, advanceStage } from "@/data/store";
-import { stageLabelOf, resolveStage, nextStage, canActOnStageFor, visiblePositions } from "@/lib/stages";
+import { Search, SlidersHorizontal } from "lucide-react";
+import { useHyreData, advanceStage, bulkReject } from "@/data/store";
+import { resolveStage, nextStage, canActOnStageFor, visiblePositions } from "@/lib/stages";
 import { useAuth } from "@/context/AuthContext";
 import { useStaggerReveal } from "@/hooks/useStaggerReveal";
 import { QUALIFICATIONS, EXPERIENCE_RANGES } from "@/lib/application";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Field";
-import { Button } from "@/components/ui/Button";
-import { StageBadge } from "@/components/ui/Badge";
-import { Avatar } from "@/components/ui/Avatar";
+import { Pagination } from "@/components/ui/Pagination";
 import { useToast } from "@/components/ui/ToastProvider";
-import { formatDate, displayName } from "@/lib/format";
-import { downloadDataUrl } from "@/lib/file";
+import { displayName } from "@/lib/format";
+import { sortApplications } from "../../functions/_lib/filtration/engine.js";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
-import EligibilityTag from "@/components/EligibilityTag";
-import { HoverScrollText } from "@/components/ui/HoverScrollText";
-import { cn } from "@/lib/utils";
+import RejectModal from "@/components/RejectModal";
+import CandidatesTableRow from "@/pages/CandidatesTableRow";
+import CandidatesTableHead from "@/pages/CandidatesTableHead";
+import CandidatesBulkBar from "@/pages/CandidatesBulkBar";
 
 // Ordinal rank so qualification / experience / stage sort meaningfully, not A–Z.
 const rank = (list, v) => {
   const i = list.indexOf(v);
   return i < 0 ? list.length : i;
 };
-const STAGE_ORDER = ["applied", "screening", "interview", "final", "hired", "hold", "rejected"];
-
 export default function CandidatesTable() {
   const { user } = useAuth();
-  const { positions: allPositions, candidates: allCandidates, loading } = useHyreData();
+  const { positions: allPositions, candidates: allCandidates, scores, loading } = useHyreData();
   const toast = useToast();
   const actor = user ? { name: user.name, role: user.role, uid: user.uid || user.email || user.name } : null;
   // HR sees candidates only from positions they're assigned to; Management: all.
   const positions = useMemo(() => visiblePositions(allPositions, user), [allPositions, user]);
-  // HIRED people are NOT candidates anymore — they live on the Employees page.
-  // The candidates table only holds people still in (or dropped from) the pipeline.
+  // HIRED people are NOT candidates anymore — they live on the Employees page,
+  // and REJECTED people live on the Rejected page — this table only holds
+  // people still active in the pipeline.
   const candidates = useMemo(() => {
     const ids = new Set(positions.map((p) => p.id));
-    return allCandidates.filter((c) => ids.has(c.positionId) && c.stage !== "hired");
+    return allCandidates.filter((c) => ids.has(c.positionId) && c.stage !== "hired" && c.stage !== "rejected");
   }, [allCandidates, positions]);
   const [q, setQ] = useState("");
   const [position, setPosition] = useState("");
-  const [stage, setStage] = useState("");
-  const [qualification, setQualification] = useState("");
-  const [experience, setExperience] = useState("");
   const [sort, setSort] = useState({ key: "appliedAt", dir: "desc" });
-  const [view, setView] = useState("all"); // all | active | hired | pool
   const [selected, setSelected] = useState(null);
   const [checked, setChecked] = useState(() => new Set()); // ticked candidate ids for bulk actions
+  const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
 
   const titleFor = (id) => positions.find((p) => p.id === id)?.title || "—";
   const positionFor = (id) => positions.find((p) => p.id === id) || null; // for the detail modal's Move-to-next-stage
   const minQualFor = (id) => positions.find((p) => p.id === id)?.minQualification || "";
-  const stagesPresent = useMemo(
-    () => STAGE_ORDER.filter((s) => candidates.some((c) => c.stage === s)),
-    [candidates]
-  );
+
+  // Match is only sortable once a single position scopes every row to exactly
+  // one score (see the "Select a position" notice next to the filter) — a
+  // person's several applications can carry different scores against
+  // different vacancies, and there's no meaningful single value to sort a
+  // person-row by across them.
+  useEffect(() => {
+    if (position) setSort({ key: "match", dir: "desc" });
+    else setSort((s) => (s.key === "match" ? { key: "appliedAt", dir: "desc" } : s));
+  }, [position]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let list = candidates.filter((c) => {
-      if (view === "active" && c.stage === "rejected") return false;
-      if (view === "pool" && c.stage !== "rejected") return false;
       if (position && c.positionId !== position) return false;
-      if (stage && c.stage !== stage) return false;
-      if (qualification && c.highestQualification !== qualification) return false;
-      if (experience && c.experience !== experience) return false;
       if (needle) {
         const hay = `${displayName(c)} ${c.email} ${c.skills} ${c.currentRole} ${c.currentCompany} ${titleFor(c.positionId)}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
+
+    // Match sort reuses the WS5 5.8 tie-break chain verbatim (score desc,
+    // core-skills desc, id asc) rather than a second, hand-rolled ordering.
+    if (sort.key === "match" && position) {
+      const entries = list.map((c) => {
+        const s = scores.get(c.id);
+        return { candidateId: c.id, status: s?.status === "scored" ? "scored" : "unscored", result: s?.status === "scored" ? s : undefined };
+      });
+      const orderedIds = sortApplications(entries).map((e) => e.candidateId);
+      const byId = new Map(list.map((c) => [c.id, c]));
+      return orderedIds.map((id) => byId.get(id));
+    }
 
     const dir = sort.dir === "asc" ? 1 : -1;
     const val = (c) => {
@@ -93,7 +102,7 @@ export default function CandidatesTable() {
       if (av > bv) return 1 * dir;
       return 0;
     });
-  }, [candidates, positions, q, position, stage, qualification, experience, sort, view]);
+  }, [candidates, positions, q, position, sort, scores]);
 
   // One person can apply to many positions (WS1) — each is its own application
   // row underneath, but they must never LOOK like the same person entered twice.
@@ -116,33 +125,19 @@ export default function CandidatesTable() {
   }, [rows]);
   const uniquePeople = (list) => new Set(list.map(personKey)).size;
 
-  const VIEWS = [
-    { id: "all", label: "All" },
-    { id: "active", label: "Active" },
-    { id: "pool", label: "Talent pool" },
-  ];
-  const counts = useMemo(
-    () => ({
-      all: uniquePeople(candidates),
-      active: uniquePeople(candidates.filter((c) => c.stage !== "rejected")),
-      pool: uniquePeople(candidates.filter((c) => c.stage === "rejected")),
-    }),
-    [candidates]
-  );
-
   const toggleSort = (key) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
 
   const clearFilters = () => {
-    setQ(""); setPosition(""); setStage(""); setQualification(""); setExperience("");
+    setQ(""); setPosition("");
   };
-  const activeFilters = q || position || stage || qualification || experience;
+  const activeFilters = q || position;
 
   // --- pagination (keeps big lists — 700+ CVs — snappy and readable) ---
   const PAGE_SIZE = 25;
   const [page, setPage] = useState(1);
   // jump back to page 1 whenever the result set changes
-  useEffect(() => setPage(1), [q, position, stage, qualification, experience, view, sort]);
+  useEffect(() => setPage(1), [q, position, sort]);
   const totalPages = Math.max(1, Math.ceil(groupedRows.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const pageGroups = groupedRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -175,6 +170,12 @@ export default function CandidatesTable() {
   )];
   const moveLabel = moveLabels.length === 1 ? moveLabels[0] : "next stage";
 
+  // Bulk reject — any selected candidate the acting user owns the current
+  // stage of (Management: any stage). Same permission gate as move, reused
+  // rather than re-derived, and rejectCandidate/bulkReject in store.js is the
+  // one path both this and the position board's bulk reject write through.
+  const rejectable = selectedRows.filter((c) => canActOnStageFor(user, positionFor(c.positionId), c.stage));
+
   const toggleGroup = (group) =>
     setChecked((prev) => {
       const next = new Set(prev);
@@ -198,19 +199,6 @@ export default function CandidatesTable() {
     toast.success(`Moved ${ids.length} candidate${ids.length === 1 ? "" : "s"} to ${moveLabel}.`);
   };
 
-  const Th = ({ label, k, className }) => (
-    <th className={cn("px-4 py-3 text-left", className)}>
-      <button onClick={() => toggleSort(k)} className="inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary">
-        {label}
-        {sort.key === k ? (
-          sort.dir === "asc" ? <ChevronUp size={13} /> : <ChevronDown size={13} />
-        ) : (
-          <ChevronUp size={13} className="opacity-20" />
-        )}
-      </button>
-    </th>
-  );
-
   return (
     <div className="p-4 sm:p-7">
       <div className="flex items-center justify-between">
@@ -222,27 +210,8 @@ export default function CandidatesTable() {
         </div>
       </div>
 
-      {/* view segments — talent pool = rejected candidates kept for future roles */}
-      <div className="mt-5 flex flex-wrap gap-2">
-        {VIEWS.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => setView(v.id)}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-[13px] font-semibold transition-colors",
-              view === v.id ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-background"
-            )}
-          >
-            {v.label}
-            <span className={cn("rounded px-1.5 py-0.5 text-[11px] font-bold", view === v.id ? "bg-card/20" : "bg-secondary text-muted-foreground")}>
-              {counts[v.id]}
-            </span>
-          </button>
-        ))}
-      </div>
-
       {/* filters */}
-      <Card className="relative z-30 mt-4 p-4">
+      <Card className="relative z-30 mt-5 p-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-[220px] flex-1">
             <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
@@ -259,18 +228,9 @@ export default function CandidatesTable() {
             <option value="">All positions</option>
             {positions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </Select>
-          <Select value={stage} onChange={(e) => setStage(e.target.value)} className="w-auto min-w-[130px]">
-            <option value="">All stages</option>
-            {stagesPresent.map((s) => <option key={s} value={s}>{stageLabelOf(s)}</option>)}
-          </Select>
-          <Select value={qualification} onChange={(e) => setQualification(e.target.value)} className="w-auto min-w-[150px]">
-            <option value="">All qualifications</option>
-            {QUALIFICATIONS.map((x) => <option key={x} value={x}>{x}</option>)}
-          </Select>
-          <Select value={experience} onChange={(e) => setExperience(e.target.value)} className="w-auto min-w-[140px]">
-            <option value="">All experience</option>
-            {EXPERIENCE_RANGES.map((x) => <option key={x} value={x}>{x}</option>)}
-          </Select>
+          {!position && (
+            <span className="text-xs font-medium text-muted-foreground">Select a position to sort by match.</span>
+          )}
           {activeFilters && (
             <button onClick={clearFilters} className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary">
               <SlidersHorizontal size={14} /> Clear
@@ -280,169 +240,46 @@ export default function CandidatesTable() {
       </Card>
 
       {/* bulk action bar — appears once you tick people */}
-      {selectedRows.length > 0 && (
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3">
-          <span className="text-sm font-semibold text-foreground">
-            {selectedRows.length} selected
-            {movable.length > 0 && (
-              <span className="ml-2 font-medium text-muted-foreground">· {movable.length} can move to {moveLabel}</span>
-            )}
-          </span>
-          <div className="flex items-center gap-2">
-            <button onClick={clearSelection} className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-secondary">
-              <X size={14} /> Clear
-            </button>
-            <Button
-              onClick={moveSelected}
-              disabled={movable.length === 0}
-              title={movable.length === 0 ? "None of the selected candidates can move — only people in Applied are eligible" : undefined}
-            >
-              <ChevronRight size={15} /> Move {movable.length} to {moveLabel}
-            </Button>
-          </div>
-        </div>
-      )}
+      <CandidatesBulkBar
+        selectedCount={selectedRows.length}
+        movable={movable}
+        moveLabel={moveLabel}
+        rejectable={rejectable}
+        onClear={clearSelection}
+        onMove={moveSelected}
+        onReject={() => setBulkRejectOpen(true)}
+      />
 
       {/* table */}
       <Card className="mt-5 overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] table-fixed text-sm">
-            {/* Every column has an explicit width, Position included — with
-                table-fixed + w-full, all-explicit widths scale proportionally
-                to fill the row, so no single column can balloon and crowd out
-                the rest the way an unconstrained column would. */}
-            <colgroup>
-              <col className="w-10" />
-              <col className="w-[200px]" />
-              <col className="w-[100px]" />
-              <col className="w-[300px]" />
-              <col className="w-[130px]" />
-              <col className="w-[100px]" />
-              <col className="w-[100px]" />
-              <col className="w-[80px]" />
-            </colgroup>
-            <thead className="border-b border-border bg-background text-[13px]">
-              <tr>
-                <th className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={pageAllChecked}
-                    onChange={toggleAllVisible}
-                    aria-label="Select all candidates on this page"
-                    className="h-4 w-4 cursor-pointer accent-primary"
-                  />
-                </th>
-                <Th label="Candidate" k="name" />
-                <th className="px-4 py-3 text-left font-semibold text-foreground">Candidate ID</th>
-                <Th label="Position" k="position" />
-                <Th label="Qualification" k="qualification" />
-                <Th label="Experience" k="experience" />
-                <Th label="Applied" k="appliedAt" />
-                <th className="px-4 py-3 text-left font-semibold text-foreground">CV</th>
-              </tr>
-            </thead>
+          <table className="w-full min-w-[1150px] table-fixed text-sm">
+            <CandidatesTableHead
+              sort={sort}
+              toggleSort={toggleSort}
+              setSort={setSort}
+              position={position}
+              pageAllChecked={pageAllChecked}
+              toggleAllVisible={toggleAllVisible}
+            />
             <tbody ref={bodyRef}>
               {loading ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">Loading candidates…</td></tr>
+                <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">Loading candidates…</td></tr>
               ) : groupedRows.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">No candidates match these filters.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">No candidates match these filters.</td></tr>
               ) : (
                 pageGroups.map((c) => (
-                  <tr
+                  <CandidatesTableRow
                     key={c.key}
-                    onClick={() => setSelected(c.applications[0])}
-                    className={cn(
-                      "cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-background",
-                      c.applications.some((a) => checked.has(a.id)) && "bg-primary/5"
-                    )}
-                  >
-                    <td className="px-4 py-3 align-top" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={c.applications.every((a) => checked.has(a.id))}
-                        onChange={() => toggleGroup(c)}
-                        aria-label={`Select ${displayName(c)}`}
-                        className="h-4 w-4 cursor-pointer accent-primary"
-                      />
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-center gap-2.5">
-                        <Avatar name={displayName(c)} color={c.avatarColor} size={34} />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <HoverScrollText text={displayName(c)} className="min-w-0 flex-1 text-sm font-semibold text-foreground" />
-                            {c.source === "Role change" && (
-                              <span className="shrink-0 rounded bg-[#EEF2FF] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#4F46E5] dark:bg-[#4F46E5]/15 dark:text-[#A5B4FC]" title={`Internal role change from ${c.fromRole || "current role"}${c.fromEmployeeId ? ` (${c.fromEmployeeId})` : ""}`}>
-                                Role change
-                              </span>
-                            )}
-                            {c.needsReview && (
-                              <span className="shrink-0 rounded bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]" title={c.cvValidation?.reason || "CV validation was borderline — worth a second look"}>
-                                Needs review
-                              </span>
-                            )}
-                          </div>
-                          <HoverScrollText text={c.email || "—"} className="text-xs text-muted-foreground" />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <HoverScrollText text={c.candidateId || "—"} className="font-mono text-xs font-semibold text-muted-foreground" />
-                    </td>
-                    {/* One self-contained "chip" per application — title, eligibility,
-                        stage and AI score all live together, so wrapping or a longer
-                        title never desyncs which stage/score belongs to which position
-                        (the old separate-columns layout let them drift apart). Never
-                        wraps to a second line — the title shrinks and, if it still
-                        doesn't fit, reveals itself on hover instead — so every chip is
-                        exactly one line tall and the whole column aligns level, row to
-                        row. The Applied column lists dates in the same order so it
-                        still lines up with these top to bottom. */}
-                    <td className="px-4 py-3 align-top text-muted-foreground">
-                      <div className="space-y-1.5">
-                        {c.applications.map((a) => (
-                          <div
-                            key={a.id}
-                            onClick={(e) => { e.stopPropagation(); setSelected(a); }}
-                            className="rounded-md border border-border/60 bg-background px-2.5 py-1.5 transition-colors hover:border-primary/40"
-                          >
-                            <div className="flex items-center gap-2">
-                              <HoverScrollText text={titleFor(a.positionId)} className="min-w-0 max-w-[45%] shrink font-medium text-foreground" />
-                              <StageBadge stageId={a.stage} />
-                              <EligibilityTag candidateQual={c.highestQualification} minQual={minQualFor(a.positionId)} />
-                            </div>
-                            {a.stage === "rejected" && a.rejection?.reason && (
-                              <div className="mt-1 text-[11px] font-medium text-[#DC2626]">{a.rejection.reason}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top text-muted-foreground">
-                      <HoverScrollText text={c.highestQualification || "—"} />
-                    </td>
-                    <td className="px-4 py-3 align-top text-muted-foreground">{c.experience || "—"}</td>
-                    <td className="px-4 py-3 align-top text-muted-foreground">
-                      <div className="space-y-1.5">
-                        {c.applications.map((a) => (
-                          <div key={a.id} className="py-1.5 leading-none">{formatDate(a.appliedAt)}</div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      {c.cvDataUrl ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); downloadDataUrl(c.cvDataUrl, c.cvFileName || "cv"); }}
-                          className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-secondary"
-                          title={c.cvFileName}
-                        >
-                          <Download size={13} /> CV
-                        </button>
-                      ) : (
-                        <span className="text-xs text-[#94A3B8]">—</span>
-                      )}
-                    </td>
-                  </tr>
+                    c={c}
+                    checked={checked}
+                    toggleGroup={toggleGroup}
+                    titleFor={titleFor}
+                    positionFor={positionFor}
+                    minQualFor={minQualFor}
+                    scores={scores}
+                    onOpenCandidate={setSelected}
+                  />
                 ))
               )}
             </tbody>
@@ -450,32 +287,8 @@ export default function CandidatesTable() {
         </div>
       </Card>
 
-      {/* pagination */}
-      {!loading && groupedRows.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-sm text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, groupedRows.length)}</span> of {groupedRows.length}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setPage(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-background disabled:pointer-events-none disabled:opacity-40"
-            >
-              <ChevronLeft size={15} /> Prev
-            </button>
-            <span className="px-2 text-sm font-semibold text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-background disabled:pointer-events-none disabled:opacity-40"
-            >
-              Next <ChevronRight size={15} />
-            </button>
-          </div>
-        </div>
+      {!loading && (
+        <Pagination page={currentPage} totalPages={totalPages} total={groupedRows.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
       )}
 
       <CandidateDetailModal
@@ -484,6 +297,17 @@ export default function CandidatesTable() {
         candidate={selected && (candidates.find((x) => x.id === selected.id) || selected)}
         position={selected ? positionFor(selected.positionId) : null}
         positionTitle={selected ? titleFor(selected.positionId) : ""}
+      />
+      <RejectModal
+        open={bulkRejectOpen}
+        count={rejectable.length}
+        onClose={() => setBulkRejectOpen(false)}
+        onConfirm={async ({ reason, comment }) => {
+          const ids = rejectable.map((c) => c.id);
+          clearSelection();
+          const n = await bulkReject(ids, { reason, comment, actor });
+          toast.success(`Rejected ${n} candidate${n === 1 ? "" : "s"}.`);
+        }}
       />
     </div>
   );

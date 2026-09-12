@@ -10,6 +10,7 @@ export default function Topbar({ onMenu = () => {} }) {
   const section =
     pathname.startsWith("/dashboard") ? "Dashboard" :
     pathname.startsWith("/candidates") ? "Candidates" :
+    pathname.startsWith("/rejected") ? "Rejected" :
     pathname.startsWith("/jobs") ? "Open Roles" :
     pathname.startsWith("/applications") ? "My Applications" :
     pathname.startsWith("/settings") ? "Settings" :

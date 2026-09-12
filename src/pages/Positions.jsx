@@ -1,7 +1,7 @@
 // Positions page — grid of position cards with live candidate counts + progress.
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { Plus, ChevronRight } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, ChevronRight, Clock } from "lucide-react";
 import { useHyreData, deletePosition } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { useStaggerReveal } from "@/hooks/useStaggerReveal";
@@ -36,6 +36,7 @@ function progressOf(pos, cands) {
 
 export default function Positions() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const confirm = useConfirm();
   const { positions: allPositions, candidates, loading } = useHyreData();
   const [filter, setFilter] = useState("All");
@@ -125,6 +126,7 @@ export default function Positions() {
         <div ref={gridRef} className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
         {shown.map((pos) => {
           const cands = candidates.filter((c) => c.positionId === pos.id);
+          const appliedCount = cands.filter((c) => c.stage === "applied").length;
           const pct = Math.round(progressOf(pos, cands) * 100);
           const stack = cands.slice(0, 3);
           const eff = effectiveStatus(pos);
@@ -153,6 +155,15 @@ export default function Positions() {
                     <span className="text-lg font-extrabold text-foreground">{pos.stages.length}</span>
                     <span className="text-[13px] text-muted-foreground">stages</span>
                   </div>
+                  {appliedCount > 0 && (
+                    <button
+                      onClick={(e) => act(e, () => navigate(`/positions/${pos.id}?stage=applied`))}
+                      title="Jump to the Applied column on this position's board"
+                      className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#FBF1DC] px-2 py-0.5 text-[12px] font-bold text-[#A9781A] transition-colors hover:bg-[#F5E4B8] dark:bg-[#A9781A]/20 dark:text-[#F5D77E] dark:hover:bg-[#A9781A]/30"
+                    >
+                      <Clock size={11} /> {appliedCount} at Applied
+                    </button>
+                  )}
                 </div>
 
                 <div>

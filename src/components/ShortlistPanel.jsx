@@ -5,17 +5,12 @@
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, RefreshCw, AlertCircle, ExternalLink, SlidersHorizontal, Settings2 } from "lucide-react";
 import { sortApplications } from "../../functions/_lib/filtration/engine.js";
-import { isScoreStale, staleReason } from "@/lib/scoreStaleness";
+import { isScoreStale, staleReason, notScoredReason, scorePillClass } from "@/lib/scoreStaleness";
 import { rescoreVacancy } from "@/data/store";
 import { displayName } from "@/lib/format";
 import { openDataUrl } from "@/lib/file";
 import { Avatar } from "@/components/ui/Avatar";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
-
-const scorePill = (s) =>
-  s >= 75 ? "bg-[#16A34A]/12 text-[#16A34A] dark:text-[#4ADE80]"
-  : s >= 50 ? "bg-[#E0A422]/15 text-[#B4801A] dark:text-[#F5D77E]"
-  : "bg-[#DC2626]/10 text-[#DC2626] dark:text-[#F87171]";
 
 // Compact per-row summary of 5.4's layer-firing — instrumentation the WS6.1
 // open decision depends on, shown right where it's earned rather than in a
@@ -32,10 +27,8 @@ function LayerSummary({ breakdown }) {
   );
 }
 
-function NotScoredRow({ c, scoreDoc, onRetry }) {
-  const reason = scoreDoc?.status === "failed"
-    ? scoreDoc.error || "Scoring failed."
-    : "Not yet scored.";
+function NotScoredRow({ c, scoreDoc, position, onRetry }) {
+  const reason = notScoredReason(scoreDoc, position);
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-background px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-2.5">
@@ -167,7 +160,7 @@ export default function ShortlistPanel({ position, applications, scores, onOpenC
                   </div>
                   <LayerSummary breakdown={e.result.breakdown} />
                 </button>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${scorePill(e.result.overallScore)}`}>{e.result.overallScore}</span>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${scorePillClass(e.result.overallScore)}`}>{e.result.overallScore}</span>
                 {e.c.cvDataUrl && (
                   <button onClick={() => openDataUrl(e.c.cvDataUrl)} title="View source CV" className="shrink-0 text-muted-foreground hover:text-primary">
                     <ExternalLink size={15} />
@@ -190,7 +183,7 @@ export default function ShortlistPanel({ position, applications, scores, onOpenC
         <div className="space-y-2 border-t border-border pt-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Not scored ({notScored.length})</div>
           {notScored.map((e) => (
-            <NotScoredRow key={e.candidateId} c={e.c} scoreDoc={e.scoreDoc} onRetry={runRescore} />
+            <NotScoredRow key={e.candidateId} c={e.c} scoreDoc={e.scoreDoc} position={position} onRetry={runRescore} />
           ))}
         </div>
       )}

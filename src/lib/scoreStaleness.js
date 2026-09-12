@@ -37,3 +37,24 @@ export function staleReason(score) {
   }
   return "";
 }
+
+/**
+ * Why an application shows no score, for the "not scored" state (10.1: never a
+ * 0, never blank). Shared by ShortlistPanel and the Candidates Match column so
+ * the reason text can't drift between the two places it's shown.
+ * @param {object|null} scoreDoc - an applicationScores doc, or null/undefined
+ * @param {object|null} position - the position this application is against
+ */
+export function notScoredReason(scoreDoc, position) {
+  if (!position?.requirements) return "no requirements set on this position";
+  if (scoreDoc?.status === "failed") return scoreDoc.error || "scoring failed";
+  return "not yet scored";
+}
+
+/** Colour band for a Match pill — shared so the Shortlist and the Candidates
+ * Match column render the same score the same colour. */
+export function scorePillClass(score) {
+  return score >= 75 ? "bg-[#16A34A]/12 text-[#16A34A] dark:text-[#4ADE80]"
+    : score >= 50 ? "bg-[#E0A422]/15 text-[#B4801A] dark:text-[#F5D77E]"
+    : "bg-[#DC2626]/10 text-[#DC2626] dark:text-[#F87171]";
+}

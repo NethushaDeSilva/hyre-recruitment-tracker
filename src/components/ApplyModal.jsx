@@ -14,7 +14,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Field, Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { fileToDataUrl, validateCvFile, humanSize, MAX_CV_BYTES, ACCEPTED_CV_TYPES } from "@/lib/file";
-import { validateCvContent, parseCvContent, scoreCvAgainst, healthCheckCvValidator, joinNicely } from "@/lib/cv-extract";
+import { validateCvContent, parseCvContent, healthCheckCvValidator, joinNicely } from "@/lib/cv-extract";
 import { profileToCandidateFields } from "@/lib/cv-profile";
 import { applyToPosition, logCvRejection, useHyreData } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
@@ -290,17 +290,15 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
       const cvEmail = (parsedProfile?.email || "").trim().toLowerCase();
       const emailMismatch = !!(cvEmail && cvEmail !== typedEmail);
 
-      // WS5 — score automatically once WS4 parsing completes; no button, no
-      // extra step. Scoped to a freshly-parsed CV this session — a carried-
-      // over CV from an earlier application isn't re-scored here, since there's
-      // no fresh parsedProfile to score with; HR's re-score picks that up later.
-      let score = null;
-      if (cvFile && parsedProfile && position?.requirements) {
-        const scored = await scoreCvAgainst(parsedProfile, scanResult?.text || "", position.requirements);
-        // scored.ok === false leaves the application unscored on purpose (10.1):
-        // "not scored — retry" on the shortlist, never a fabricated zero here.
-        if (scored.ok) score = scored.result;
-      }
+      // WS5 — NOT scored here. applicationScores is deliberately staff-write-only
+      // (R3 — a candidate must never be able to forge their own match score,
+      // and Firestore has no way to allow a write but not a read on the same
+      // collection), so a candidate's own session can never durably write a
+      // score no matter how it's computed — found live 2026-09-12: every
+      // self-application to a position with requirements failed outright here.
+      // Scoring happens staff-side instead: HR's "Re-score all" on the
+      // shortlist (rescoreVacancy(), already staff-authenticated) picks up
+      // every unscored application, including this one, the moment HR opens it.
 
       await applyToPosition({
         email: form.email.trim(),
@@ -330,7 +328,6 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
               ...(emailMismatch ? { emailFromCv: parsedProfile.email, emailMismatch: true } : {}),
             }
           : {}),
-        ...(score ? { score } : {}),
       });
       close();
       onApplied?.(position);

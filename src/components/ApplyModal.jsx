@@ -19,6 +19,7 @@ import { profileToCandidateFields } from "@/lib/cv-profile";
 import { applyToPosition, logCvRejection, useHyreData } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { isEmail, looksLikeEmail } from "@/lib/validate";
+import { checkEmailDomain } from "@/lib/emailDomain";
 import { cn } from "@/lib/utils";
 
 const EMPTY = { email: "", phone: "" };
@@ -41,7 +42,7 @@ const prefillFrom = (app, user) => ({
 });
 
 export default function ApplyModal({ open, onClose, position, onApplied }) {
-  const { user } = useAuth();
+  const { user, refreshEmailVerified } = useAuth();
   const { candidates } = useHyreData();
   const [form, setForm] = useState({ ...EMPTY, email: user?.email || "" });
   const [cvFile, setCvFile] = useState(null); // a NEWLY chosen File (uploaded on submit)
@@ -254,6 +255,22 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
 
     setBusy(true);
     setSummary("");
+
+    // Signup email validation, layer 1 — this typed email, not the account
+    // email, is the address everything downstream (notifications, interview
+    // invites) actually uses, so it gets the same domain check as signup.
+    // Fails open on our own infra trouble; the only reject is an explicit
+    // deliverable:false.
+    const domainCheck = await checkEmailDomain(form.email.trim());
+    if (domainCheck.deliverable === false) {
+      setBusy(false);
+      const msg = "This email domain cannot receive mail. Please check the address.";
+      setErrors((er) => ({ ...er, email: msg }));
+      setSummary(msg);
+      topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
     try {
       // Use a freshly chosen file if there is one; otherwise reuse the CV
       // carried over from the candidate's previous application (already a
@@ -290,6 +307,13 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
       const cvEmail = (parsedProfile?.email || "").trim().toLowerCase();
       const emailMismatch = !!(cvEmail && cvEmail !== typedEmail);
 
+      // Layer 2's status, stored on the APPLICATION so HR can see it — never
+      // blocking. refreshEmailVerified() forces a fresh read (the SDK's
+      // cached value doesn't update on its own after the link is clicked in
+      // another tab) and refreshes the ID token, so the Firestore rule below
+      // sees the current claim rather than a stale one.
+      const emailVerified = await refreshEmailVerified();
+
       // WS5 — NOT scored here. applicationScores is deliberately staff-write-only
       // (R3 — a candidate must never be able to forge their own match score,
       // and Firestore has no way to allow a write but not a read on the same
@@ -308,6 +332,7 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
         cvDataUrl: cvUrl, // Storage download URL (or a carried-over legacy data URL)
         cvSize,
         submittedByUid: user?.uid || "",
+        emailVerified,
         // Only set when a fresh file was actually scanned this session — a
         // carried-over CV isn't re-flagged one way or the other.
         ...(cvFile && scanResult

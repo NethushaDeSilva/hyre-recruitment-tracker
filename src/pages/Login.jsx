@@ -6,6 +6,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Check, AlertCircle, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
+import { checkEmailDomain } from "@/lib/emailDomain";
 import { DEMO_LOGINS, DEMO_PASSWORD } from "@/context/auth-config";
 import { Button } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
@@ -51,10 +52,35 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setBusy(true);
+
+    // Signup email validation, layer 1 — a domain that can't receive mail at
+    // all is rejected before an account is ever created. Never blocks on our
+    // own infra failing (checkEmailDomain fails open), and never claims to
+    // have confirmed the actual mailbox — only the domain.
+    if (isRegister) {
+      const domainCheck = await checkEmailDomain(email.trim());
+      if (domainCheck.deliverable === false) {
+        setBusy(false);
+        const msg = "This email domain cannot receive mail. Please check the address.";
+        setError(msg);
+        toast.error(msg, { title: "Couldn't create account" });
+        return;
+      }
+    }
+
     const res = isRegister
       ? await register({ name, email, password, remember })
       : await login(email, password, remember);
     if (res.ok) {
+      // 10.1 — the account exists either way; a failed verification send is
+      // surfaced, never silently dropped. Not a blocker: the candidate still
+      // gets in, and can resend anytime from their Profile page.
+      if (isRegister && res.verificationEmailSent === false) {
+        toast.error(
+          "Your account was created, but we couldn't send the verification email right now. You can resend it anytime from your Profile page.",
+          { title: "Verification email not sent", duration: 8000 }
+        );
+      }
       setPending(true); // stay on "Signing in…" until the effect above redirects
     } else {
       setBusy(false);

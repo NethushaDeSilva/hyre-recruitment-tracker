@@ -19,7 +19,7 @@
 // fine for the assignment demo; rotate them for anything real.
 import { readFileSync } from "node:fs";
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendEmailVerification } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 // ---------------------------------------------------------------------------
@@ -54,29 +54,44 @@ const app = initializeApp({
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Same custom /verify-email landing page the app itself uses (AuthContext's
+// verifyEmailActionSettings) — kept in sync manually since this script runs
+// standalone, outside the app bundle.
+const APP_URL = process.env.HYRE_APP_URL || "https://hyre-hiring.pages.dev";
+
 let ok = 0;
 for (const s of STAFF) {
   try {
-    let uid;
+    let user;
     try {
       const cred = await createUserWithEmailAndPassword(auth, s.email, s.password);
-      uid = cred.user.uid;
+      user = cred.user;
       console.log(`＋ created ${s.email}`);
     } catch (e) {
       if (e.code === "auth/email-already-in-use") {
         const cred = await signInWithEmailAndPassword(auth, s.email, s.password);
-        uid = cred.user.uid;
+        user = cred.user;
         console.log(`↻ exists, updating ${s.email}`);
       } else {
         throw e;
       }
     }
     await setDoc(
-      doc(db, "users", uid),
+      doc(db, "users", user.uid),
       { displayName: s.displayName, title: s.title, role: s.role, avatarColor: s.avatarColor, photoURL: "", email: s.email },
       { merge: true }
     );
-    console.log(`  ✓ ${s.email} → ${s.role}  (uid ${uid})`);
+    // Layer 2 (signup email validation): HR functions stay locked (see
+    // RequireVerified.jsx) until this is clicked. Skip if already verified.
+    if (!user.emailVerified) {
+      try {
+        await sendEmailVerification(user, { url: `${APP_URL}/verify-email`, handleCodeInApp: true });
+        console.log(`  → verification email sent to ${s.email}`);
+      } catch (e) {
+        console.error(`  ✗ verification email to ${s.email} failed: ${e.code || e.message} (account still provisioned — resend from the app)`);
+      }
+    }
+    console.log(`  ✓ ${s.email} → ${s.role}  (uid ${user.uid})`);
     await signOut(auth);
     ok++;
   } catch (e) {

@@ -3,7 +3,7 @@
 // profile (display name, photo, avatar colour, role) in a Firestore users/{uid}
 // document. Falls back to demo/in-memory if keys are absent.
 import { createContext, useContext, useEffect, useState } from "react";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, updateProfile as updateAuthProfile, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, sendEmailVerification, updateProfile as updateAuthProfile, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, firebaseReady } from "@/firebase/config";
 import { syncAuth, ensureUserId } from "@/data/store";
@@ -58,6 +58,14 @@ function friendlySignupError(code) {
       return "Could not create your account. Please try again.";
   }
 }
+
+// The custom /verify-email route (VerifyEmail.jsx) handles the link in-app —
+// consistent with the rest of Hyre never relying on Firebase's default hosted
+// action page — so it gives real control over expired/invalid copy.
+const verifyEmailActionSettings = () => ({
+  url: `${window.location.origin}/verify-email`,
+  handleCodeInApp: true,
+});
 
 function friendlyError(code) {
   switch (code) {
@@ -126,6 +134,7 @@ export function AuthProvider({ children }) {
       setUser({
         uid: fbUser.uid,
         email: fbUser.email,
+        emailVerified: !!fbUser.emailVerified,
         role: resolvedRole,
         title: cleanTitle(resolvedRole, profile?.title || base.title),
         name: profile?.displayName || base.name,
@@ -214,14 +223,58 @@ export function AuthProvider({ children }) {
         const cred = await createUserWithEmailAndPassword(auth, String(email).trim(), password);
         if (displayName) await updateAuthProfile(cred.user, { displayName });
         markActive();
-        return { ok: true };
+        // Layer 2's real proof. The account exists regardless of whether this
+        // send succeeds (10.1: never a silent drop) — a failure is reported
+        // back so the caller can show a retryable banner, not swallowed here.
+        let verificationEmailSent = true;
+        try {
+          await sendEmailVerification(cred.user, verifyEmailActionSettings());
+        } catch (e) {
+          console.error("sendEmailVerification (register):", e);
+          verificationEmailSent = false;
+        }
+        return { ok: true, verificationEmailSent };
       } catch (e) {
         return { ok: false, error: friendlySignupError(e.code) };
       }
     }
     // demo mode
     setUser({ role: "Candidate", name: displayName || email, title: "Applicant", avatarColor: "#2563EB", email: String(email).trim() });
-    return { ok: true };
+    return { ok: true, verificationEmailSent: true };
+  };
+
+  // Resend the verification link to whoever is currently signed in — used by
+  // both the staff RequireVerified gate and Login's post-register banner.
+  const resendVerificationEmail = async () => {
+    if (!firebaseReady || !auth.currentUser) return { ok: false, error: "Not signed in." };
+    try {
+      await sendEmailVerification(auth.currentUser, verifyEmailActionSettings());
+      return { ok: true };
+    } catch (e) {
+      console.error("resendVerificationEmail:", e);
+      if (e.code === "auth/too-many-requests") return { ok: false, error: "Too many attempts — please wait a moment and try again." };
+      return { ok: false, error: "Could not send the verification email. Please try again." };
+    }
+  };
+
+  // Pull the latest emailVerified claim from Firebase (the SDK's cached user
+  // object doesn't update on its own when the link is clicked in another tab)
+  // and force a fresh ID token so Firestore rules see the current claim too —
+  // without this, a just-verified candidate's application could still be
+  // rejected by the applications-create rule on a stale token. Never throws;
+  // a failure here just means "we don't know yet", not "blocked" — the caller
+  // (ApplyModal, RequireVerified) must never let this stall a real user.
+  const refreshEmailVerified = async () => {
+    if (!firebaseReady || !auth.currentUser) return false;
+    try {
+      await auth.currentUser.reload();
+      await auth.currentUser.getIdToken(true);
+    } catch (e) {
+      console.error("refreshEmailVerified:", e);
+    }
+    const verified = !!auth.currentUser?.emailVerified;
+    setUser((u) => (u ? { ...u, emailVerified: verified } : u));
+    return verified;
   };
 
   // Email the signed-in user a password-reset link.
@@ -291,7 +344,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  return <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, sendPasswordReset, forgotPassword }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{ user, loading, login, register, logout, updateProfile, sendPasswordReset, forgotPassword, resendVerificationEmail, refreshEmailVerified }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

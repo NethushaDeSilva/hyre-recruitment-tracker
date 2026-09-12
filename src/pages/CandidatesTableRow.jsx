@@ -4,7 +4,7 @@
 // Position, Match and Applied columns, in the same order, so multiple
 // applications from the same person never look like a single blended record.
 import { useState } from "react";
-import { ChevronDown, ChevronUp, AlertCircle, Download } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertCircle, Download, MailWarning } from "lucide-react";
 import { StageBadge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDate, displayName } from "@/lib/format";
@@ -107,6 +107,18 @@ export default function CandidatesTableRow({ c, checked, toggleGroup, titleFor, 
                 <HoverScrollText text={titleFor(a.positionId)} className="min-w-0 max-w-[45%] shrink font-medium text-foreground" />
                 <StageBadge stageId={a.stage} />
                 <EligibilityTag candidateQual={c.highestQualification} minQual={minQualFor(a.positionId)} />
+                {/* emailVerified is explicit false only once actually checked at apply
+                    time (WS2 layer 2) — undefined (legacy applications, or HR-added
+                    candidates with no verification to speak of) stays silent rather
+                    than claiming a status we don't actually know. */}
+                {a.emailVerified === false && (
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 rounded bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]"
+                    title="This candidate's email hasn't been verified yet — the application itself is never blocked for this."
+                  >
+                    <MailWarning size={10} /> Email unverified
+                  </span>
+                )}
               </div>
               {a.stage === "rejected" && a.rejection?.reason && (
                 <div className="mt-1 text-[11px] font-medium text-[#DC2626]">{a.rejection.reason}</div>

@@ -3,7 +3,7 @@
 // Candidates also see their own read-only Candidate ID here — it's their core
 // identifier across Hyre (the same CAND-#### recruiters see in the candidates table).
 import { useState, useMemo } from "react";
-import { Upload, Trash2, Check, Fingerprint, Copy, BadgeCheck } from "lucide-react";
+import { Upload, Trash2, Check, Fingerprint, Copy, BadgeCheck, MailCheck, MailWarning, RotateCcw } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useHyreData } from "@/data/store";
 import { Avatar } from "@/components/ui/Avatar";
@@ -17,7 +17,7 @@ const COLORS = ["#1F3A5F", "#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626"
 const candNum = (s) => parseInt(String(s || "").replace(/\D/g, ""), 10) || 0;
 
 export default function Profile() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, resendVerificationEmail, refreshEmailVerified } = useAuth();
   const { candidates } = useHyreData();
   const [name, setName] = useState(user?.name || "");
   const [color, setColor] = useState(user?.avatarColor || "#1F3A5F");
@@ -25,6 +25,21 @@ export default function Profile() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState(null);
+
+  const resendVerification = async () => {
+    setVerifyBusy(true);
+    setVerifyMsg(null);
+    const res = await resendVerificationEmail();
+    setVerifyBusy(false);
+    setVerifyMsg(res.ok ? { ok: true, text: "Sent — check your inbox." } : { ok: false, text: res.error });
+  };
+  const checkVerified = async () => {
+    setVerifyBusy(true);
+    await refreshEmailVerified();
+    setVerifyBusy(false);
+  };
 
   // All of this person's own candidate rows (a person may apply more than once).
   const isCandidate = user?.role === "Candidate";
@@ -214,11 +229,48 @@ export default function Profile() {
           </div>
           <div>
             <div className="text-[13px] font-semibold text-foreground">Email</div>
-            <div className="mt-1.5 truncate rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-muted-foreground">
-              {user?.email}
+            <div className="mt-1.5 flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3.5 py-2.5 text-sm text-muted-foreground">
+              <span className="truncate">{user?.email}</span>
+              {user?.emailVerified ? (
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#16A34A]">
+                  <MailCheck size={13} /> Verified
+                </span>
+              ) : (
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#B4791A]">
+                  <MailWarning size={13} /> Not verified
+                </span>
+              )}
             </div>
           </div>
         </div>
+
+        {!user?.emailVerified && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#E0A422]/40 bg-[#E0A422]/10 p-3.5">
+            <MailWarning size={16} className="shrink-0 text-[#B4791A]" />
+            <p className="flex-1 text-[13px] text-foreground">
+              Verify your email to {user?.role === "Candidate" ? "keep your account secure" : "unlock HR functions"}.
+            </p>
+            <button
+              type="button"
+              onClick={checkVerified}
+              disabled={verifyBusy}
+              className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+            >
+              I've verified
+            </button>
+            <button
+              type="button"
+              onClick={resendVerification}
+              disabled={verifyBusy}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+            >
+              <RotateCcw size={12} /> Resend
+            </button>
+          </div>
+        )}
+        {verifyMsg && (
+          <p className={`text-xs font-medium ${verifyMsg.ok ? "text-[#16A34A]" : "text-[#DC2626]"}`}>{verifyMsg.text}</p>
+        )}
 
         {/* avatar colour */}
         <div>

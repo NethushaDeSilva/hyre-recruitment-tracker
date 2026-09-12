@@ -484,8 +484,19 @@ export function syncAuth(user) {
     (err) => console.error("notifications listener:", err)
   );
 
+  // Staff need every status (draft/open/closed) to manage the board; a
+  // candidate's read is rule-gated to status == 'Open' (R6 — draft/closed
+  // never leak). Firestore's rule-for-queries check requires the QUERY ITSELF
+  // to structurally prove that gate — an unfiltered collection() listener
+  // can't, and the whole read is denied outright for a non-staff caller, not
+  // just the closed/draft docs. So the query has to carry the same filter the
+  // rule checks, not just rely on the rule to narrow an unfiltered read.
+  const positionsSource =
+    user.role === "Candidate"
+      ? query(collection(db, "positions"), where("status", "==", "Open"))
+      : collection(db, "positions");
   unsubPositions = onSnapshot(
-    collection(db, "positions"),
+    positionsSource,
     (snap) => {
       positions = snap.docs.map(mapPosition).sort((a, b) => b.createdAt - a.createdAt);
       publishStageMeta(positions);

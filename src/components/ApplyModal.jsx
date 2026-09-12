@@ -13,12 +13,11 @@ import { UploadCloud, FileText, CheckCircle2, X, AlertCircle, Wand2, Loader2, Ro
 import { Modal } from "@/components/ui/Modal";
 import { Field, Input } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import { uploadCv, fileToDataUrl, validateCvFile, humanSize, MAX_CV_BYTES, ACCEPTED_CV_TYPES } from "@/lib/file";
+import { fileToDataUrl, validateCvFile, humanSize, MAX_CV_BYTES, ACCEPTED_CV_TYPES } from "@/lib/file";
 import { validateCvContent, parseCvContent, scoreCvAgainst, healthCheckCvValidator, joinNicely } from "@/lib/cv-extract";
 import { profileToCandidateFields } from "@/lib/cv-profile";
 import { applyToPosition, logCvRejection, useHyreData } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
-import { firebaseReady } from "@/firebase/config";
 import { isEmail, looksLikeEmail } from "@/lib/validate";
 import { cn } from "@/lib/utils";
 
@@ -258,24 +257,26 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     try {
       // Use a freshly chosen file if there is one; otherwise reuse the CV
       // carried over from the candidate's previous application (already a
-      // stored URL — no re-upload needed). A fresh file goes to real Firebase
-      // Storage when it's configured; in mock/demo mode (no Firebase) there's
-      // no Storage to upload to, so it falls back to a local base64 data URL.
-      // Either way, this only ever runs once the scan above has passed — a
-      // rejected file is never uploaded, so nothing is ever left orphaned.
+      // stored URL — no re-upload needed). This only ever runs once the scan
+      // above has passed — a rejected file is never uploaded, so nothing is
+      // ever left orphaned.
+      //
+      // TEMPORARY (as of 2026-09-12): Firebase Storage requires the project
+      // to be on the Blaze plan just to provision a bucket at all — a Google
+      // policy change, not something this codebase controls — and Blaze
+      // isn't enabled here (no billing on this project). Every CV upload
+      // falls back to the legacy base64-in-Firestore path (fileToDataUrl)
+      // that already existed for pre-Storage candidates, with MAX_CV_BYTES
+      // lowered accordingly (see file.js). Swap the branch below back to
+      // uploadCv() once Storage is provisioned — nothing downstream of this
+      // (Firestore writes, CandidateDetailModal's open/download, etc.) needs
+      // to change either way, since both paths already produce a URL string.
       let cvUrl, cvName, cvSize;
       if (cvFile) {
-        if (firebaseReady) {
-          const uploaded = await uploadCv(cvFile, { uid: user?.uid });
-          cvUrl = uploaded.url;
-          cvName = uploaded.name;
-          cvSize = uploaded.size;
-        } else {
-          const d = await fileToDataUrl(cvFile);
-          cvUrl = d.dataUrl;
-          cvName = d.name;
-          cvSize = d.size;
-        }
+        const d = await fileToDataUrl(cvFile);
+        cvUrl = d.dataUrl;
+        cvName = d.name;
+        cvSize = d.size;
       } else {
         cvUrl = existingCv.dataUrl;
         cvName = existingCv.name;

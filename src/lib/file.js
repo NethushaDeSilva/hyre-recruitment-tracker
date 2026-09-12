@@ -1,19 +1,27 @@
-// CV handling. New applications (WS2 onward) upload the CV file straight to
-// Firebase Storage via uploadCv() when Firebase is configured — this doesn't
-// need Blaze, only Cloud Functions making outbound calls do. That's what lets
-// us accept up to 5 MB (storage.rules enforces the same cap server-side). In
-// mock/demo mode (no Firebase configured, firebaseReady === false — see
-// firebase/config.js) uploadCv() has nothing to upload to, so ApplyModal falls
-// back to fileToDataUrl() instead, same as it always has there. Candidates who
-// applied before this change also still have their CV as a base64 `data:` URL
-// inside their Firestore document (the old production path, capped at ~700KB
-// by Firestore's ~1MB doc limit) — the data-URL branches below stay so those
-// still open/download correctly. Open/download handle BOTH data URLs and
-// Storage URLs, so nothing breaks either way.
+// CV handling. The design is uploadCv() straight to Firebase Storage once
+// it's configured (see MAX_CV_BYTES below for why that's currently paused —
+// contrary to what an earlier version of this comment claimed, provisioning
+// a Storage bucket at all now DOES require the Blaze plan, a Google policy
+// change discovered live rather than anticipated). Until then, every CV goes
+// through fileToDataUrl() — the same legacy base64-in-Firestore path
+// candidates who applied before Storage existed already used, so their CVs
+// still open/download correctly with no migration. Open/download handle BOTH
+// data URLs and Storage URLs, so nothing breaks either way once Storage
+// resumes.
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage, firebaseReady } from "@/firebase/config";
 
-export const MAX_CV_BYTES = 5 * 1024 * 1024; // 5 MB — matches storage.rules
+// TEMPORARY (as of 2026-09-12): Firebase Storage needs the Blaze plan just to
+// provision a bucket, which isn't enabled on this project (no billing) — see
+// ApplyModal.jsx's submit(). Every CV currently goes through the legacy
+// base64-in-Firestore path instead, so this cap protects Firestore's ~1MB
+// per-document limit rather than matching storage.rules' 5MB (that value is
+// what to raise this back to once Storage is provisioned — Storage has no
+// such ceiling). Base64 inflates a file by ~4/3, and the candidate identity
+// document also carries education/experience/skills/cvExtractedText
+// alongside the CV itself — 500KB of raw file leaves comfortable headroom
+// under 1MB once all of that is accounted for.
+export const MAX_CV_BYTES = 500 * 1024;
 export const ACCEPTED_CV_TYPES = ".pdf,.doc,.docx";
 
 // Allowed CV file extensions (the reliable signal in the browser; MIME types for

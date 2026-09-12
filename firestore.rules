@@ -137,9 +137,20 @@ service cloud.firestore {
     // auth email either) — `submittedByUid`, when present, is the real anchor.
     match /candidates/{id} {
       // read: staff → all; a person → only their own identity record.
+      // The `!exists()` clause is load-bearing, not defensive dressing: a
+      // FIRST-TIME applicant's own upsertIdentityInTx() does a tx.get() on
+      // this exact path BEFORE the document exists (check-before-create), and
+      // without it `resource.data.submittedByUid` dereferences a null
+      // `resource` — Firestore treats that evaluation error as denied, which
+      // blocked every brand-new candidate's very first application outright
+      // (found live; existing candidate docs all predate this path or were
+      // created by staff, whose isStaff() branch never touches `resource`).
+      // Safe to allow unconditionally: a nonexistent document has no data to
+      // leak.
       allow read: if isStaff()
         || (signedIn() && (
-              resource.data.submittedByUid == request.auth.uid
+              !exists(/databases/$(database)/documents/candidates/$(id))
+              || resource.data.submittedByUid == request.auth.uid
               || resource.data.email == request.auth.token.email));
 
       // create: staff (HR quick-add, WS5 email intake) or a signed-in person

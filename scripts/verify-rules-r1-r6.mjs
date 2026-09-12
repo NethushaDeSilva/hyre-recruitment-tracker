@@ -1,15 +1,16 @@
-// CLAUDE.md 6.7 — Role-based access tests (R1-R6). Tests against FIRESTORE
-// RULES via the real client SDK (never firebase-admin, which bypasses rules
-// entirely), signed in as real accounts. "Test against Firestore rules, not
-// the UI... attempt the read from the console and confirm the rule rejects
-// it" — this is that attempt, automated so it re-runs after every rules
-// change (6.7: "Automate what can be automated").
+// CLAUDE.md 6.7 — Role-based access tests (R1-R6, plus a regression check for
+// a real bug found 2026-09-12, R7). Tests against FIRESTORE RULES via the
+// real client SDK (never firebase-admin, which bypasses rules entirely),
+// signed in as real accounts. "Test against Firestore rules, not the UI...
+// attempt the read from the console and confirm the rule rejects it" — this
+// is that attempt, automated so it re-runs after every rules change (6.7:
+// "Automate what can be automated").
 //
-// Touches ZERO Firestore documents: R1-R5 read existing real project data
-// (never write), and R6/candidate-scoped checks sign in as a throwaway Auth
-// account that is deleted at the end of the run — a candidate identity is
-// only ever created in Firestore when someone actually applies, which this
-// script never does.
+// Touches ZERO Firestore documents: every check here is a READ (R1-R6 read
+// existing real project data or a deliberately nonexistent path for R7;
+// nothing is ever written). Sign-in uses a throwaway Auth account deleted at
+// the end of the run — a candidate identity is only ever created in
+// Firestore when someone actually applies, which this script never does.
 //
 //   node scripts/verify-rules-r1-r6.mjs
 //
@@ -98,6 +99,23 @@ record(
   "denied",
   await expectDenied(() => getDoc(doc(db, "applicationScores", REAL_APPLICATION))),
   `target: applicationScores/${REAL_APPLICATION}`
+);
+// Regression check, not one of the numbered R1-R6 tests: a first-time
+// applicant's own upsertIdentityInTx() (src/data/store.js) does a tx.get()
+// on their OWN candidates/{email} doc BEFORE it exists (check-before-create).
+// Found live 2026-09-12 — the read rule dereferenced resource.data on a null
+// resource for a nonexistent doc, which Firestore treats as denied, blocking
+// every brand-new candidate's very first application outright. Existing
+// candidate docs never exercised this path (created by staff, whose
+// isStaff() branch never touches `resource`, or already existed by the time
+// this check was added) — that's exactly why it went unnoticed until a real
+// first-time applicant hit it.
+record(
+  "R7",
+  "Candidate: read own identity doc before it exists (check-before-create)",
+  "allowed",
+  await expectDenied(() => getDoc(doc(db, "candidates", testEmail))),
+  `target: candidates/${testEmail} (deliberately does not exist)`
 );
 record(
   "R6",

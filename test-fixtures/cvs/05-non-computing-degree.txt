@@ -1,0 +1,21 @@
+Priyanka Rajapaksa
+Colombo, Sri Lanka
+Backend Engineer
+
+EDUCATION
+BSc (Hons) Mathematics, University of Colombo, 2015
+
+WORK EXPERIENCE
+Backend Engineer, Continuum Analytics Lanka, 2016-01 - 2025-01
+Built the core Node.js services powering the firm's risk-analysis platform,
+backed by a PostgreSQL primary and a Redis layer for hot pricing data.
+Migrated the deployment pipeline onto Kubernetes and containerised every
+service with Docker. Own the MongoDB cluster storing historical market
+data. Introduced Terraform to manage every environment from a single
+source of truth, and built the GraphQL layer the front-end team consumes.
+
+SKILLS
+Node.js, Docker, PostgreSQL, Redis, Kubernetes, MongoDB, Terraform, GraphQL
+
+CONTACT
+priyanka.rajapaksa@example.com

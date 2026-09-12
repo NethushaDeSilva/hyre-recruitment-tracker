@@ -1,0 +1,165 @@
+Dr. Chamodi Wijesuriya, PhD
+Colombo, Sri Lanka
+
+EDUCATION
+BSc (Hons) Computer Science, University of Colombo, 2009
+PhD in Distributed Systems, University of Moratuwa, 2015
+
+RESEARCH SUMMARY
+Systems researcher and platform engineer with production experience spanning
+Node.js, Docker, PostgreSQL, Redis, Kubernetes and MongoDB, alongside
+Terraform-managed infrastructure and GraphQL API design for large-scale
+research computing platforms.
+
+PUBLICATIONS
+
+Wijesuriya, C. et al. (2010). "A study on consensus protocols under partial network partition." IEEE Transactions on Parallel and Distributed Systems, pp. 100-112.
+Wijesuriya, C. et al. (2011). "A study on tail-latency reduction in multi-tenant research clusters." ACM Symposium on Cloud Computing, pp. 101-113.
+Wijesuriya, C. et al. (2012). "A study on energy-aware scheduling for batch scientific workloads." USENIX Annual Technical Conference, pp. 102-114.
+Wijesuriya, C. et al. (2013). "A study on fault-tolerant checkpointing for long-running simulations." International Conference on Distributed Computing Systems, pp. 103-115.
+Wijesuriya, C. et al. (2014). "A study on data locality optimisation across federated storage tiers." Journal of Systems and Software, pp. 104-116.
+Wijesuriya, C. et al. (2015). "A study on adaptive replication for read-heavy analytics workloads." IEEE/ACM International Conference on Grid Computing, pp. 105-117.
+Wijesuriya, C. et al. (2016). "A study on capacity planning for bursty academic compute demand." IEEE Transactions on Parallel and Distributed Systems, pp. 106-118.
+Wijesuriya, C. et al. (2017). "A study on consensus protocols under partial network partition." ACM Symposium on Cloud Computing, pp. 107-119.
+Wijesuriya, C. et al. (2018). "A study on tail-latency reduction in multi-tenant research clusters." USENIX Annual Technical Conference, pp. 108-120.
+Wijesuriya, C. et al. (2019). "A study on energy-aware scheduling for batch scientific workloads." International Conference on Distributed Computing Systems, pp. 109-121.
+Wijesuriya, C. et al. (2020). "A study on fault-tolerant checkpointing for long-running simulations." Journal of Systems and Software, pp. 110-122.
+Wijesuriya, C. et al. (2021). "A study on data locality optimisation across federated storage tiers." IEEE/ACM International Conference on Grid Computing, pp. 111-123.
+Wijesuriya, C. et al. (2022). "A study on adaptive replication for read-heavy analytics workloads." IEEE Transactions on Parallel and Distributed Systems, pp. 112-124.
+Wijesuriya, C. et al. (2023). "A study on capacity planning for bursty academic compute demand." ACM Symposium on Cloud Computing, pp. 113-125.
+Wijesuriya, C. et al. (2024). "A study on consensus protocols under partial network partition." USENIX Annual Technical Conference, pp. 114-126.
+Wijesuriya, C. et al. (2010). "A study on tail-latency reduction in multi-tenant research clusters." International Conference on Distributed Computing Systems, pp. 115-127.
+Wijesuriya, C. et al. (2011). "A study on energy-aware scheduling for batch scientific workloads." Journal of Systems and Software, pp. 116-128.
+Wijesuriya, C. et al. (2012). "A study on fault-tolerant checkpointing for long-running simulations." IEEE/ACM International Conference on Grid Computing, pp. 117-129.
+Wijesuriya, C. et al. (2013). "A study on data locality optimisation across federated storage tiers." IEEE Transactions on Parallel and Distributed Systems, pp. 118-130.
+Wijesuriya, C. et al. (2014). "A study on adaptive replication for read-heavy analytics workloads." ACM Symposium on Cloud Computing, pp. 119-131.
+Wijesuriya, C. et al. (2015). "A study on capacity planning for bursty academic compute demand." USENIX Annual Technical Conference, pp. 120-132.
+Wijesuriya, C. et al. (2016). "A study on consensus protocols under partial network partition." International Conference on Distributed Computing Systems, pp. 121-133.
+Wijesuriya, C. et al. (2017). "A study on tail-latency reduction in multi-tenant research clusters." Journal of Systems and Software, pp. 122-134.
+Wijesuriya, C. et al. (2018). "A study on energy-aware scheduling for batch scientific workloads." IEEE/ACM International Conference on Grid Computing, pp. 123-135.
+Wijesuriya, C. et al. (2019). "A study on fault-tolerant checkpointing for long-running simulations." IEEE Transactions on Parallel and Distributed Systems, pp. 124-136.
+Wijesuriya, C. et al. (2020). "A study on data locality optimisation across federated storage tiers." ACM Symposium on Cloud Computing, pp. 125-137.
+Wijesuriya, C. et al. (2021). "A study on adaptive replication for read-heavy analytics workloads." USENIX Annual Technical Conference, pp. 126-138.
+Wijesuriya, C. et al. (2022). "A study on capacity planning for bursty academic compute demand." International Conference on Distributed Computing Systems, pp. 127-139.
+Wijesuriya, C. et al. (2023). "A study on consensus protocols under partial network partition." Journal of Systems and Software, pp. 128-140.
+Wijesuriya, C. et al. (2024). "A study on tail-latency reduction in multi-tenant research clusters." IEEE/ACM International Conference on Grid Computing, pp. 129-141.
+Wijesuriya, C. et al. (2010). "A study on energy-aware scheduling for batch scientific workloads." IEEE Transactions on Parallel and Distributed Systems, pp. 130-142.
+Wijesuriya, C. et al. (2011). "A study on fault-tolerant checkpointing for long-running simulations." ACM Symposium on Cloud Computing, pp. 131-143.
+Wijesuriya, C. et al. (2012). "A study on data locality optimisation across federated storage tiers." USENIX Annual Technical Conference, pp. 132-144.
+Wijesuriya, C. et al. (2013). "A study on adaptive replication for read-heavy analytics workloads." International Conference on Distributed Computing Systems, pp. 133-145.
+Wijesuriya, C. et al. (2014). "A study on capacity planning for bursty academic compute demand." Journal of Systems and Software, pp. 134-146.
+Wijesuriya, C. et al. (2015). "A study on consensus protocols under partial network partition." IEEE/ACM International Conference on Grid Computing, pp. 135-147.
+Wijesuriya, C. et al. (2016). "A study on tail-latency reduction in multi-tenant research clusters." IEEE Transactions on Parallel and Distributed Systems, pp. 136-148.
+Wijesuriya, C. et al. (2017). "A study on energy-aware scheduling for batch scientific workloads." ACM Symposium on Cloud Computing, pp. 137-149.
+Wijesuriya, C. et al. (2018). "A study on fault-tolerant checkpointing for long-running simulations." USENIX Annual Technical Conference, pp. 138-150.
+Wijesuriya, C. et al. (2019). "A study on data locality optimisation across federated storage tiers." International Conference on Distributed Computing Systems, pp. 139-151.
+Wijesuriya, C. et al. (2020). "A study on adaptive replication for read-heavy analytics workloads." Journal of Systems and Software, pp. 140-152.
+Wijesuriya, C. et al. (2021). "A study on capacity planning for bursty academic compute demand." IEEE/ACM International Conference on Grid Computing, pp. 141-153.
+Wijesuriya, C. et al. (2022). "A study on consensus protocols under partial network partition." IEEE Transactions on Parallel and Distributed Systems, pp. 142-154.
+Wijesuriya, C. et al. (2023). "A study on tail-latency reduction in multi-tenant research clusters." ACM Symposium on Cloud Computing, pp. 143-155.
+Wijesuriya, C. et al. (2024). "A study on energy-aware scheduling for batch scientific workloads." USENIX Annual Technical Conference, pp. 144-156.
+Wijesuriya, C. et al. (2010). "A study on fault-tolerant checkpointing for long-running simulations." International Conference on Distributed Computing Systems, pp. 145-157.
+Wijesuriya, C. et al. (2011). "A study on data locality optimisation across federated storage tiers." Journal of Systems and Software, pp. 146-158.
+Wijesuriya, C. et al. (2012). "A study on adaptive replication for read-heavy analytics workloads." IEEE/ACM International Conference on Grid Computing, pp. 147-159.
+Wijesuriya, C. et al. (2013). "A study on capacity planning for bursty academic compute demand." IEEE Transactions on Parallel and Distributed Systems, pp. 148-160.
+Wijesuriya, C. et al. (2014). "A study on consensus protocols under partial network partition." ACM Symposium on Cloud Computing, pp. 149-161.
+Wijesuriya, C. et al. (2015). "A study on tail-latency reduction in multi-tenant research clusters." USENIX Annual Technical Conference, pp. 150-162.
+Wijesuriya, C. et al. (2016). "A study on energy-aware scheduling for batch scientific workloads." International Conference on Distributed Computing Systems, pp. 151-163.
+Wijesuriya, C. et al. (2017). "A study on fault-tolerant checkpointing for long-running simulations." Journal of Systems and Software, pp. 152-164.
+Wijesuriya, C. et al. (2018). "A study on data locality optimisation across federated storage tiers." IEEE/ACM International Conference on Grid Computing, pp. 153-165.
+Wijesuriya, C. et al. (2019). "A study on adaptive replication for read-heavy analytics workloads." IEEE Transactions on Parallel and Distributed Systems, pp. 154-166.
+Wijesuriya, C. et al. (2020). "A study on capacity planning for bursty academic compute demand." ACM Symposium on Cloud Computing, pp. 155-167.
+Wijesuriya, C. et al. (2021). "A study on consensus protocols under partial network partition." USENIX Annual Technical Conference, pp. 156-168.
+Wijesuriya, C. et al. (2022). "A study on tail-latency reduction in multi-tenant research clusters." International Conference on Distributed Computing Systems, pp. 157-169.
+Wijesuriya, C. et al. (2023). "A study on energy-aware scheduling for batch scientific workloads." Journal of Systems and Software, pp. 158-170.
+Wijesuriya, C. et al. (2024). "A study on fault-tolerant checkpointing for long-running simulations." IEEE/ACM International Conference on Grid Computing, pp. 159-171.
+Wijesuriya, C. et al. (2010). "A study on data locality optimisation across federated storage tiers." IEEE Transactions on Parallel and Distributed Systems, pp. 160-172.
+Wijesuriya, C. et al. (2011). "A study on adaptive replication for read-heavy analytics workloads." ACM Symposium on Cloud Computing, pp. 161-173.
+Wijesuriya, C. et al. (2012). "A study on capacity planning for bursty academic compute demand." USENIX Annual Technical Conference, pp. 162-174.
+Wijesuriya, C. et al. (2013). "A study on consensus protocols under partial network partition." International Conference on Distributed Computing Systems, pp. 163-175.
+Wijesuriya, C. et al. (2014). "A study on tail-latency reduction in multi-tenant research clusters." Journal of Systems and Software, pp. 164-176.
+Wijesuriya, C. et al. (2015). "A study on energy-aware scheduling for batch scientific workloads." IEEE/ACM International Conference on Grid Computing, pp. 165-177.
+Wijesuriya, C. et al. (2016). "A study on fault-tolerant checkpointing for long-running simulations." IEEE Transactions on Parallel and Distributed Systems, pp. 166-178.
+Wijesuriya, C. et al. (2017). "A study on data locality optimisation across federated storage tiers." ACM Symposium on Cloud Computing, pp. 167-179.
+Wijesuriya, C. et al. (2018). "A study on adaptive replication for read-heavy analytics workloads." USENIX Annual Technical Conference, pp. 168-180.
+Wijesuriya, C. et al. (2019). "A study on capacity planning for bursty academic compute demand." International Conference on Distributed Computing Systems, pp. 169-181.
+Wijesuriya, C. et al. (2020). "A study on consensus protocols under partial network partition." Journal of Systems and Software, pp. 170-182.
+Wijesuriya, C. et al. (2021). "A study on tail-latency reduction in multi-tenant research clusters." IEEE/ACM International Conference on Grid Computing, pp. 171-183.
+Wijesuriya, C. et al. (2022). "A study on energy-aware scheduling for batch scientific workloads." IEEE Transactions on Parallel and Distributed Systems, pp. 172-184.
+Wijesuriya, C. et al. (2023). "A study on fault-tolerant checkpointing for long-running simulations." ACM Symposium on Cloud Computing, pp. 173-185.
+Wijesuriya, C. et al. (2024). "A study on data locality optimisation across federated storage tiers." USENIX Annual Technical Conference, pp. 174-186.
+
+RESEARCH GRANTS
+
+National Research Council Grant NRC-2000 (2011) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 3000000.
+National Research Council Grant NRC-2007 (2012) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 4500000.
+National Research Council Grant NRC-2014 (2013) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 6000000.
+National Research Council Grant NRC-2021 (2014) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 7500000.
+National Research Council Grant NRC-2028 (2015) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 9000000.
+National Research Council Grant NRC-2035 (2016) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 10500000.
+National Research Council Grant NRC-2042 (2017) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 12000000.
+National Research Council Grant NRC-2049 (2018) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 13500000.
+National Research Council Grant NRC-2056 (2019) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 15000000.
+National Research Council Grant NRC-2063 (2020) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 16500000.
+National Research Council Grant NRC-2070 (2021) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 18000000.
+National Research Council Grant NRC-2077 (2022) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 19500000.
+National Research Council Grant NRC-2084 (2023) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 21000000.
+National Research Council Grant NRC-2091 (2024) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 22500000.
+National Research Council Grant NRC-2098 (2025) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 24000000.
+National Research Council Grant NRC-2105 (2026) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 25500000.
+National Research Council Grant NRC-2112 (2027) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 27000000.
+National Research Council Grant NRC-2119 (2028) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 28500000.
+National Research Council Grant NRC-2126 (2029) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 30000000.
+National Research Council Grant NRC-2133 (2030) — Principal Investigator, "Resilient computing infrastructure for academic clusters," award value approx. LKR 31500000.
+
+TEACHING
+
+Distributed Systems (Semester 1, 2015) — Lecturer, University of Moratuwa, class size 40.
+Operating Systems (Semester 2, 2016) — Lecturer, University of Moratuwa, class size 43.
+Cloud Computing (Semester 1, 2017) — Lecturer, University of Moratuwa, class size 46.
+Advanced Algorithms (Semester 2, 2018) — Lecturer, University of Moratuwa, class size 49.
+Computer Networks (Semester 1, 2019) — Lecturer, University of Moratuwa, class size 52.
+Distributed Systems (Semester 2, 2020) — Lecturer, University of Moratuwa, class size 55.
+Operating Systems (Semester 1, 2021) — Lecturer, University of Moratuwa, class size 58.
+Cloud Computing (Semester 2, 2022) — Lecturer, University of Moratuwa, class size 61.
+Advanced Algorithms (Semester 1, 2023) — Lecturer, University of Moratuwa, class size 64.
+Computer Networks (Semester 2, 2024) — Lecturer, University of Moratuwa, class size 67.
+Distributed Systems (Semester 1, 2015) — Lecturer, University of Moratuwa, class size 70.
+Operating Systems (Semester 2, 2016) — Lecturer, University of Moratuwa, class size 73.
+Cloud Computing (Semester 1, 2017) — Lecturer, University of Moratuwa, class size 76.
+Advanced Algorithms (Semester 2, 2018) — Lecturer, University of Moratuwa, class size 79.
+Computer Networks (Semester 1, 2019) — Lecturer, University of Moratuwa, class size 82.
+Distributed Systems (Semester 2, 2020) — Lecturer, University of Moratuwa, class size 85.
+Operating Systems (Semester 1, 2021) — Lecturer, University of Moratuwa, class size 88.
+Cloud Computing (Semester 2, 2022) — Lecturer, University of Moratuwa, class size 91.
+
+CONFERENCE SERVICE
+
+Programme Committee Member, IEEE Transactions on Parallel and Distributed Systems (2012).
+Programme Committee Member, ACM Symposium on Cloud Computing (2013).
+Programme Committee Member, USENIX Annual Technical Conference (2014).
+Programme Committee Member, International Conference on Distributed Computing Systems (2015).
+Programme Committee Member, Journal of Systems and Software (2016).
+Programme Committee Member, IEEE/ACM International Conference on Grid Computing (2017).
+Programme Committee Member, IEEE Transactions on Parallel and Distributed Systems (2018).
+Programme Committee Member, ACM Symposium on Cloud Computing (2019).
+Programme Committee Member, USENIX Annual Technical Conference (2020).
+Programme Committee Member, International Conference on Distributed Computing Systems (2021).
+Programme Committee Member, Journal of Systems and Software (2022).
+Programme Committee Member, IEEE/ACM International Conference on Grid Computing (2023).
+Programme Committee Member, IEEE Transactions on Parallel and Distributed Systems (2024).
+Programme Committee Member, ACM Symposium on Cloud Computing (2025).
+Programme Committee Member, USENIX Annual Technical Conference (2026).
+
+EMPLOYMENT HISTORY
+
+Senior Platform Engineer, National Research Computing Centre, 2015-01 - 2023-01
+Designed and operated the centre's core Node.js services fronting a
+PostgreSQL cluster, with a Redis caching layer for high-throughput queries.
+Migrated batch workloads onto Kubernetes and containerised every service
+with Docker. Owns the MongoDB-backed metadata store and the GraphQL API
+layer used by partner institutions. Authored the Terraform modules that
+provision every research environment.
+
+CONTACT
+chamodi.wijesuriya@example.ac.lk

@@ -1,0 +1,1183 @@
+[
+  {
+    "id": "01",
+    "file": "01-strong-match.txt",
+    "band": [
+      95,
+      100
+    ],
+    "heuristic": {
+      "ok": true
+    },
+    "validate": {
+      "isCv": true,
+      "confidence": 0.9,
+      "reason": "The document contains a well-structured CV with all required sections and detailed information about the candidate's work experience, education, and skills.",
+      "missingSections": [],
+      "fallback": false,
+      "truncationApplied": false,
+      "truncationStrategy": null,
+      "sectionsFound": [
+        "work experience",
+        "education",
+        "skills",
+        "contact details"
+      ],
+      "httpStatus": 200
+    },
+    "parsed": {
+      "fullName": "Ishara Wickramasinghe",
+      "email": "ishara.wickramasinghe@example.com",
+      "phone": "",
+      "location": "Colombo, Sri Lanka",
+      "education": [
+        {
+          "awardType": "BSc (Hons)",
+          "field": "Computer Science",
+          "institution": "University of Moratuwa",
+          "year": "2013"
+        }
+      ],
+      "experience": [
+        {
+          "title": "Senior Backend Engineer",
+          "company": "Zephyr Logistics",
+          "startDate": "2016-01",
+          "endDate": "Present",
+          "summary": "Lead a team of four building the shipment-tracking platform. Designed the core Node.js services that sit in front of a PostgreSQL primary and a Redis cache layer for hot reads. Migrated the deployment target from bare VMs to Kubernetes, cutting release time from forty minutes to six. Introduced Terraform to manage every environment from a single source of truth instead of hand-clicked infrastructure. Own the GraphQL gateway that fronts the service mesh for internal clients."
+        },
+        {
+          "title": "Backend Engineer",
+          "company": "Colombo Data Systems",
+          "startDate": "2013-06",
+          "endDate": "2015-12",
+          "summary": "Built and maintained a document-processing pipeline. Owned the MongoDB cluster storing parsed documents and the ingestion service written in Node.js. Containerised the existing deployment with Docker as part of a platform modernisation project."
+        }
+      ],
+      "skills": [
+        "Node.js",
+        "Docker",
+        "PostgreSQL",
+        "Redis",
+        "Kubernetes",
+        "MongoDB",
+        "Terraform",
+        "GraphQL",
+        "TypeScript",
+        "CI/CD"
+      ],
+      "certifications": [],
+      "languages": [],
+      "totalYearsExperience": 13.2
+    },
+    "truncationApplied": false,
+    "truncationStrategy": null,
+    "score": {
+      "overallScore": 100,
+      "capApplied": false,
+      "breakdown": {
+        "qualifications": {
+          "score": 25,
+          "max": 25,
+          "levelMet": true,
+          "fieldSimilarity": 1,
+          "matched": [
+            "BSc (Hons)"
+          ]
+        },
+        "coreSkills": {
+          "score": 45,
+          "max": 45,
+          "matched": [
+            {
+              "required": "Node.js",
+              "found": "Node.js",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Node.js",
+              "offset": 339
+            },
+            {
+              "required": "Docker",
+              "found": "Docker",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Docker",
+              "offset": 348
+            },
+            {
+              "required": "PostgreSQL",
+              "found": "PostgreSQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "PostgreSQL",
+              "offset": 356
+            },
+            {
+              "required": "Redis",
+              "found": "Redis",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Redis",
+              "offset": 368
+            },
+            {
+              "required": "Kubernetes",
+              "found": "Kubernetes",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Kubernetes",
+              "offset": 375
+            },
+            {
+              "required": "MongoDB",
+              "found": "MongoDB",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "MongoDB",
+              "offset": 387
+            }
+          ],
+          "missing": []
+        },
+        "experience": {
+          "score": 20,
+          "max": 20,
+          "candidateYears": 13.2,
+          "requiredYears": 8
+        },
+        "preferredSkills": {
+          "score": 10,
+          "max": 10,
+          "matched": [
+            {
+              "required": "Terraform",
+              "found": "Terraform",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Terraform",
+              "offset": 396
+            },
+            {
+              "required": "GraphQL",
+              "found": "GraphQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "GraphQL",
+              "offset": 407
+            }
+          ],
+          "missing": []
+        }
+      },
+      "instrumentation": {
+        "layers": {
+          "normalisation": 9,
+          "embedding": 0,
+          "none": 0
+        },
+        "borderline": 0
+      }
+    },
+    "inBand": true
+  },
+  {
+    "id": "02",
+    "file": "02-keyword-stuffed.txt",
+    "band": [
+      17,
+      27
+    ],
+    "heuristic": {
+      "ok": true
+    },
+    "validate": {
+      "isCv": true,
+      "confidence": 0.9,
+      "reason": "The document contains all standard CV sections and appears to be a genuine CV/resume.",
+      "missingSections": [],
+      "fallback": false,
+      "truncationApplied": false,
+      "truncationStrategy": null,
+      "sectionsFound": [
+        "work experience",
+        "education",
+        "skills",
+        "contact details"
+      ],
+      "httpStatus": 200
+    },
+    "parsed": {
+      "fullName": "Kasun Perera",
+      "email": "kasun.perera@example.com",
+      "phone": "",
+      "location": "Kandy, Sri Lanka",
+      "education": [
+        {
+          "awardType": "BSc (Hons)",
+          "field": "Computer Science",
+          "institution": "University of Peradeniya",
+          "year": "2025"
+        }
+      ],
+      "experience": [
+        {
+          "title": "Intern",
+          "company": "Lakehouse Software (Pvt) Ltd",
+          "startDate": "2025-06",
+          "endDate": "2025-09",
+          "summary": "Shadowed the platform team and helped keep the internal wiki up to date. Attended daily stand-ups and took notes for the sprint retrospective."
+        }
+      ],
+      "skills": [
+        "Node.js",
+        "Docker",
+        "PostgreSQL",
+        "Redis",
+        "Kubernetes",
+        "MongoDB",
+        "Terraform",
+        "GraphQL"
+      ],
+      "certifications": [],
+      "languages": [],
+      "totalYearsExperience": 0.3
+    },
+    "truncationApplied": false,
+    "truncationStrategy": null,
+    "score": {
+      "overallScore": 80,
+      "capApplied": false,
+      "breakdown": {
+        "qualifications": {
+          "score": 25,
+          "max": 25,
+          "levelMet": true,
+          "fieldSimilarity": 1,
+          "matched": [
+            "BSc (Hons)"
+          ]
+        },
+        "coreSkills": {
+          "score": 45,
+          "max": 45,
+          "matched": [
+            {
+              "required": "Node.js",
+              "found": "Node.js",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Node.js",
+              "offset": 109
+            },
+            {
+              "required": "Docker",
+              "found": "Docker",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Docker",
+              "offset": 118
+            },
+            {
+              "required": "PostgreSQL",
+              "found": "PostgreSQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "PostgreSQL",
+              "offset": 126
+            },
+            {
+              "required": "Redis",
+              "found": "Redis",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Redis",
+              "offset": 138
+            },
+            {
+              "required": "Kubernetes",
+              "found": "Kubernetes",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Kubernetes",
+              "offset": 145
+            },
+            {
+              "required": "MongoDB",
+              "found": "MongoDB",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "MongoDB",
+              "offset": 157
+            }
+          ],
+          "missing": []
+        },
+        "experience": {
+          "score": 0,
+          "max": 20,
+          "candidateYears": 0.3,
+          "requiredYears": 8
+        },
+        "preferredSkills": {
+          "score": 10,
+          "max": 10,
+          "matched": [
+            {
+              "required": "Terraform",
+              "found": "Terraform",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Terraform",
+              "offset": 166
+            },
+            {
+              "required": "GraphQL",
+              "found": "GraphQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "GraphQL",
+              "offset": 177
+            }
+          ],
+          "missing": []
+        }
+      },
+      "instrumentation": {
+        "layers": {
+          "normalisation": 9,
+          "embedding": 0,
+          "none": 0
+        },
+        "borderline": 0
+      }
+    },
+    "inBand": false
+  },
+  {
+    "id": "03",
+    "file": "03-different-vocabulary.txt",
+    "band": [
+      15,
+      25
+    ],
+    "heuristic": {
+      "ok": true
+    },
+    "validate": {
+      "isCv": true,
+      "confidence": 0.9,
+      "reason": "The document contains a clear work experience, education, and contact details section, with a well-structured format and relevant information for a Backend & Platform Engineer position.",
+      "missingSections": [],
+      "fallback": false,
+      "truncationApplied": false,
+      "truncationStrategy": null,
+      "sectionsFound": [
+        "work experience",
+        "education",
+        "contact details"
+      ],
+      "httpStatus": 200
+    },
+    "parsed": {
+      "fullName": "Ruwan Abeysekara",
+      "email": "ruwan.abeysekara@example.com",
+      "phone": "",
+      "location": "Galle, Sri Lanka",
+      "education": [
+        {
+          "awardType": "BSc (Hons)",
+          "field": "Software Engineering",
+          "institution": "Sri Lanka Institute of Information Technology",
+          "year": "2013"
+        }
+      ],
+      "experience": [
+        {
+          "title": "Principal Engineer",
+          "company": "Orbital Fintech",
+          "startDate": "2014-01",
+          "endDate": "2026-01",
+          "summary": "Own the server-side JavaScript services that process every payment in the platform, backed by a relational database cluster tuned for high write throughput and an in-memory caching layer for session state. Led the move from a monolith to container orchestration, cutting deploy times from an hour to under ten minutes, and codified every environment through infrastructure-as-code so nothing is provisioned by hand. Store all unstructured event data in a NoSQL document store, and expose a declarative API querying layer to the mobile team instead of a growing pile of REST endpoints."
+        }
+      ],
+      "skills": [
+        "container orchestration",
+        "infrastructure-as-code"
+      ],
+      "certifications": [],
+      "languages": [],
+      "totalYearsExperience": 12
+    },
+    "truncationApplied": false,
+    "truncationStrategy": null,
+    "score": {
+      "overallScore": 20,
+      "capApplied": false,
+      "breakdown": {
+        "qualifications": {
+          "score": 0,
+          "max": 25,
+          "levelMet": true,
+          "fieldSimilarity": null,
+          "matched": []
+        },
+        "coreSkills": {
+          "score": 0,
+          "max": 45,
+          "matched": [],
+          "missing": [
+            "Node.js",
+            "Docker",
+            "PostgreSQL",
+            "Redis",
+            "Kubernetes",
+            "MongoDB"
+          ]
+        },
+        "experience": {
+          "score": 20,
+          "max": 20,
+          "candidateYears": 12,
+          "requiredYears": 8
+        },
+        "preferredSkills": {
+          "score": 0,
+          "max": 10,
+          "matched": [],
+          "missing": [
+            "Terraform",
+            "GraphQL"
+          ]
+        }
+      },
+      "instrumentation": {
+        "layers": {
+          "normalisation": 0,
+          "embedding": 0,
+          "none": 9
+        },
+        "borderline": 0
+      }
+    },
+    "inBand": true
+  },
+  {
+    "id": "04",
+    "file": "04-career-changer.txt",
+    "band": [
+      90,
+      100
+    ],
+    "heuristic": {
+      "ok": true
+    },
+    "validate": {
+      "isCv": true,
+      "confidence": 0.9,
+      "reason": "The document appears to be a genuine CV with all required sections present and well-structured.",
+      "missingSections": [],
+      "fallback": false,
+      "truncationApplied": false,
+      "truncationStrategy": null,
+      "sectionsFound": [
+        "work experience",
+        "education",
+        "skills",
+        "contact details"
+      ],
+      "httpStatus": 200
+    },
+    "parsed": {
+      "fullName": "Dilani Fernando",
+      "email": "dilani.fernando@example.com",
+      "phone": "",
+      "location": "Negombo, Sri Lanka",
+      "education": [
+        {
+          "awardType": "BSc (Hons)",
+          "field": "Computer Science",
+          "institution": "University of Kelaniya",
+          "year": "2018"
+        }
+      ],
+      "experience": [
+        {
+          "title": "IT Operations Analyst",
+          "company": "Harbourline Shipping Co",
+          "startDate": "2018-06",
+          "endDate": "2026-06",
+          "summary": "Day-to-day operations role supporting the company's internal systems. Built and maintained the backend Node.js services behind the internal booking tool, with PostgreSQL as the system of record and Redis fronting the busiest read paths. Moved the team's deployments onto Kubernetes and containerised every service with Docker. Own the MongoDB cluster that stores shipment tracking events. Wrote the Terraform modules that provision every environment the team uses."
+        }
+      ],
+      "skills": [
+        "Node.js",
+        "Docker",
+        "PostgreSQL",
+        "Redis",
+        "Kubernetes",
+        "MongoDB",
+        "Terraform"
+      ],
+      "certifications": [],
+      "languages": [],
+      "totalYearsExperience": 8
+    },
+    "truncationApplied": false,
+    "truncationStrategy": null,
+    "score": {
+      "overallScore": 95,
+      "capApplied": false,
+      "breakdown": {
+        "qualifications": {
+          "score": 25,
+          "max": 25,
+          "levelMet": true,
+          "fieldSimilarity": 1,
+          "matched": [
+            "BSc (Hons)"
+          ]
+        },
+        "coreSkills": {
+          "score": 45,
+          "max": 45,
+          "matched": [
+            {
+              "required": "Node.js",
+              "found": "Node.js",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Node.js",
+              "offset": 312
+            },
+            {
+              "required": "Docker",
+              "found": "Docker",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Docker",
+              "offset": 528
+            },
+            {
+              "required": "PostgreSQL",
+              "found": "PostgreSQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "PostgreSQL",
+              "offset": 368
+            },
+            {
+              "required": "Redis",
+              "found": "Redis",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Redis",
+              "offset": 407
+            },
+            {
+              "required": "Kubernetes",
+              "found": "Kubernetes",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Kubernetes",
+              "offset": 480
+            },
+            {
+              "required": "MongoDB",
+              "found": "MongoDB",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "MongoDB",
+              "offset": 544
+            }
+          ],
+          "missing": []
+        },
+        "experience": {
+          "score": 20,
+          "max": 20,
+          "candidateYears": 8,
+          "requiredYears": 8
+        },
+        "preferredSkills": {
+          "score": 5,
+          "max": 10,
+          "matched": [
+            {
+              "required": "Terraform",
+              "found": "Terraform",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Terraform",
+              "offset": 608
+            }
+          ],
+          "missing": [
+            "GraphQL"
+          ]
+        }
+      },
+      "instrumentation": {
+        "layers": {
+          "normalisation": 8,
+          "embedding": 0,
+          "none": 1
+        },
+        "borderline": 0
+      }
+    },
+    "inBand": true
+  },
+  {
+    "id": "05",
+    "file": "05-non-computing-degree.txt",
+    "band": [
+      70,
+      80
+    ],
+    "heuristic": {
+      "ok": true
+    },
+    "validate": {
+      "isCv": true,
+      "confidence": 0.9,
+      "reason": "The document contains all standard CV sections and appears to be a genuine CV/resume.",
+      "missingSections": [],
+      "fallback": false,
+      "truncationApplied": false,
+      "truncationStrategy": null,
+      "sectionsFound": [
+        "work experience",
+        "education",
+        "skills",
+        "contact details"
+      ],
+      "httpStatus": 200
+    },
+    "parsed": {
+      "fullName": "Priyanka Rajapaksa",
+      "email": "priyanka.rajapaksa@example.com",
+      "phone": "",
+      "location": "Colombo, Sri Lanka",
+      "education": [
+        {
+          "awardType": "BSc (Hons)",
+          "field": "Mathematics",
+          "institution": "University of Colombo",
+          "year": "2015"
+        }
+      ],
+      "experience": [
+        {
+          "title": "Backend Engineer",
+          "company": "Continuum Analytics Lanka",
+          "startDate": "2016-01",
+          "endDate": "2025-01",
+          "summary": "Built the core Node.js services powering the firm's risk-analysis platform, backed by a PostgreSQL primary and a Redis layer for hot pricing data. Migrated the deployment pipeline onto Kubernetes and containerised every service with Docker. Own the MongoDB cluster storing historical market data. Introduced Terraform to manage every environment from a single source of truth, and built the GraphQL layer the front-end team consumes."
+        }
+      ],
+      "skills": [
+        "Node.js",
+        "Docker",
+        "PostgreSQL",
+        "Redis",
+        "Kubernetes",
+        "MongoDB",
+        "Terraform",
+        "GraphQL"
+      ],
+      "certifications": [],
+      "languages": [],
+      "totalYearsExperience": 9
+    },
+    "truncationApplied": false,
+    "truncationStrategy": null,
+    "score": {
+      "overallScore": 75,
+      "capApplied": false,
+      "breakdown": {
+        "qualifications": {
+          "score": 0,
+          "max": 25,
+          "levelMet": true,
+          "fieldSimilarity": null,
+          "matched": []
+        },
+        "coreSkills": {
+          "score": 45,
+          "max": 45,
+          "matched": [
+            {
+              "required": "Node.js",
+              "found": "Node.js",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Node.js",
+              "offset": 213
+            },
+            {
+              "required": "Docker",
+              "found": "Docker",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Docker",
+              "offset": 431
+            },
+            {
+              "required": "PostgreSQL",
+              "found": "PostgreSQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "PostgreSQL",
+              "offset": 286
+            },
+            {
+              "required": "Redis",
+              "found": "Redis",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Redis",
+              "offset": 311
+            },
+            {
+              "required": "Kubernetes",
+              "found": "Kubernetes",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Kubernetes",
+              "offset": 383
+            },
+            {
+              "required": "MongoDB",
+              "found": "MongoDB",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "MongoDB",
+              "offset": 447
+            }
+          ],
+          "missing": []
+        },
+        "experience": {
+          "score": 20,
+          "max": 20,
+          "candidateYears": 9,
+          "requiredYears": 8
+        },
+        "preferredSkills": {
+          "score": 10,
+          "max": 10,
+          "matched": [
+            {
+              "required": "Terraform",
+              "found": "Terraform",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Terraform",
+              "offset": 506
+            },
+            {
+              "required": "GraphQL",
+              "found": "GraphQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "GraphQL",
+              "offset": 589
+            }
+          ],
+          "missing": []
+        }
+      },
+      "instrumentation": {
+        "layers": {
+          "normalisation": 8,
+          "embedding": 0,
+          "none": 1
+        },
+        "borderline": 0
+      }
+    },
+    "inBand": true
+  },
+  {
+    "id": "06",
+    "file": "06-academic-long.txt",
+    "band": [
+      95,
+      100
+    ],
+    "heuristic": {
+      "ok": true
+    },
+    "validate": {
+      "isCv": true,
+      "confidence": 0.95,
+      "reason": "The document contains a well-structured CV with clear sections for education, work experience, skills, and contact details, along with a professional summary and research history.",
+      "missingSections": [],
+      "fallback": false,
+      "truncationApplied": true,
+      "truncationStrategy": "HEAD_TAIL_FALLBACK",
+      "sectionsFound": [
+        "work experience",
+        "education",
+        "contact details"
+      ],
+      "httpStatus": 200
+    },
+    "parsed": {
+      "fullName": "Dr. Chamodi Wijesuriya",
+      "email": "chamodi.wijesuriya@example.ac.lk",
+      "phone": "",
+      "location": "Colombo, Sri Lanka",
+      "education": [
+        {
+          "awardType": "BSc (Hons)",
+          "field": "Computer Science",
+          "institution": "University of Colombo",
+          "year": "2009"
+        },
+        {
+          "awardType": "PhD",
+          "field": "Distributed Systems",
+          "institution": "University of Moratuwa",
+          "year": "2015"
+        }
+      ],
+      "experience": [
+        {
+          "title": "Senior Platform Engineer",
+          "company": "National Research Computing Centre",
+          "startDate": "2015-01",
+          "endDate": "2023-01",
+          "summary": "Designed and operated the centre's core Node.js services fronting a PostgreSQL cluster, with a Redis caching layer for high-throughput queries. Migrated batch workloads onto Kubernetes and containerised every service with Docker. Owns the MongoDB-backed metadata store and the GraphQL API layer used by partner institutions. Authored the Terraform modules that provision every research environment."
+        }
+      ],
+      "skills": [
+        "Node.js",
+        "Docker",
+        "PostgreSQL",
+        "Redis",
+        "Kubernetes",
+        "MongoDB",
+        "GraphQL",
+        "Terraform"
+      ],
+      "certifications": [],
+      "languages": [],
+      "totalYearsExperience": 8
+    },
+    "truncationApplied": true,
+    "truncationStrategy": "HEAD_TAIL_FALLBACK",
+    "score": {
+      "overallScore": 100,
+      "capApplied": false,
+      "breakdown": {
+        "qualifications": {
+          "score": 25,
+          "max": 25,
+          "levelMet": true,
+          "fieldSimilarity": 1,
+          "matched": [
+            "BSc (Hons)"
+          ]
+        },
+        "coreSkills": {
+          "score": 45,
+          "max": 45,
+          "matched": [
+            {
+              "required": "Node.js",
+              "found": "Node.js",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Node.js",
+              "offset": 267
+            },
+            {
+              "required": "Docker",
+              "found": "Docker",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Docker",
+              "offset": 276
+            },
+            {
+              "required": "PostgreSQL",
+              "found": "PostgreSQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "PostgreSQL",
+              "offset": 284
+            },
+            {
+              "required": "Redis",
+              "found": "Redis",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Redis",
+              "offset": 296
+            },
+            {
+              "required": "Kubernetes",
+              "found": "Kubernetes",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Kubernetes",
+              "offset": 303
+            },
+            {
+              "required": "MongoDB",
+              "found": "MongoDB",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "MongoDB",
+              "offset": 318
+            }
+          ],
+          "missing": []
+        },
+        "experience": {
+          "score": 20,
+          "max": 20,
+          "candidateYears": 8,
+          "requiredYears": 8
+        },
+        "preferredSkills": {
+          "score": 10,
+          "max": 10,
+          "matched": [
+            {
+              "required": "Terraform",
+              "found": "Terraform",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Terraform",
+              "offset": 337
+            },
+            {
+              "required": "GraphQL",
+              "found": "GraphQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "GraphQL",
+              "offset": 374
+            }
+          ],
+          "missing": []
+        }
+      },
+      "instrumentation": {
+        "layers": {
+          "normalisation": 9,
+          "embedding": 0,
+          "none": 0
+        },
+        "borderline": 0
+      }
+    },
+    "inBand": true
+  },
+  {
+    "id": "07",
+    "file": "07-no-headings-long.txt",
+    "band": [
+      83,
+      93
+    ],
+    "heuristic": {
+      "ok": true
+    },
+    "validate": {
+      "isCv": true,
+      "confidence": 0.9,
+      "reason": "The document contains a detailed work history, education background, and skills, but lacks contact information such as email address, phone number, or LinkedIn profile.",
+      "missingSections": [
+        "contact details"
+      ],
+      "fallback": false,
+      "truncationApplied": true,
+      "truncationStrategy": "HEAD_TAIL_FALLBACK",
+      "sectionsFound": [],
+      "httpStatus": 200
+    },
+    "parsed": {
+      "fullName": "Nadeesha Kularatne",
+      "email": "",
+      "phone": "",
+      "location": "Colombo, Sri Lanka",
+      "education": [
+        {
+          "awardType": "BSc (Hons)",
+          "field": "Computer Science",
+          "institution": "University of Kelaniya",
+          "year": "2013"
+        }
+      ],
+      "experience": [
+        {
+          "title": "Backend Engineer",
+          "company": "Solstice Retail Systems",
+          "startDate": "March 2015",
+          "endDate": "March 2025",
+          "summary": "Designed the core Node.js services that sit in front of a PostgreSQL primary and a Redis caching layer for the company's checkout platform, moved the team's deployments onto Kubernetes, and containerised every service with Docker. Built the GraphQL layer that the mobile team now depends on instead of a growing pile of REST endpoints."
+        }
+      ],
+      "skills": [
+        "backend engineer",
+        "Node.js",
+        "PostgreSQL",
+        "Redis",
+        "Kubernetes",
+        "Docker",
+        "GraphQL",
+        "REST endpoints"
+      ],
+      "certifications": [],
+      "languages": [],
+      "totalYearsExperience": 10
+    },
+    "truncationApplied": true,
+    "truncationStrategy": "HEAD_TAIL_FALLBACK",
+    "score": {
+      "overallScore": 88,
+      "capApplied": false,
+      "breakdown": {
+        "qualifications": {
+          "score": 25,
+          "max": 25,
+          "levelMet": true,
+          "fieldSimilarity": 1,
+          "matched": [
+            "BSc (Hons)"
+          ]
+        },
+        "coreSkills": {
+          "score": 38,
+          "max": 45,
+          "matched": [
+            {
+              "required": "Node.js",
+              "found": "Node.js",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Node.js",
+              "offset": 312
+            },
+            {
+              "required": "Docker",
+              "found": "Docker",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Docker",
+              "offset": 517
+            },
+            {
+              "required": "PostgreSQL",
+              "found": "PostgreSQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "PostgreSQL",
+              "offset": 352
+            },
+            {
+              "required": "Redis",
+              "found": "Redis",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Redis",
+              "offset": 377
+            },
+            {
+              "required": "Kubernetes",
+              "found": "Kubernetes",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "Kubernetes",
+              "offset": 468
+            }
+          ],
+          "missing": [
+            "MongoDB"
+          ]
+        },
+        "experience": {
+          "score": 20,
+          "max": 20,
+          "candidateYears": 10,
+          "requiredYears": 8
+        },
+        "preferredSkills": {
+          "score": 5,
+          "max": 10,
+          "matched": [
+            {
+              "required": "GraphQL",
+              "found": "GraphQL",
+              "layer": "normalisation",
+              "similarity": 1,
+              "status": "verified",
+              "evidence": "GraphQL",
+              "offset": 544
+            }
+          ],
+          "missing": [
+            "Terraform"
+          ]
+        }
+      },
+      "instrumentation": {
+        "layers": {
+          "normalisation": 7,
+          "embedding": 0,
+          "none": 2
+        },
+        "borderline": 0
+      }
+    },
+    "inBand": true
+  }
+]

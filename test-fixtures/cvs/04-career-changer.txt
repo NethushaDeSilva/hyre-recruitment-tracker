@@ -1,0 +1,22 @@
+Dilani Fernando
+Negombo, Sri Lanka
+IT Operations Analyst
+
+EDUCATION
+BSc (Hons) Computer Science, University of Kelaniya, 2018
+
+WORK EXPERIENCE
+IT Operations Analyst, Harbourline Shipping Co, 2018-06 - 2026-06
+Day-to-day operations role supporting the company's internal systems.
+Built and maintained the backend Node.js services behind the internal
+booking tool, with PostgreSQL as the system of record and Redis fronting
+the busiest read paths. Moved the team's deployments onto Kubernetes and
+containerised every service with Docker. Own the MongoDB cluster that
+stores shipment tracking events. Wrote the Terraform modules that
+provision every environment the team uses.
+
+SKILLS
+Node.js, Docker, PostgreSQL, Redis, Kubernetes, MongoDB, Terraform
+
+CONTACT
+dilani.fernando@example.com

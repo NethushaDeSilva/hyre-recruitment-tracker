@@ -1,0 +1,16 @@
+Kasun Perera
+Kandy, Sri Lanka
+
+EDUCATION
+BSc (Hons) Computer Science, University of Peradeniya, 2025
+
+SKILLS
+Node.js, Docker, PostgreSQL, Redis, Kubernetes, MongoDB, Terraform, GraphQL
+
+WORK EXPERIENCE
+Intern, Lakehouse Software (Pvt) Ltd, 2025-06 - 2025-09
+Shadowed the platform team and helped keep the internal wiki up to date.
+Attended daily stand-ups and took notes for the sprint retrospective.
+
+CONTACT
+kasun.perera@example.com

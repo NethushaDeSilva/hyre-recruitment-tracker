@@ -1,0 +1,34 @@
+Ishara Wickramasinghe
+Colombo, Sri Lanka
+Backend Software Engineer
+
+SUMMARY
+Backend engineer with over a decade of experience building and operating
+production services. Comfortable owning a system end to end, from data
+modelling through deployment and on-call.
+
+EDUCATION
+BSc (Hons) Computer Science, University of Moratuwa, 2013
+
+SKILLS
+Node.js, Docker, PostgreSQL, Redis, Kubernetes, MongoDB, Terraform, GraphQL,
+TypeScript, CI/CD
+
+WORK EXPERIENCE
+Senior Backend Engineer, Zephyr Logistics, 2016-01 - Present
+Lead a team of four building the shipment-tracking platform. Designed the
+core Node.js services that sit in front of a PostgreSQL primary and a Redis
+cache layer for hot reads. Migrated the deployment target from bare VMs to
+Kubernetes, cutting release time from forty minutes to six. Introduced
+Terraform to manage every environment from a single source of truth instead
+of hand-clicked infrastructure. Own the GraphQL gateway that fronts the
+service mesh for internal clients.
+
+Backend Engineer, Colombo Data Systems, 2013-06 - 2015-12
+Built and maintained a document-processing pipeline. Owned the MongoDB
+cluster storing parsed documents and the ingestion service written in
+Node.js. Containerised the existing deployment with Docker as part of a
+platform modernisation project.
+
+CONTACT
+ishara.wickramasinghe@example.com

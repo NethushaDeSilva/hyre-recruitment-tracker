@@ -1,0 +1,26 @@
+Sprint Planning Notes — Team Retro, Week 14
+
+Attendees: Malsha, Chathura, Ruwan, Anjali
+
+Carried over from last sprint:
+- Fix the flaky checkout test on CI (still failing intermittently, Chathura to
+  investigate the timing issue on the payment mock)
+- Update the onboarding doc with the new local dev setup steps
+
+New this sprint:
+- Prioritise the search-latency ticket before anything else — customer
+  support flagged three complaints this week
+- Anjali to pair with Ruwan on the caching layer refactor
+- Decide whether we're doing the database migration this sprint or pushing
+  it to next — leaning towards pushing given the search-latency work
+
+Action items:
+1. Malsha to write up the retro notes and share in the team channel
+2. Chathura to open a ticket for the CI flakiness with logs attached
+3. Everyone to update their sprint board cards by end of day Friday
+
+Parking lot (discuss next retro):
+- Whether we need a second staging environment
+- Revisiting the alert thresholds on the dashboard, they've been too noisy
+
+Next retro: same time next Friday.

@@ -1,0 +1,114 @@
+Nadeesha Kularatne is a backend engineer based in Colombo, Sri Lanka, who holds a BSc (Hons) Computer Science degree from the University of Kelaniya, awarded in 2013. She has spent the last decade, from March 2015 through March 2025, as a backend engineer at Solstice Retail Systems, where she designed the core Node.js services that sit in front of a PostgreSQL primary and a Redis caching layer for the company's checkout platform, moved the team's deployments onto Kubernetes, and containerised every service with Docker. She also built the GraphQL layer that the mobile team now depends on instead of a growing pile of REST endpoints.
+
+Outside of her day-to-day work she spends a lot of time thinking about how a small backend team should structure its on-call rotation so that nobody burns out during a bad release week, and has written several internal documents on the subject that the wider engineering organisation eventually adopted as a template for other teams to follow.
+
+She has mentored four junior engineers over the years, each of whom joined the team with little production experience and left able to run an incident review on their own, which she considers one of the more satisfying parts of a senior role that otherwise involves a lot of meetings about quarterly planning.
+
+A recurring theme in her retrospectives is that the checkout platform's busiest period of the year is the week before a major national holiday, when traffic can be four or five times a normal day, and she has spent a disproportionate amount of engineering time over the years making sure the system degrades gracefully rather than falling over outright during that week.
+
+She also maintains a small internal tool that the support team uses to look up a customer's recent orders without needing direct database access, which started as a weekend project and slowly became something several other teams now depend on daily, to the point where she has had to write proper documentation for it.
+
+In one particularly memorable incident a few years ago, a third-party payment provider had a partial outage during a flash sale, and the retry logic she had written the previous year meant the checkout platform kept working for the vast majority of customers while the provider's own dashboard showed everything as red.
+
+She has given a couple of internal talks about that incident since, mostly because a lot of the audience assumed the system must have failed given how bad the provider's own status page looked at the time, and she enjoys correcting that assumption with the actual graphs from that afternoon.
+
+Her manager has described her, more than once, as the person who quietly prevents most of the fires nobody ever hears about, which she finds both flattering and slightly annoying, since it also means most of her hardest work goes unnoticed by anyone outside the immediate team.
+
+She reads widely outside of strictly technical material as well, and has a habit of bringing analogies from completely unrelated fields into architecture discussions, which occasionally confuses newer engineers until they get used to how she thinks about systems.
+
+Outside of her day-to-day work she spends a lot of time thinking about how a small backend team should structure its on-call rotation so that nobody burns out during a bad release week, and has written several internal documents on the subject that the wider engineering organisation eventually adopted as a template for other teams to follow.
+
+She has mentored four junior engineers over the years, each of whom joined the team with little production experience and left able to run an incident review on their own, which she considers one of the more satisfying parts of a senior role that otherwise involves a lot of meetings about quarterly planning.
+
+A recurring theme in her retrospectives is that the checkout platform's busiest period of the year is the week before a major national holiday, when traffic can be four or five times a normal day, and she has spent a disproportionate amount of engineering time over the years making sure the system degrades gracefully rather than falling over outright during that week.
+
+She also maintains a small internal tool that the support team uses to look up a customer's recent orders without needing direct database access, which started as a weekend project and slowly became something several other teams now depend on daily, to the point where she has had to write proper documentation for it.
+
+In one particularly memorable incident a few years ago, a third-party payment provider had a partial outage during a flash sale, and the retry logic she had written the previous year meant the checkout platform kept working for the vast majority of customers while the provider's own dashboard showed everything as red.
+
+She has given a couple of internal talks about that incident since, mostly because a lot of the audience assumed the system must have failed given how bad the provider's own status page looked at the time, and she enjoys correcting that assumption with the actual graphs from that afternoon.
+
+Her manager has described her, more than once, as the person who quietly prevents most of the fires nobody ever hears about, which she finds both flattering and slightly annoying, since it also means most of her hardest work goes unnoticed by anyone outside the immediate team.
+
+She reads widely outside of strictly technical material as well, and has a habit of bringing analogies from completely unrelated fields into architecture discussions, which occasionally confuses newer engineers until they get used to how she thinks about systems.
+
+Outside of her day-to-day work she spends a lot of time thinking about how a small backend team should structure its on-call rotation so that nobody burns out during a bad release week, and has written several internal documents on the subject that the wider engineering organisation eventually adopted as a template for other teams to follow.
+
+She has mentored four junior engineers over the years, each of whom joined the team with little production experience and left able to run an incident review on their own, which she considers one of the more satisfying parts of a senior role that otherwise involves a lot of meetings about quarterly planning.
+
+A recurring theme in her retrospectives is that the checkout platform's busiest period of the year is the week before a major national holiday, when traffic can be four or five times a normal day, and she has spent a disproportionate amount of engineering time over the years making sure the system degrades gracefully rather than falling over outright during that week.
+
+She also maintains a small internal tool that the support team uses to look up a customer's recent orders without needing direct database access, which started as a weekend project and slowly became something several other teams now depend on daily, to the point where she has had to write proper documentation for it.
+
+In one particularly memorable incident a few years ago, a third-party payment provider had a partial outage during a flash sale, and the retry logic she had written the previous year meant the checkout platform kept working for the vast majority of customers while the provider's own dashboard showed everything as red.
+
+She has given a couple of internal talks about that incident since, mostly because a lot of the audience assumed the system must have failed given how bad the provider's own status page looked at the time, and she enjoys correcting that assumption with the actual graphs from that afternoon.
+
+Her manager has described her, more than once, as the person who quietly prevents most of the fires nobody ever hears about, which she finds both flattering and slightly annoying, since it also means most of her hardest work goes unnoticed by anyone outside the immediate team.
+
+She reads widely outside of strictly technical material as well, and has a habit of bringing analogies from completely unrelated fields into architecture discussions, which occasionally confuses newer engineers until they get used to how she thinks about systems.
+
+Outside of her day-to-day work she spends a lot of time thinking about how a small backend team should structure its on-call rotation so that nobody burns out during a bad release week, and has written several internal documents on the subject that the wider engineering organisation eventually adopted as a template for other teams to follow.
+
+She has mentored four junior engineers over the years, each of whom joined the team with little production experience and left able to run an incident review on their own, which she considers one of the more satisfying parts of a senior role that otherwise involves a lot of meetings about quarterly planning.
+
+A recurring theme in her retrospectives is that the checkout platform's busiest period of the year is the week before a major national holiday, when traffic can be four or five times a normal day, and she has spent a disproportionate amount of engineering time over the years making sure the system degrades gracefully rather than falling over outright during that week.
+
+She also maintains a small internal tool that the support team uses to look up a customer's recent orders without needing direct database access, which started as a weekend project and slowly became something several other teams now depend on daily, to the point where she has had to write proper documentation for it.
+
+In one particularly memorable incident a few years ago, a third-party payment provider had a partial outage during a flash sale, and the retry logic she had written the previous year meant the checkout platform kept working for the vast majority of customers while the provider's own dashboard showed everything as red.
+
+She has given a couple of internal talks about that incident since, mostly because a lot of the audience assumed the system must have failed given how bad the provider's own status page looked at the time, and she enjoys correcting that assumption with the actual graphs from that afternoon.
+
+Her manager has described her, more than once, as the person who quietly prevents most of the fires nobody ever hears about, which she finds both flattering and slightly annoying, since it also means most of her hardest work goes unnoticed by anyone outside the immediate team.
+
+She reads widely outside of strictly technical material as well, and has a habit of bringing analogies from completely unrelated fields into architecture discussions, which occasionally confuses newer engineers until they get used to how she thinks about systems.
+
+Outside of her day-to-day work she spends a lot of time thinking about how a small backend team should structure its on-call rotation so that nobody burns out during a bad release week, and has written several internal documents on the subject that the wider engineering organisation eventually adopted as a template for other teams to follow.
+
+She has mentored four junior engineers over the years, each of whom joined the team with little production experience and left able to run an incident review on their own, which she considers one of the more satisfying parts of a senior role that otherwise involves a lot of meetings about quarterly planning.
+
+A recurring theme in her retrospectives is that the checkout platform's busiest period of the year is the week before a major national holiday, when traffic can be four or five times a normal day, and she has spent a disproportionate amount of engineering time over the years making sure the system degrades gracefully rather than falling over outright during that week.
+
+She also maintains a small internal tool that the support team uses to look up a customer's recent orders without needing direct database access, which started as a weekend project and slowly became something several other teams now depend on daily, to the point where she has had to write proper documentation for it.
+
+In one particularly memorable incident a few years ago, a third-party payment provider had a partial outage during a flash sale, and the retry logic she had written the previous year meant the checkout platform kept working for the vast majority of customers while the provider's own dashboard showed everything as red.
+
+She has given a couple of internal talks about that incident since, mostly because a lot of the audience assumed the system must have failed given how bad the provider's own status page looked at the time, and she enjoys correcting that assumption with the actual graphs from that afternoon.
+
+Her manager has described her, more than once, as the person who quietly prevents most of the fires nobody ever hears about, which she finds both flattering and slightly annoying, since it also means most of her hardest work goes unnoticed by anyone outside the immediate team.
+
+She reads widely outside of strictly technical material as well, and has a habit of bringing analogies from completely unrelated fields into architecture discussions, which occasionally confuses newer engineers until they get used to how she thinks about systems.
+
+Outside of her day-to-day work she spends a lot of time thinking about how a small backend team should structure its on-call rotation so that nobody burns out during a bad release week, and has written several internal documents on the subject that the wider engineering organisation eventually adopted as a template for other teams to follow.
+
+She has mentored four junior engineers over the years, each of whom joined the team with little production experience and left able to run an incident review on their own, which she considers one of the more satisfying parts of a senior role that otherwise involves a lot of meetings about quarterly planning.
+
+A recurring theme in her retrospectives is that the checkout platform's busiest period of the year is the week before a major national holiday, when traffic can be four or five times a normal day, and she has spent a disproportionate amount of engineering time over the years making sure the system degrades gracefully rather than falling over outright during that week.
+
+She also maintains a small internal tool that the support team uses to look up a customer's recent orders without needing direct database access, which started as a weekend project and slowly became something several other teams now depend on daily, to the point where she has had to write proper documentation for it.
+
+In one particularly memorable incident a few years ago, a third-party payment provider had a partial outage during a flash sale, and the retry logic she had written the previous year meant the checkout platform kept working for the vast majority of customers while the provider's own dashboard showed everything as red.
+
+She has given a couple of internal talks about that incident since, mostly because a lot of the audience assumed the system must have failed given how bad the provider's own status page looked at the time, and she enjoys correcting that assumption with the actual graphs from that afternoon.
+
+Her manager has described her, more than once, as the person who quietly prevents most of the fires nobody ever hears about, which she finds both flattering and slightly annoying, since it also means most of her hardest work goes unnoticed by anyone outside the immediate team.
+
+She reads widely outside of strictly technical material as well, and has a habit of bringing analogies from completely unrelated fields into architecture discussions, which occasionally confuses newer engineers until they get used to how she thinks about systems.
+
+Outside of her day-to-day work she spends a lot of time thinking about how a small backend team should structure its on-call rotation so that nobody burns out during a bad release week, and has written several internal documents on the subject that the wider engineering organisation eventually adopted as a template for other teams to follow.
+
+She has mentored four junior engineers over the years, each of whom joined the team with little production experience and left able to run an incident review on their own, which she considers one of the more satisfying parts of a senior role that otherwise involves a lot of meetings about quarterly planning.
+
+A recurring theme in her retrospectives is that the checkout platform's busiest period of the year is the week before a major national holiday, when traffic can be four or five times a normal day, and she has spent a disproportionate amount of engineering time over the years making sure the system degrades gracefully rather than falling over outright during that week.
+
+She also maintains a small internal tool that the support team uses to look up a customer's recent orders without needing direct database access, which started as a weekend project and slowly became something several other teams now depend on daily, to the point where she has had to write proper documentation for it.
+
+In one particularly memorable incident a few years ago, a third-party payment provider had a partial outage during a flash sale, and the retry logic she had written the previous year meant the checkout platform kept working for the vast majority of customers while the provider's own dashboard showed everything as red.
+
+She has given a couple of internal talks about that incident since, mostly because a lot of the audience assumed the system must have failed given how bad the provider's own status page looked at the time, and she enjoys correcting that assumption with the actual graphs from that afternoon.
+
+Her manager has described her, more than once, as the person who quietly prevents most of the fires nobody ever hears about, which she finds both flattering and slightly annoying, since it also means most of her hardest work goes unnoticed by anyone outside the immediate team.
+
+She reads widely outside of strictly technical material as well, and has a habit of bringing analogies from completely unrelated fields into architecture discussions, which occasionally confuses newer engineers until they get used to how she thinks about systems.
+

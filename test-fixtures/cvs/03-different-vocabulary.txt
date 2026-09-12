@@ -1,0 +1,26 @@
+Ruwan Abeysekara
+Galle, Sri Lanka
+Backend & Platform Engineer
+
+EDUCATION
+BSc (Hons) Software Engineering, Sri Lanka Institute of Information Technology, 2013
+
+SUMMARY
+Twelve years building and running backend platforms for logistics and fintech
+clients, with a strong background in container orchestration and
+infrastructure-as-code.
+
+WORK EXPERIENCE
+Principal Engineer, Orbital Fintech, 2014-01 - 2026-01
+Own the server-side JavaScript services that process every payment in the
+platform, backed by a relational database cluster tuned for high write
+throughput and an in-memory caching layer for session state. Led the move
+from a monolith to container orchestration, cutting deploy times from an
+hour to under ten minutes, and codified every environment through
+infrastructure-as-code so nothing is provisioned by hand. Store all
+unstructured event data in a NoSQL document store, and expose a declarative
+API querying layer to the mobile team instead of a growing pile of REST
+endpoints.
+
+CONTACT
+ruwan.abeysekara@example.com

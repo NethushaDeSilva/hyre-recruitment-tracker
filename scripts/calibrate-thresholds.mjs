@@ -16,6 +16,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { normalizeTerm } from "../functions/_lib/filtration/matching.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
@@ -56,13 +57,29 @@ async function embedAll(strings) {
   return vectors;
 }
 
+// A hard negative that normalizeTerm() collapses to the SAME string on both
+// sides is never actually evaluated by layer 3 in the live engine — layer 1
+// resolves it as an exact match first (5.4: "layer 1 first, only terms with
+// no normalised match fall through"). Its measured similarity is real, but
+// using it to set the threshold that GOVERNS layer 3 pins that threshold to
+// a case layer 3 never sees — found live 2026-09-12 via Angular/AngularJS
+// (both normalize to "angular", the ".js"-suffix strip meant for Node.js/
+// NodeJS also catching AngularJS). Excluded from threshold derivation below,
+// kept in the table with a note, for the same reason v1/v2's contaminated
+// pairs are kept rather than deleted — the correction is the evidence.
+function isLayer1Reachable(pair) {
+  if (pair.category !== "hard_negative") return true; // only hard negatives set the threshold
+  return normalizeTerm(pair.a) !== normalizeTerm(pair.b);
+}
+
 // The 6.1 selection rule, applied to one domain's (skills or qualifications)
 // 45-pair distribution independently.
 function deriveThreshold(pairs) {
   const byCat = (cat) => pairs.filter((p) => p.category === cat).map((p) => p.similarity);
   const trueMatches = byCat("true_match");
   const trueNonMatches = byCat("true_non_match");
-  const hardNegatives = byCat("hard_negative");
+  const hardNegatives = pairs.filter((p) => p.category === "hard_negative" && p.layer1Reachable).map((p) => p.similarity);
+  const excludedHardNegatives = pairs.filter((p) => p.category === "hard_negative" && !p.layer1Reachable);
 
   const minTrueMatch = Math.min(...trueMatches);
   const maxTrueMatch = Math.max(...trueMatches);
@@ -93,6 +110,7 @@ function deriveThreshold(pairs) {
     falseNegativeRate: falseNegatives.length / trueMatches.length,
     falseNegativeCount: falseNegatives.length,
     hardNegativeFalsePositiveRate: hardNegativeFalsePositives.length / hardNegatives.length,
+    excludedHardNegatives,
   };
 }
 
@@ -128,18 +146,23 @@ function renderTable(label, pairs, derived) {
   if (hasRelation) {
     lines.push("| a | b | category | relation | similarity |", "|---|---|---|---|---|");
     for (const p of pairs) {
-      lines.push(`| ${p.a} | ${p.b} | ${p.category} | ${p.relation || "—"} | ${fmt(p.similarity)} |`);
+      const excl = p.category === "hard_negative" && !p.layer1Reachable;
+      lines.push(`| ${p.a} | ${p.b} | ${p.category}${excl ? " (layer-1 collapsed — excluded)" : ""} | ${p.relation || "—"} | ${fmt(p.similarity)} |`);
     }
   } else {
     lines.push("| a | b | category | similarity |", "|---|---|---|---|");
     for (const p of pairs) {
-      lines.push(`| ${p.a} | ${p.b} | ${p.category} | ${fmt(p.similarity)} |`);
+      const excl = p.category === "hard_negative" && !p.layer1Reachable;
+      lines.push(`| ${p.a} | ${p.b} | ${p.category}${excl ? " (layer-1 collapsed — excluded)" : ""} | ${fmt(p.similarity)} |`);
     }
   }
   lines.push("");
   lines.push(`- true_match: min ${fmt(derived.stats.trueMatch.min)}, max ${fmt(derived.stats.trueMatch.max)} (n=${derived.stats.trueMatch.n})`);
   lines.push(`- true_non_match: min ${fmt(derived.stats.trueNonMatch.min)}, max ${fmt(derived.stats.trueNonMatch.max)} (n=${derived.stats.trueNonMatch.n})`);
-  lines.push(`- hard_negative: min ${fmt(derived.stats.hardNegative.min)}, max ${fmt(derived.stats.hardNegative.max)} (n=${derived.stats.hardNegative.n})`);
+  lines.push(`- hard_negative (layer-1-REACHABLE only, sets the threshold): min ${fmt(derived.stats.hardNegative.min)}, max ${fmt(derived.stats.hardNegative.max)} (n=${derived.stats.hardNegative.n})`);
+  if (derived.excludedHardNegatives.length) {
+    lines.push(`- hard_negative EXCLUDED as layer-1-unreachable (normalizeTerm() collapses both sides to the same string — layer 3 never evaluates these live): ${derived.excludedHardNegatives.map((p) => `${p.a}/${p.b} (${fmt(p.similarity)})`).join(", ")}`);
+  }
   lines.push(`- distributions separated cleanly: ${derived.separated}`);
   lines.push(`- false-negative rate on true_match at this threshold: ${(derived.falseNegativeRate * 100).toFixed(1)}% (${derived.falseNegativeCount}/${derived.stats.trueMatch.n})`);
   lines.push(`- hard-negative false-positive rate at this threshold: ${(derived.hardNegativeFalsePositiveRate * 100).toFixed(1)}%`);
@@ -161,7 +184,10 @@ async function run() {
   const vectors = await embedAll(allStrings);
 
   const withSimilarity = (pairs) =>
-    pairs.map((p) => ({ ...p, similarity: cosine(vectors.get(p.a), vectors.get(p.b)) }));
+    pairs.map((p) => {
+      const withSim = { ...p, similarity: cosine(vectors.get(p.a), vectors.get(p.b)) };
+      return { ...withSim, layer1Reachable: isLayer1Reachable(withSim) };
+    });
 
   const skillsPairs = withSimilarity(skillsSet.pairs);
   const qualPairs = withSimilarity(qualSet.pairs);

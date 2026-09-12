@@ -1,8 +1,8 @@
 # WS6.1 threshold calibration results
 
-Calibrated 2026-09-12T14:55:44.882Z against `@cf/baai/bge-base-en-v1.5`.
+Calibrated 2026-09-10T09:37:37.496Z against `@cf/baai/bge-base-en-v1.5`.
 
-## Skills — PRIMARY (sets SKILL_SIMILARITY_THRESHOLD) — derived threshold: 0.8099 (max(hardNegatives) — distributions overlapped)
+## Skills — PRIMARY (sets SKILL_SIMILARITY_THRESHOLD) — derived threshold: 0.8804 (max(hardNegatives) — distributions overlapped)
 
 | a | b | category | relation | similarity |
 |---|---|---|---|---|
@@ -40,7 +40,7 @@ Calibrated 2026-09-12T14:55:44.882Z against `@cf/baai/bge-base-en-v1.5`.
 | C | C++ | hard_negative | — | 0.7009 |
 | React | React Native | hard_negative | — | 0.7958 |
 | C++ | C# | hard_negative | — | 0.7253 |
-| Angular | AngularJS | hard_negative (layer-1 collapsed — excluded) | — | 0.8804 |
+| Angular | AngularJS | hard_negative | — | 0.8804 |
 | Node.js | Deno | hard_negative | — | 0.5432 |
 | Vue | Nuxt | hard_negative | — | 0.6751 |
 | MySQL | PostgreSQL | hard_negative | — | 0.8099 |
@@ -54,15 +54,14 @@ Calibrated 2026-09-12T14:55:44.882Z against `@cf/baai/bge-base-en-v1.5`.
 
 - true_match: min 0.5910, max 0.8046 (n=15)
 - true_non_match: min 0.4603, max 0.7681 (n=15)
-- hard_negative (layer-1-REACHABLE only, sets the threshold): min 0.5432, max 0.8099 (n=14)
-- hard_negative EXCLUDED as layer-1-unreachable (normalizeTerm() collapses both sides to the same string — layer 3 never evaluates these live): Angular/AngularJS (0.8804)
+- hard_negative: min 0.5432, max 0.8804 (n=15)
 - distributions separated cleanly: false
 - false-negative rate on true_match at this threshold: 100.0% (15/15)
 - hard-negative false-positive rate at this threshold: 0.0%
 
 ## Skills — secondary, informational only (does not set the threshold)
 
-Scored against the PRIMARY threshold 0.8099. Clearing or missing it here changes nothing at runtime — this table exists to show what happens when a vacancy states a general capability and a CV names a specific tool, which the primary keyword-vs-keyword set above does not cover.
+Scored against the PRIMARY threshold 0.8804. Clearing or missing it here changes nothing at runtime — this table exists to show what happens when a vacancy states a general capability and a CV names a specific tool, which the primary keyword-vs-keyword set above does not cover.
 
 | a (general capability) | b (named tool) | relation | similarity | clears primary threshold |
 |---|---|---|---|---|
@@ -78,11 +77,11 @@ Scored against the PRIMARY threshold 0.8099. Clearing or missing it here changes
 | Deep learning model training | TensorFlow | category_instance | 0.7384 | no |
 | Cloud compute provisioning | AWS | category_instance | 0.7111 | no |
 | Building and consuming RESTful APIs | API development | equivalence | 0.7761 | no |
-| Writing automated test suites | Test automation | equivalence | 0.8727 | yes |
-| Optimizing SQL query performance | Database performance tuning | equivalence | 0.8481 | yes |
+| Writing automated test suites | Test automation | equivalence | 0.8727 | no |
+| Optimizing SQL query performance | Database performance tuning | equivalence | 0.8481 | no |
 | Troubleshooting production issues | Live system debugging | equivalence | 0.7361 | no |
 
-- 2/15 clear the primary threshold
+- 0/15 clear the primary threshold
 
 ## Qualifications — derived threshold: 0.8782 (max(hardNegatives) — distributions overlapped)
 
@@ -136,7 +135,7 @@ Scored against the PRIMARY threshold 0.8099. Clearing or missing it here changes
 
 - true_match: min 0.7223, max 0.8760 (n=15)
 - true_non_match: min 0.4847, max 0.7345 (n=15)
-- hard_negative (layer-1-REACHABLE only, sets the threshold): min 0.6389, max 0.8782 (n=15)
+- hard_negative: min 0.6389, max 0.8782 (n=15)
 - distributions separated cleanly: false
 - false-negative rate on true_match at this threshold: 100.0% (15/15)
 - hard-negative false-positive rate at this threshold: 0.0%

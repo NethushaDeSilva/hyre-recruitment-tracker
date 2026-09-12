@@ -1,0 +1,38 @@
+Kavindu Ratnayake
+Colombo, Sri Lanka
+kavindu.ratnayake@example.com
+
+SUMMARY
+Backend-focused platform engineer with nine years building and operating
+production services. Comfortable across the full deployment stack, from
+container orchestration to the databases and caches behind it.
+
+EDUCATION
+BSc (Hons) Electrical Engineering
+University of Moratuwa, 2016
+
+WORK EXPERIENCE
+
+Senior Platform Engineer
+Horizon Freight Systems — 2019-03 to Present
+Own the backend services powering the company's shipment-tracking product.
+Designed and maintain the core Node.js services fronting a PostgreSQL
+primary with a Redis cache layer for hot reads. Migrated the deployment
+target to Kubernetes, cutting release time from forty minutes to six.
+Introduced Terraform to manage every environment from a single source of
+truth. Own the GraphQL gateway that fronts the service mesh for internal
+and partner clients.
+
+Backend Engineer
+Colombo Data Systems — 2016-07 to 2019-02
+Built and maintained a document-processing pipeline. Owned the MongoDB
+cluster storing parsed documents and the ingestion service written in
+Node.js. Containerised the existing deployment with Docker as part of a
+platform modernisation project.
+
+SKILLS
+Node.js, Docker, PostgreSQL, Redis, Kubernetes, MongoDB, Terraform, GraphQL,
+TypeScript, CI/CD
+
+CERTIFICATIONS
+None listed.

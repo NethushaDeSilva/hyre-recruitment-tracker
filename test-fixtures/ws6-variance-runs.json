@@ -8140,5 +8140,1305 @@
       "architecture discussions"
     ],
     "totalYearsExperience": 10
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 0,
+    "ms": 2690,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 1,
+    "ms": 2258,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 2,
+    "ms": 2736,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 3,
+    "ms": 3507,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 4,
+    "ms": 2983,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 5,
+    "ms": 3576,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 6,
+    "ms": 2408,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 7,
+    "ms": 2882,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 8,
+    "ms": 2393,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
+  },
+  {
+    "fixtureId": "08",
+    "runIndex": 9,
+    "ms": 2732,
+    "overallScore": 75,
+    "capApplied": false,
+    "breakdown": {
+      "qualifications": {
+        "score": 0,
+        "max": 25,
+        "levelMet": true,
+        "fieldSimilarity": null,
+        "matched": []
+      },
+      "coreSkills": {
+        "score": 45,
+        "max": 45,
+        "matched": [
+          {
+            "required": "Node.js",
+            "found": "Node.js",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Node.js",
+            "offset": 552
+          },
+          {
+            "required": "Docker",
+            "found": "Docker",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Docker",
+            "offset": 1153
+          },
+          {
+            "required": "PostgreSQL",
+            "found": "PostgreSQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "PostgreSQL",
+            "offset": 580
+          },
+          {
+            "required": "Redis",
+            "found": "Redis",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Redis",
+            "offset": 606
+          },
+          {
+            "required": "Kubernetes",
+            "found": "Kubernetes",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Kubernetes",
+            "offset": 673
+          },
+          {
+            "required": "MongoDB",
+            "found": "MongoDB",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "MongoDB",
+            "offset": 1023
+          }
+        ],
+        "missing": []
+      },
+      "experience": {
+        "score": 20,
+        "max": 20,
+        "candidateYears": 10.1,
+        "requiredYears": 8
+      },
+      "preferredSkills": {
+        "score": 10,
+        "max": 10,
+        "matched": [
+          {
+            "required": "Terraform",
+            "found": "Terraform",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "Terraform",
+            "offset": 744
+          },
+          {
+            "required": "GraphQL",
+            "found": "GraphQL",
+            "layer": "normalisation",
+            "similarity": 1,
+            "status": "verified",
+            "evidence": "GraphQL",
+            "offset": 821
+          }
+        ],
+        "missing": []
+      }
+    },
+    "instrumentation": {
+      "layers": {
+        "normalisation": 8,
+        "embedding": 0,
+        "none": 1
+      },
+      "borderline": 0
+    },
+    "skillsExtracted": [
+      "Node.js",
+      "Docker",
+      "PostgreSQL",
+      "Redis",
+      "Kubernetes",
+      "MongoDB",
+      "Terraform",
+      "GraphQL",
+      "TypeScript",
+      "CI/CD"
+    ],
+    "totalYearsExperience": 10.1,
+    "rawFieldSimilarity": 0.8657850550983841
   }
 ]

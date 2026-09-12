@@ -1,0 +1,38 @@
+Sanduni Weerasinghe
+Galle, Sri Lanka
+sanduni.weerasinghe@example.com
+
+SUMMARY
+Backend engineer comfortable across the full modern data platform, from
+event-driven pipelines to graph-shaped data and everything in between. I
+enjoy picking the right tool for the job and learning new parts of the
+stack as a project demands it.
+
+EDUCATION
+BSc (Hons) Computer Science
+University of Colombo, 2017
+
+WORK EXPERIENCE
+
+Backend Engineer
+Tidewater Logistics — 2018-01 to Present
+Built and maintained RESTful APIs in Express, serving the company's
+booking and tracking product to both the web app and partner
+integrations. Designed the relational schema in PostgreSQL and added a
+Redis layer in front of the busiest read paths to cut response times
+under peak load. Wrote the middleware layer handling authentication,
+rate limiting and request validation for every route. Worked closely
+with the data team on schema design as the product's data model grew
+more interconnected over time.
+
+Junior Developer
+Coral Bay Software — 2017-06 to 2017-12
+Maintained internal tooling and fixed bugs across a small Express-based
+service. Wrote unit and integration tests and helped migrate an older
+callback-based codebase to use async/await throughout.
+
+SKILLS
+Express, PostgreSQL, Redis, REST APIs, JavaScript, Git, Jest
+
+CERTIFICATIONS
+None listed.

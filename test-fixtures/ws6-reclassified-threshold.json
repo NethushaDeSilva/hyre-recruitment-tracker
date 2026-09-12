@@ -1,0 +1,105 @@
+{
+  "OLD_THRESHOLD": 0.8803687307862392,
+  "NEW_THRESHOLD": 0.8099,
+  "rows": [
+    {
+      "fixture": "03",
+      "required": "Node.js",
+      "bestCandidate": "infrastructure-as-code",
+      "similarity": 0.6241565102568628,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "03",
+      "required": "Docker",
+      "bestCandidate": "container orchestration",
+      "similarity": 0.7301847269927269,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "03",
+      "required": "PostgreSQL",
+      "bestCandidate": "infrastructure-as-code",
+      "similarity": 0.5824785268766487,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "03",
+      "required": "Redis",
+      "bestCandidate": "container orchestration",
+      "similarity": 0.5824980287973055,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "03",
+      "required": "Kubernetes",
+      "bestCandidate": "container orchestration",
+      "similarity": 0.7266266469964525,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "03",
+      "required": "MongoDB",
+      "bestCandidate": "container orchestration",
+      "similarity": 0.5836275044254684,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "03",
+      "required": "Terraform",
+      "bestCandidate": "container orchestration",
+      "similarity": 0.6090121851305631,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "03",
+      "required": "GraphQL",
+      "bestCandidate": "container orchestration",
+      "similarity": 0.5825540137689212,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "04",
+      "required": "GraphQL",
+      "bestCandidate": "PostgreSQL",
+      "similarity": 0.703627593845776,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "07",
+      "required": "MongoDB",
+      "bestCandidate": "Node.js",
+      "similarity": 0.6737811457059593,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    },
+    {
+      "fixture": "07",
+      "required": "Terraform",
+      "bestCandidate": "Kubernetes",
+      "similarity": 0.6606307103876076,
+      "clearsOld": false,
+      "clearsNew": false,
+      "flip": false
+    }
+  ]
+}

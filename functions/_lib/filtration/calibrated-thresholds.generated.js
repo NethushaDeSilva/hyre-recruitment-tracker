@@ -3,8 +3,8 @@
 // Full pair-level evidence: test-fixtures/calibration-pairs/calibration-results.md
 
 export const CALIBRATED_THRESHOLDS = {
-  calibratedAt: "2026-09-10T09:37:37.496Z",
+  calibratedAt: "2026-09-12T14:55:44.882Z",
   model: "@cf/baai/bge-base-en-v1.5",
-  skillThreshold: 0.8803687307862392,
+  skillThreshold: 0.809885258157237,
   qualThreshold: 0.8782373319923322,
 };

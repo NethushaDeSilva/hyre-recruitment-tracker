@@ -1,0 +1,58 @@
+[
+  {
+    "term": "PostgreSQL",
+    "why": "control — literally stated, must come back verified",
+    "status": "verified",
+    "evidence": "PostgreSQL",
+    "offset": 645,
+    "confidence": 1
+  },
+  {
+    "term": "Node.js",
+    "why": "not literally stated; Express + REST API context nearby — the inferred test",
+    "status": "unverifiable",
+    "evidence": null,
+    "offset": null,
+    "confidence": 0.68257535295483
+  },
+  {
+    "term": "Kubernetes",
+    "why": "not literally stated, no container/orchestration context anywhere — the unverifiable test",
+    "status": "unverifiable",
+    "evidence": null,
+    "offset": null,
+    "confidence": 0.6257417398288635
+  },
+  {
+    "term": "backend web framework",
+    "why": "2nd inferred attempt — capability implied by 'Express'",
+    "status": "unverifiable",
+    "evidence": null,
+    "offset": null,
+    "confidence": 0.7867828995553947
+  },
+  {
+    "term": "relational database",
+    "why": "3rd inferred attempt — implied by the PostgreSQL sentence's own content",
+    "status": "unverifiable",
+    "evidence": null,
+    "offset": null,
+    "confidence": 0.8068903032105929
+  },
+  {
+    "term": "API testing",
+    "why": "4th inferred attempt — implied by 'Wrote unit and integration tests' + REST APIs context",
+    "status": "unverifiable",
+    "evidence": null,
+    "offset": null,
+    "confidence": 0.6976029551793639
+  },
+  {
+    "term": "asynchronous JavaScript",
+    "why": "5th inferred attempt — the CV literally says 'use async/await throughout'",
+    "status": "unverifiable",
+    "evidence": null,
+    "offset": null,
+    "confidence": 0.7376707571199591
+  }
+]

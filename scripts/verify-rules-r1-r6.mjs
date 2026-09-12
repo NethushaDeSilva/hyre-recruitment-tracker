@@ -48,7 +48,7 @@ const HR_PASSWORD = process.env.HYRE_STAFF_PASSWORD || "hyre1234";
 const REAL_POSITION_OPEN = "BD-01";
 const REAL_POSITION_CLOSED = "NE-01";
 const REAL_OTHER_CANDIDATE = "kodithuwakusamantha@gmail.com";
-const REAL_APPLICATION = "EXuNpN6ZtokEglUxeQ48";
+const REAL_APPLICATION = "6H9281nZ57kSN51JqeUQ";
 
 const results = [];
 function record(id, desc, expected, actual, detail = "") {

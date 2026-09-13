@@ -61,21 +61,27 @@ describe("scoreOneApplication — meta is assembled after the engine returns", (
     });
   });
 
-  it("routes layer-3 matches through the real Workers AI call shape (env.AI.run)", async () => {
-    const { env, calls } = fakeAiEnv({ "Container orchestration": REF, Kubernetes: unit(0.95) });
-    const requirements = { requiredQualification: null, requiredSkills: ["Container orchestration"], minYearsExperience: 2, niceToHave: [] };
+  it("routes verifyTerm()'s embedding fallback through the real Workers AI call shape (env.AI.run) — matching.js's own layer 3 was removed, 5.4", async () => {
+    const { env, calls } = fakeAiEnv({
+      Kubernetes: REF,
+      "Deployed workloads using a fully orchestrated container platform across multiple clusters.": unit(0.95),
+    });
+    const requirements = { requiredQualification: null, requiredSkills: ["Kubernetes"], minYearsExperience: 2, niceToHave: [] };
     const candidate = {
-      skills: ["Kubernetes"],
+      skills: ["Kubernetes"], // matches at layer 1 (exact, after normalisation)
       education: [],
       totalYearsExperience: 2,
-      extractedText: "Deployed workloads using Kubernetes across multiple clusters.",
+      // "Kubernetes" is never written literally, only paraphrased — so
+      // verifyTerm()'s literal search fails and it falls to embedding (5.6,
+      // the one embedding-backed step layer-3 removal deliberately kept).
+      extractedText: "Deployed workloads using a fully orchestrated container platform across multiple clusters.",
     };
 
     const result = await scoreOneApplication({ candidate, requirements, env, now: NOW });
 
     expect(calls).toHaveLength(1);
-    expect(new Set(calls[0])).toEqual(new Set(["Container orchestration", "Kubernetes"]));
-    expect(result.breakdown.coreSkills.matched[0].layer).toBe("embedding");
+    expect(new Set(calls[0])).toEqual(new Set(["Kubernetes", "Deployed workloads using a fully orchestrated container platform across multiple clusters."]));
+    expect(result.breakdown.coreSkills.matched[0].status).toBe("inferred");
     expect(result.meta.scoredAt).toBe("2026-09-10T12:00:00.000Z");
   });
 
@@ -88,24 +94,29 @@ describe("scoreOneApplication — meta is assembled after the engine returns", (
 
 describe("scoreVacancyApplications — 5.5 shared embedding cache across candidates", () => {
   it("embeds each unique string exactly once across the whole batch, not once per candidate", async () => {
-    const { env, calls } = fakeAiEnv({ "Container orchestration": REF, Kubernetes: unit(0.95), Docker: unit(0.9) });
-    const requirements = { requiredQualification: null, requiredSkills: ["Container orchestration"], minYearsExperience: 0, niceToHave: [] };
+    // 5.5's caching claim, now proven through verifyTerm()'s (5.6) embedding
+    // fallback rather than the removed matching-layer one: both candidates
+    // match "Kubernetes" at layer 1, and both need it verified by embedding
+    // (neither's extractedText states it literally) — the shared TERM
+    // "Kubernetes" must still be embedded exactly once across the batch,
+    // even though each candidate's own sentence is unique to them.
+    const { env, calls } = fakeAiEnv({
+      Kubernetes: REF,
+      "Deployed workloads on a fully managed container orchestration platform.": unit(0.95),
+      "Ran production services on an automated container scheduling system.": unit(0.9),
+    });
+    const requirements = { requiredQualification: null, requiredSkills: ["Kubernetes"], minYearsExperience: 0, niceToHave: [] };
     const candidates = [
-      { candidateId: "CAND-0001", skills: ["Kubernetes"], education: [], totalYearsExperience: 0, extractedText: "Kubernetes deployments." },
-      { candidateId: "CAND-0002", skills: ["Docker"], education: [], totalYearsExperience: 0, extractedText: "Docker containers." },
+      { candidateId: "CAND-0001", skills: ["Kubernetes"], education: [], totalYearsExperience: 0, extractedText: "Deployed workloads on a fully managed container orchestration platform." },
+      { candidateId: "CAND-0002", skills: ["Kubernetes"], education: [], totalYearsExperience: 0, extractedText: "Ran production services on an automated container scheduling system." },
     ];
 
     const results = await scoreVacancyApplications({ candidates, requirements, env, now: NOW });
 
-    // The shared cache (built into engine.js's scoreApplications) is lazy, not
-    // a pre-batched fetch — calls happen incrementally as each candidate is
-    // scored, so there can be more than one call. What 5.5 actually promises
-    // is that no string is EMBEDDED TWICE: "Container orchestration" is needed
-    // by both candidates but must appear in exactly one call, total.
     const allEmbedded = calls.flat();
-    expect(allEmbedded.filter((s) => s === "Container orchestration")).toHaveLength(1);
-    expect(new Set(allEmbedded)).toEqual(new Set(["Container orchestration", "Kubernetes", "Docker"]));
+    expect(allEmbedded.filter((s) => s === "Kubernetes")).toHaveLength(1);
     expect(results.every((r) => r.status === "scored")).toBe(true);
+    expect(results.every((r) => r.result.instrumentation.verification.embedding === 1)).toBe(true);
     expect(results.every((r) => r.result.meta.engineVersion === ENGINE_VERSION)).toBe(true);
   });
 

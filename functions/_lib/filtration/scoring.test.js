@@ -72,14 +72,14 @@ describe("qualificationScore", () => {
   it("when no field is required, credit is gated on level alone", () => {
     const classified = [{ level: 7, field: "Physics", recognised: true, source: "MSc Physics" }];
     expect(qualificationScore({ level: 7, field: null }, { levelMet: true, fieldMatch: null, classifiedEducation: classified }))
-      .toEqual({ score: 25, max: 25, levelMet: true, fieldSimilarity: null, matched: ["MSc Physics"] });
+      .toEqual({ score: 25, max: 25, levelMet: true, matched: ["MSc Physics"] });
     expect(qualificationScore({ level: 8, field: null }, { levelMet: false, fieldMatch: null, classifiedEducation: classified }))
-      .toEqual({ score: 0, max: 25, levelMet: false, fieldSimilarity: null, matched: [] });
+      .toEqual({ score: 0, max: 25, levelMet: false, matched: [] });
   });
 
   it("when a field is required, credit and level are independent — a field match at the wrong level still earns the 25", () => {
     const classified = [{ level: 6, field: "Computer Science", recognised: true, source: "BSc Computer Science" }];
-    const fieldMatch = { matched: [{ required: "Computer Science", found: "Computer Science", similarity: 1, layer: "normalisation" }], missing: [], counters: {} };
+    const fieldMatch = { matched: [{ required: "Computer Science", found: "Computer Science" }], missing: [] };
     const result = qualificationScore({ level: 8, field: "Computer Science" }, { levelMet: false, fieldMatch, classifiedEducation: classified });
     expect(result.score).toBe(25); // field matched...
     expect(result.levelMet).toBe(false); // ...but level did not — the cap, not this score, is what penalises it
@@ -88,7 +88,7 @@ describe("qualificationScore", () => {
 
   it("no field match earns 0, regardless of level", () => {
     const classified = [{ level: 8, field: "Physics", recognised: true, source: "PhD Physics" }];
-    const fieldMatch = { matched: [], missing: ["Computer Science"], counters: {} };
+    const fieldMatch = { matched: [], missing: ["Computer Science"] };
     const result = qualificationScore({ level: 6, field: "Computer Science" }, { levelMet: true, fieldMatch, classifiedEducation: classified });
     expect(result.score).toBe(0);
   });

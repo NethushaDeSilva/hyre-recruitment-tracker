@@ -1,13 +1,15 @@
 // WS5 — the initial filtration engine. Orchestrates matching.js (who
-// matches — layers 1/3), verification.js (is it grounded in the CV text —
-// 5.6), and scoring.js (how many points — 5.3) into the 5.7 output schema
-// for one application, plus the layer-provenance and BORDERLINE
-// instrumentation this decision depends on (5.4's open decision, 6.4).
+// matches — layer 1, normalisation only, since 2026-09-12: see 5.4),
+// verification.js (is it grounded in the CV text — 5.6, still
+// embedding-backed and deliberately kept), and scoring.js (how many points —
+// 5.3) into the 5.7 output schema for one application, plus the
+// verification-firing-rate and BORDERLINE instrumentation the 5.4 decision
+// record (test-fixtures/ws6-results.md) was built on.
 //
-// Nothing here calls an LLM. Embeddings are the one model call in the
-// scoring path, and 5.1 explicitly allows that — it's the generative
-// judgement model that's banned at scoring time, not the embedding model
-// layer 3 already depends on throughout this spec.
+// Nothing here calls an LLM. verifyTerm()'s embedding call is the one model
+// call left in the scoring path, and 5.1 explicitly allows that — it's the
+// generative judgement model that's banned at scoring time, not the
+// embedding model 5.6 depends on.
 
 import { matchTermSet } from "./matching.js";
 import { verifyTerm, verifyTerms } from "./verification.js";
@@ -30,31 +32,37 @@ export const ENGINE_VERSION = "1.0.0";
 
 export class ScoringError extends Error {}
 
-function emptyCounters() {
-  return { normalisation: 0, embedding: 0, none: 0, borderline: 0 };
+// 5.4 instrumentation, relabeled 2026-09-12 to track verifyTerm()'s (5.6)
+// firing rate — the embedding-backed layer that's actually still live —
+// rather than leaving permanently-zero counters for matching.js's removed
+// layer 3. `literal` = resolved by word-boundary text search, no model call.
+// `embedding` = verifyTerm() actually called embedTexts. `borderline` = of
+// those, how many landed within BORDERLINE_BAND of the threshold — the ones
+// exposed to the embedding non-reproducibility measured in 6.4.
+function emptyVerificationTally() {
+  return { literal: 0, embedding: 0, borderline: 0 };
 }
-function addCounters(a, b) {
-  return {
-    normalisation: a.normalisation + b.normalisation,
-    embedding: a.embedding + b.embedding,
-    none: a.none + b.none,
-    borderline: a.borderline + b.borderline,
-  };
+function tallyVerification(results) {
+  return results.reduce((acc, v) => {
+    if (v.firedEmbedding) acc.embedding++;
+    else acc.literal++;
+    if (v.borderline) acc.borderline++;
+    return acc;
+  }, emptyVerificationTally());
 }
 
-/** Match a required-skill list against the candidate's skills, verify each
- * match against the stored extracted text, and return both the scored
- * component and the raw matched/missing records for the 5.7 breakdown. */
+/** Match a required-skill list against the candidate's skills (layer 1
+ * only), verify each match against the stored extracted text, and return
+ * both the scored component and the raw matched/missing records for the 5.7
+ * breakdown, plus the raw verifyTerm() results for instrumentation. */
 async function scoreSkillList(requiredList, candidateSkills, extractedText, weight, deps) {
   const { embedTexts, threshold } = deps;
-  const { matched, missing, counters } = await matchTermSet(requiredList, candidateSkills, { embedTexts, threshold });
+  const { matched, missing } = matchTermSet(requiredList, candidateSkills);
   const verified = await verifyTerms(matched.map((m) => m.found), extractedText, { embedTexts, threshold });
 
   const records = matched.map((m, i) => ({
     required: m.required,
     found: m.found,
-    layer: m.layer,
-    similarity: m.similarity,
     status: verified[i].status,
     evidence: verified[i].evidence,
     offset: verified[i].offset,
@@ -62,7 +70,7 @@ async function scoreSkillList(requiredList, candidateSkills, extractedText, weig
   const creditWeights = records.map((r) => creditWeightForStatus(r.status));
   const score = weightedSkillsScore(creditWeights, requiredList.length, weight);
 
-  return { score, max: weight, matched: records, missing, counters };
+  return { score, max: weight, matched: records, missing, verification: verified };
 }
 
 /**
@@ -97,7 +105,7 @@ export async function scoreApplication(candidate, requirements, deps) {
   const niceToHave = requirements.niceToHave || [];
   const preferred = niceToHave.length
     ? await scoreSkillList(niceToHave, candidateSkills, extractedText, 10, { embedTexts, threshold: SKILL_SIMILARITY_THRESHOLD })
-    : { score: 0, max: 10, matched: [], missing: [], counters: emptyCounters() };
+    : { score: 0, max: 10, matched: [], missing: [], verification: [] };
 
   const experience = {
     score: experienceScore(candidate.totalYearsExperience || 0, requirements.minYearsExperience || 0),
@@ -107,7 +115,7 @@ export async function scoreApplication(candidate, requirements, deps) {
   };
 
   let qual = null;
-  let qualCounters = emptyCounters();
+  let qualVerification = null; // the verifyTerm() result for the matched claim, if any — folded into instrumentation below
   let qualBreakdown = { applicable: false };
   if (requirements.requiredQualification) {
     const classified = classifyCandidateEducation(candidate.education);
@@ -118,17 +126,14 @@ export async function scoreApplication(candidate, requirements, deps) {
     // qualification (an MBA/PhD entry, or a CV that honestly states none) or
     // an extraction gap; there is no way to tell which from here, so per 5.6
     // it is flagged for review below rather than silently scored as a
-    // non-match. No embedding call either — there is nothing to embed against.
+    // non-match.
     let fieldNotExtracted = false;
     if (requirements.requiredQualification.field) {
       const fields = classified.filter((c) => c.field).map((c) => c.field);
       if (!fields.length) {
         fieldNotExtracted = true;
       } else {
-        fieldMatch = await matchTermSet([requirements.requiredQualification.field], fields, {
-          embedTexts, threshold: QUAL_SIMILARITY_THRESHOLD,
-        });
-        qualCounters = fieldMatch.counters;
+        fieldMatch = matchTermSet([requirements.requiredQualification.field], fields);
       }
     }
     qual = qualificationScore(requirements.requiredQualification, { levelMet, fieldMatch, classifiedEducation: classified });
@@ -149,8 +154,8 @@ export async function scoreApplication(candidate, requirements, deps) {
       needsReview = true;
       reviewReason = "field-not-extracted";
     } else if (qual.matched.length) {
-      const qualCheck = await verifyTerm(qual.matched[0], extractedText, { embedTexts, threshold: QUAL_SIMILARITY_THRESHOLD });
-      if (qualCheck.status === "unverifiable") {
+      qualVerification = await verifyTerm(qual.matched[0], extractedText, { embedTexts, threshold: QUAL_SIMILARITY_THRESHOLD });
+      if (qualVerification.status === "unverifiable") {
         needsReview = true;
         reviewReason = "unverifiable";
         flaggedQualification = qual.matched[0];
@@ -159,7 +164,7 @@ export async function scoreApplication(candidate, requirements, deps) {
     }
 
     qualBreakdown = {
-      score: qual.score, max: qual.max, levelMet: qual.levelMet, fieldSimilarity: qual.fieldSimilarity, matched: qual.matched,
+      score: qual.score, max: qual.max, levelMet: qual.levelMet, matched: qual.matched,
       ...(needsReview ? { needsReview: true, reviewReason } : {}),
       // Only present when there's an actual matched claim to point at —
       // "field-not-extracted" has no specific claim, just an absence.
@@ -174,7 +179,8 @@ export async function scoreApplication(candidate, requirements, deps) {
     niceToHaveScore: preferred.score,
   });
 
-  const layers = [core.counters, preferred.counters, qualCounters].reduce(addCounters, emptyCounters());
+  const allVerifications = qualVerification ? [...core.verification, ...preferred.verification, qualVerification] : [...core.verification, ...preferred.verification];
+  const verification = tallyVerification(allVerifications);
 
   return {
     overallScore,
@@ -185,15 +191,17 @@ export async function scoreApplication(candidate, requirements, deps) {
       experience,
       preferredSkills: { score: preferred.score, max: preferred.max, matched: preferred.matched, missing: preferred.missing },
     },
-    // Not part of 5.7's output schema — this is the counter WS6.1's open
-    // decision (5.4) depends on: how many matches per application came from
-    // each layer, and how many sat close enough to the threshold to be
-    // exposed to the 6.4 embedding non-reproducibility finding. A counter,
-    // not a feature — nothing reads this at scoring time, it exists to be
-    // aggregated across WS6.3 fixtures once they exist.
+    // Not part of 5.7's output schema — this is the 5.4 decision record's
+    // instrumentation (test-fixtures/ws6-results.md), relabeled 2026-09-12 to
+    // track verifyTerm()'s (5.6) firing rate now that matching.js's layer 3
+    // is gone: how many matched terms per application verified via literal
+    // text search vs. needed an embedding call, and how many of those sat
+    // close enough to the threshold to be exposed to the 6.4 embedding
+    // non-reproducibility finding. A counter, not a feature — nothing reads
+    // this at scoring time.
     instrumentation: {
-      layers: { normalisation: layers.normalisation, embedding: layers.embedding, none: layers.none },
-      borderline: layers.borderline,
+      verification: { literal: verification.literal, embedding: verification.embedding },
+      borderline: verification.borderline,
     },
   };
 }

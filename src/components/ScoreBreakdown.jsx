@@ -2,7 +2,7 @@
 // "Every score opens to its breakdown... a recruiter must be able to check
 // the machine, not trust it." Renders exactly the engine's output schema —
 // nothing here recomputes or reinterprets a number the engine already gave.
-import { CheckCircle2, XCircle, AlertTriangle, Zap, Type } from "lucide-react";
+import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/lib/format";
 
 function Bar({ score, max }) {
@@ -14,24 +14,13 @@ function Bar({ score, max }) {
   );
 }
 
-// The layer-firing indicator (5.4's open decision, WS6.1): exact/normalised
-// matches vs an embedding-backed one, right on the term that used it — the
-// most legible place to demonstrate traceability, not a separate report.
-function LayerTag({ layer, similarity }) {
-  const isEmbedding = layer === "embedding";
-  return (
-    <span
-      title={isEmbedding ? `Matched by embedding similarity (${similarity?.toFixed(3)})` : "Exact match after normalisation"}
-      className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-        isEmbedding ? "bg-[#7C3AED]/12 text-[#7C3AED] dark:text-[#C4B5FD]" : "bg-[#16A34A]/12 text-[#16A34A] dark:text-[#4ADE80]"
-      }`}
-    >
-      {isEmbedding ? <Zap size={9} /> : <Type size={9} />}
-      {isEmbedding ? "embed" : "exact"}
-    </span>
-  );
-}
-
+// The exact/embedding LayerTag that used to live here was removed 2026-09-12
+// alongside matching.js's layer 3 (5.4) — every matched skill is now
+// trivially an exact match after normalisation, so a badge distinguishing
+// two states neither of which varies any more is dead weight, not
+// traceability. The verified/inferred/unverifiable status icon below is 5.6
+// (verifyTerm), unrelated and unaffected — that distinction is real and
+// still varies.
 function SkillRow({ m }) {
   const statusIcon =
     m.status === "verified" ? <CheckCircle2 size={12} className="shrink-0 text-[#16A34A]" /> :
@@ -42,7 +31,6 @@ function SkillRow({ m }) {
       {statusIcon}
       <span className="font-medium text-foreground">{m.required}</span>
       {m.found !== m.required && <span className="text-muted-foreground">({m.found})</span>}
-      <LayerTag layer={m.layer} similarity={m.similarity} />
       {m.status === "inferred" && <span className="text-[10px] text-[#A9781A]">inferred, not literal</span>}
     </li>
   );
@@ -97,7 +85,6 @@ export default function ScoreBreakdown({ score }) {
             <p className="text-[12px] text-muted-foreground">
               {qual.levelMet ? "Level met" : "Level not met"}
               {qual.matched?.length > 0 && <> — {qual.matched.join(", ")}</>}
-              {qual.fieldSimilarity != null && <> · field similarity {qual.fieldSimilarity.toFixed(3)}</>}
             </p>
             {qual.needsReview && qual.reviewReason === "field-not-extracted" && (
               <p className="flex items-center gap-1 text-[12px] font-semibold text-[#B91C1C]">

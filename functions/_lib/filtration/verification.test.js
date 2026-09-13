@@ -18,6 +18,10 @@ describe("verifyTerm — verified (word-boundary text match)", () => {
     expect(result.status).toBe("verified");
     expect(result.evidence).toBe("React");
     expect(result.offset).toBe(text.indexOf("React"));
+    // 5.4 instrumentation (relabeled to track this layer since matching.js's
+    // own layer 3 was removed): a literal match never fires the embedding call.
+    expect(result.firedEmbedding).toBe(false);
+    expect(result.borderline).toBe(false);
   });
 
   it("never verifies a multi-word term by scattered single words", async () => {
@@ -53,6 +57,16 @@ describe("verifyTerm — inferred (embedding-supported, not literal)", () => {
     expect(result.status).toBe("inferred");
     expect(result.evidence).toBe(text);
     expect(result.confidence).toBeCloseTo(0.9, 5);
+    expect(result.firedEmbedding).toBe(true);
+    expect(result.borderline).toBe(false); // 0.9 vs 0.8 threshold — well clear, not within BORDERLINE_BAND (0.01)
+  });
+
+  it("flags borderline when the winning similarity sits within BORDERLINE_BAND of the threshold", async () => {
+    const text = "Some nearby sentence.";
+    const embedTexts = mockEmbed({ Term: REF, [text]: unit(0.805) }); // threshold 0.8, within 0.01
+    const result = await verifyTerm("Term", text, { embedTexts, threshold: 0.8 });
+    expect(result.status).toBe("inferred"); // 0.805 > 0.8, strictly above, still credited
+    expect(result.borderline).toBe(true);
   });
 });
 
@@ -64,11 +78,17 @@ describe("verifyTerm — unverifiable", () => {
     expect(result.status).toBe("unverifiable");
     expect(result.evidence).toBeNull();
     expect(result.offset).toBeNull();
+    // The embedding call DID fire here (there was text to compare against) —
+    // it just didn't clear the threshold. Distinct from the empty-text case
+    // below, where it never fires at all.
+    expect(result.firedEmbedding).toBe(true);
   });
 
-  it("is unverifiable against empty text", async () => {
+  it("is unverifiable against empty text, and never calls embedTexts — nothing to compare against", async () => {
     const embedTexts = async () => { throw new Error("should not be called"); };
     const result = await verifyTerm("Kubernetes", "", { embedTexts, threshold: 0.8 });
     expect(result.status).toBe("unverifiable");
+    expect(result.firedEmbedding).toBe(false);
+    expect(result.borderline).toBe(false);
   });
 });

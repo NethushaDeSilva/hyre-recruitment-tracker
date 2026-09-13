@@ -12,21 +12,6 @@ import { openDataUrl } from "@/lib/file";
 import { Avatar } from "@/components/ui/Avatar";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 
-// Compact per-row summary of 5.4's layer-firing — instrumentation the WS6.1
-// open decision depends on, shown right where it's earned rather than in a
-// separate report, and doubling as viva-ready traceability.
-function LayerSummary({ breakdown }) {
-  const all = [...(breakdown.coreSkills.matched || []), ...(breakdown.preferredSkills.matched || [])];
-  if (!all.length) return null;
-  const exact = all.filter((m) => m.layer === "normalisation").length;
-  const embed = all.filter((m) => m.layer === "embedding").length;
-  return (
-    <span className="text-[10px] font-medium text-muted-foreground" title="How matched skills were found: exact/normalised match vs embedding similarity">
-      {exact} exact{embed > 0 ? ` · ${embed} embed` : ""}
-    </span>
-  );
-}
-
 function NotScoredRow({ c, scoreDoc, position, onRetry }) {
   const reason = notScoredReason(scoreDoc, position);
   return (
@@ -158,7 +143,6 @@ export default function ShortlistPanel({ position, applications, scores, onOpenC
                       </span>
                     )}
                   </div>
-                  <LayerSummary breakdown={e.result.breakdown} />
                 </button>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${scorePillClass(e.result.overallScore)}`}>{e.result.overallScore}</span>
                 {e.c.cvDataUrl && (

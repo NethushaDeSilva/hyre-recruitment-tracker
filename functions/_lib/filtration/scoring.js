@@ -70,11 +70,15 @@ export function levelMetFor(classifiedEducation, requiredLevel) {
 /**
  * Qualification component (0-25), independent of level. Caller supplies the
  * field-match result (from matching.js's matchTermSet, required field vs
- * every classified degree field) since that call is async/embedding-backed
- * and this module stays pure. `requiredQualification.field === null` means
- * there is nothing to compare — full credit is gated on level alone in that
- * case (5.4: "any degree at or above the required level earns full
- * qualification points").
+ * every classified degree field) since that module stays separate from this
+ * pure one. `requiredQualification.field === null` means there is nothing to
+ * compare — full credit is gated on level alone in that case (5.4: "any
+ * degree at or above the required level earns full qualification points").
+ *
+ * No `fieldSimilarity` in the returned object — matching.js's layer 3 (the
+ * only thing that ever produced a graded similarity here) was removed
+ * 2026-09-12 (5.4). Field matching is now normalisation-or-nothing, same as
+ * skills, so there is no similarity score left to report, only matched/not.
  */
 export function qualificationScore(requiredQualification, { levelMet, fieldMatch, classifiedEducation }) {
   if (!requiredQualification) return null; // caller should use the null-qualification path instead
@@ -82,7 +86,7 @@ export function qualificationScore(requiredQualification, { levelMet, fieldMatch
     const source = levelMet
       ? classifiedEducation.filter((c) => c.level != null && c.level >= requiredQualification.level).map((c) => c.source)
       : [];
-    return { score: levelMet ? 25 : 0, max: 25, levelMet, fieldSimilarity: null, matched: source };
+    return { score: levelMet ? 25 : 0, max: 25, levelMet, matched: source };
   }
   const hit = fieldMatch && fieldMatch.matched[0];
   const matched = Boolean(hit);
@@ -94,7 +98,6 @@ export function qualificationScore(requiredQualification, { levelMet, fieldMatch
     score: matched ? 25 : 0,
     max: 25,
     levelMet,
-    fieldSimilarity: hit ? hit.similarity : null,
     matched: sourceEntry ? [sourceEntry.source] : [],
   };
 }

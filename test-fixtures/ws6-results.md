@@ -1,6 +1,23 @@
 # WS6 — Calibration and Test Evidence — Results
 
-Run 2026-09-12 against the live deployed pipeline (`https://hyre-hiring.pages.dev`), real Cloudflare Workers AI calls throughout, zero Firestore writes (every scoring/parsing call below goes through the real `/api/parse-cv`, `/api/validate-cv`, `/api/embed` endpoints and the real `scoreApplication()`/`verifyTerm()` functions directly — no application, candidate or score document was ever created in Firestore for this evidence run). Extended the same day to close two gaps the first pass flagged (a near-threshold fixture, 08, and a hallucination-control fixture, 09), then extended again to fix a methodology defect found while building fixture 08: `SKILL_SIMILARITY_THRESHOLD` was set by a hard-negative pair layer 3 never actually evaluates (6.1). Audited, fixed at the source, re-run, and every score in this document re-confirmed against the corrected value. Raw data backing every number in this document is committed alongside it: `ws6-batch1-results.json` (fixtures 01–07 single-pass sanity run), `ws6-variance-runs.json` (80 raw runs, fixtures 01–08 × 10), `ws6-analysis.json` (derived stats), `ws6-hallucination-results.json` (fixture 09's `verifyTerm()` results), `ws6-reclassified-threshold.json` (every layer-3 skill comparison under both the original and corrected threshold), `calibration-pairs/calibration-results-v3-layer1-uncorrected.md`/`.json` (the pre-correction round, kept as evidence per this project's own before/after convention).
+Run 2026-09-12 against the live deployed pipeline (`https://hyre-hiring.pages.dev`), real Cloudflare Workers AI calls throughout, zero Firestore writes (every scoring/parsing call below goes through the real `/api/parse-cv`, `/api/validate-cv`, `/api/embed` endpoints and the real `scoreApplication()`/`verifyTerm()` functions directly — no application, candidate or score document was ever created in Firestore for this evidence run). Extended across the same day three times: to close two gaps the first pass flagged (a near-threshold fixture, 08, and a hallucination-control fixture, 09); to fix a methodology defect found while building fixture 08 (`SKILL_SIMILARITY_THRESHOLD` was set by a hard-negative pair layer 3 never actually evaluated — audited, fixed at the source, every score re-confirmed against the corrected value); and finally to act on the resulting 5.4 decision — `matchTermSet()`'s embedding fallback (layer 3) is now removed from the live engine, `verifyTerm()`'s is deliberately kept, and every affected file (engine, tests, UI, this document) reflects that. Raw data backing every number in this document is committed alongside it: `ws6-batch1-results.json` (fixtures 01–07 single-pass sanity run), `ws6-variance-runs.json` (80 raw runs, fixtures 01–08 × 10), `ws6-analysis.json` (derived stats), `ws6-hallucination-results.json` (fixture 09's `verifyTerm()` results), `ws6-reclassified-threshold.json` (every layer-3 skill comparison under both the original and corrected threshold), `calibration-pairs/calibration-results-v3-layer1-uncorrected.md`/`.json` (the pre-correction round, kept as evidence per this project's own before/after convention).
+
+**The single number that explains this whole document:** a genuine synonym (`relational database`, standing in for a real, well-implied skill) misses `SKILL_SIMILARITY_THRESHOLD` by **0.0030** — three thousandths. The threshold that rejects it is pinned by `MySQL`/`PostgreSQL`, two technologies that are genuinely, defensibly different products. A threshold correctly calibrated to keep those two apart sits close enough above a real synonym to reject it by a margin smaller than the model's own documented run-to-run drift (0.008–0.01, WS6.1). See 5.4 for the full picture this sits inside.
+
+### The sequence, in order — because it's the strongest thing in this document
+
+Every fact below is real and independently checkable, but the order they happened in is itself the evidence that 5.4's conclusion was earned, not assumed. Read top to bottom, not as a table of contents:
+
+1. **Built** layer 3 — embedding-based equivalence matching, on top of layer 1 (normalisation) — per the original 5.4 design, to catch genuine synonyms exact matching can't.
+2. **Calibrated** it (6.1) — 45 labelled pairs per domain, a documented selection rule, a threshold derived from measurement rather than picked.
+3. **Measured it crediting nothing** — the first real run against realistic CVs (this document, originally) found layer 3 firing on a meaningful share of comparisons and crediting **zero** of them. A result that, on its own, invites the suspicion that something in the measurement itself is wrong.
+4. **Found our own methodology error** — while hunting for a fixture to stress-test that exact suspicion (6.4/6.5's near-threshold fixture), the pair setting `SKILL_SIMILARITY_THRESHOLD`, `Angular`/`AngularJS`, turned out to be resolved at layer 1 before layer 3 ever runs. The threshold governing layer 3 had been pinned by a comparison layer 3 doesn't make (6.1).
+5. **Corrected it** — audited the full hard-negative set for the same defect (1 of 15 skills pairs affected, 0 of 15 qualifications pairs), fixed the calibration script at the source, not the output file, and re-ran it for real.
+6. **Re-measured** — every fixture re-run live against the corrected threshold; every real layer-3 comparison from this session reclassified against it.
+7. **Confirmed the finding survived the correction** — 100% false-negative on true_match, unchanged. Zero flips, zero newly-credited matches, zero scores that came out different. The suspicion in step 3 turned out not to explain the result; the result held up anyway.
+8. **Removed the layer, on evidence** (5.4) — not on the step-3 measurement alone, which could have been an artefact of the step-4 bug, but on the step-7 measurement, taken *after* the bug was found and fixed. `verifyTerm()`'s own, separate embedding fallback (5.6) was deliberately kept — different purpose, opposite failure mode, argued on its own terms, not swept out by the same decision.
+
+The rest of this document is the detail behind each of those eight steps — 6.1 for 2/4/5/6, this section (5.4) for 1/3/7/8, 6.4/6.5 for the fixture that prompted step 4 in the first place.
 
 Reference vacancy used for every fixture (BD-01's real, live requirements):
 ```
@@ -44,6 +61,8 @@ While searching for a near-threshold pair (6.4), the pair that *sets* `SKILL_SIM
 | **Qualifications** | **0.8782** (= max hard-negative, `Electrical Engineering`/`Electronic Engineering`) | 0.7223–0.8760 (n=15) | 0.6389–0.8782 (n=15) | **100%** (15/15) |
 
 Both are live in production (`functions/_lib/filtration/calibrated-thresholds.generated.js`) — every score in this document was re-confirmed against these exact, corrected numbers (`scripts/ws6-reclassify-corrected-threshold.mjs` and a direct live re-run of fixtures 03 and 08 both reproduce their original scores unchanged — see 5.4 for the full reclassification).
+
+**Both thresholds stay live and load-bearing after the 5.4 decision (below) — this calibration is not dead evidence.** `matchTermSet()`'s embedding fallback was removed (5.4), which means `SKILL_SIMILARITY_THRESHOLD`/`QUAL_SIMILARITY_THRESHOLD` no longer govern *matching*. They still govern `verifyTerm()` (5.6), which was deliberately kept and still calls `embedTexts` with these exact numbers on every matched term that can't be found literally in the CV text. Anyone reading this later: the calibration pipeline (`calibrate-thresholds.mjs`, the pair sets, `getThresholds()`) is real, current, runtime infrastructure for 5.6 — not a leftover from a removed feature. If 5.6 is ever also removed or reworked, that would be the point to revisit whether calibration is still needed at all; it isn't that point today.
 
 ---
 
@@ -162,11 +181,46 @@ Reported as measured, no target set in advance, per 6.6's own rule. The one junk
 
 ---
 
-## 5.4 — Embedding layer firing rate (the open decision's evidence)
+## 5.4 — Embedding layer firing rate, and the decision
 
-**Everything below was originally measured against `SKILL_SIMILARITY_THRESHOLD = 0.8804` — since corrected to 0.8099 (6.1: that value was set by a hard-negative pair layer 3 never actually evaluates). Re-measured against the corrected threshold before reporting — see the reclassification below. The bottom-line numbers below are unchanged by the correction, and that fact is itself part of the evidence, not assumed.**
+**Lead with the sharpest number in this document.** Fixture 09's `relational database` — a real, well-implied synonym for a database skill actually described in the CV — measures 0.8069 against the corrected `SKILL_SIMILARITY_THRESHOLD` of 0.8099. It misses by **0.0030**. The threshold it misses by that margin is set by `MySQL`/`PostgreSQL` (0.8099) — a pair that is correctly excluded, because MySQL and PostgreSQL are genuinely different database engines a recruiter should not treat as interchangeable. That is the entire tension this layer lived in, in one comparison: a threshold has to sit *above* MySQL/PostgreSQL to do its job, and sitting there rejects a genuine synonym by a margin three times smaller than the model's own documented run-to-run drift (0.008–0.01, WS6.1's qualifications re-run). No amount of re-tuning fixes this without breaking the other side.
 
-Aggregated across all 80 real runs (fixtures 01–07: 63 comparisons/pass × 10 rounds; fixture 08 adds 1 qualification-field comparison × 10 rounds = 720 total), as originally classified:
+### The decision: layer 3 removed from matching, kept in verification
+
+**Removed** `matchTermSet()`'s embedding fallback (matching.js). Skill and qualification-field matching are now normalisation-plus-exact-match only — no embedding call, no threshold comparison, nothing left to flip.
+
+**Kept** `verifyTerm()`'s embedding fallback (verification.js, 5.6) — deliberately, on a different rationale than the removal. Same infrastructure, opposite purpose, opposite failure mode:
+- Layer 3 (removed) **awarded** credit for a term matching a *different* term it was never literally equal to — a false positive there invents a skill a candidate may not have.
+- `verifyTerm()` (kept) **withholds** credit for a term already matched from the candidate's own stated skills, only when it can't be found literally in the CV text — a false negative there drops a skill the candidate legitimately has, just because extraction phrased it slightly differently than the CV's own wording.
+
+In a hiring system those are not symmetric risks. Removing a control that protects candidates in order to win a cleaner determinism claim would be the wrong trade.
+
+**Scope, recorded precisely:** `matchTermSet()` is shared, single infrastructure for both skill matching and qualification-field matching — there is one function, not two — so this removal changes qualification-field matching too, not only skills. Fixture 08's near-threshold evidence (6.4/6.5) is qualification-side; its result is unaffected by the removal (the comparison it exercised already never cleared threshold, so "no longer attempted" produces the identical outcome as "attempted and rejected").
+
+### What 5.4 now is, precisely — do not overclaim
+
+Scoring is deterministic **given a fixed CandidateProfile**: σ = 0.00, proven by unit test across 100 runs. The scoring path contains **one remaining non-deterministic element**: `verifyTerm()`'s embedding fallback, which fires only when a matched term cannot be found by literal word-boundary search in the CV text. Across all 9 fixtures and every run this session it never fired on a genuine match, because a layer-1 match means the extracted term came from the CV text and is therefore findable in it. This is **empirically observed, not structurally guaranteed**: a WS4 extraction that reformats a term would still trigger it. This residual is accepted deliberately, because `verifyTerm()` protects candidates from losing credit for skills they hold.
+
+### The four lines of evidence behind this decision
+
+1. **Firing-rate evidence** (below): non-trivial firing (19.4% of 140 real layer-3 attempts across 80 runs), zero credited matches, zero borderline — under both the original, flawed threshold and the corrected one.
+2. **The single real production data point** recorded earlier this session (`Container orchestration`/`Kubernetes`, 0.7276 — 0.0823 below even the corrected 0.8099).
+3. **Fixture 08**: the closest real near-threshold pair available in the project (Δ0.0125 under `QUAL_SIMILARITY_THRESHOLD`, unaffected by the skill-threshold correction) — did not flip across 10 real calls, real wall-clock spacing.
+4. **Fixture 09's inferred attempts**: six real attempts, closest miss Δ0.0030 under the corrected skill threshold — the single nearest measurement in this entire document, and still a miss.
+
+None of this proves the documented cross-session drift (0.8701→0.8782, qualifications, WS6.1) can never flip a score — that remains real, separate, measured evidence, and it's exactly why `verifyTerm()`'s own embedding fallback was kept rather than also removed: the residual risk is real, just accepted deliberately in the one place it protects a candidate rather than the one place it could fabricate a match.
+
+### A second finding, alongside determinism, not instead of it: this removal is a measured cost saving
+
+The case for removal in this document has mostly been about correctness and stability — but there's a second, concrete finding that stands on its own: **layer 3 was structurally incapable of succeeding on this evidence, so every Neuron it spent was spent on a foregone conclusion.** Fixture 03 is the clearest real measurement of that. Before removal, its 9 layer-3 comparisons (6 core skills + 2 nice-to-have + 1 qualification field, all paraphrased) each triggered a real embedding call that was always going to come back "no match" — 0/9 credited, exactly as the aggregate 140-attempt, 0-credited firing-rate data (below) predicts. After removal, the same fixture re-run live shows `instrumentation.verification = {literal: 0, embedding: 0}` — **zero embedding calls**, not because the fixture changed, but because matching no longer attempts a comparison whose outcome the entire evidence base already showed is never going to be anything other than "no match." That's not just cleaner architecture. It's Neurons not spent, on calls this project's own measurement shows would not have changed a single score.
+
+### Instrumentation — relabeled, not left permanently zero
+
+`instrumentation.layers` (matching's exact/embedding/none/borderline counters) is gone — matching no longer has more than one outcome to count. `instrumentation.verification` now tracks the layer that's actually still live: `{ literal, embedding }` — how many matched terms per application verified via literal text search vs. needed `verifyTerm()`'s embedding call — plus `borderline`, whether that call's similarity landed within `BORDERLINE_BAND` (0.01) of the threshold. Confirmed live, real pipeline, post-removal: fixture 01 → `{literal: 9, embedding: 0}`; fixture 03 → `{literal: 0, embedding: 0}` (the cost saving above); fixture 08 → `{literal: 8, embedding: 0}`. All three reproduce their original overallScore exactly (100, 20, 75).
+
+### Aggregated firing-rate data (measured before the removal, the basis for the decision)
+
+Aggregated across all 80 real runs (fixtures 01–07: 63 comparisons/pass × 10 rounds; fixture 08 adds 1 qualification-field comparison × 10 rounds = 720 total), as originally classified against `SKILL_SIMILARITY_THRESHOLD = 0.8804`:
 
 | | Count | % of all comparisons |
 |---|---|---|
@@ -184,17 +238,7 @@ Comparisons that flip from "missing" to "matched" under the corrected threshold:
 Closest: "Docker" vs extracted "container orchestration" (fixture 03) = 0.7302 -- still 0.0797 short of 0.8099
 ```
 
-Fixture 08's qualification-field comparison uses `QUAL_SIMILARITY_THRESHOLD`, which the audit (6.1) found **was not affected** by the layer-1-collapse defect — its result (0.865785, Δ0.0125 below threshold, stable across 10 runs) stands as originally reported. Fixture 09's six `inferred`-attempt similarities were also reclassified against the corrected skill threshold: none flip, though the closest (`relational database`, 0.8069) now sits only **0.0030** below the corrected threshold — the single closest miss anywhere in this entire evidence set, corrected or not.
-
-**Directly re-confirmed, not just recalculated:** fixtures 03 and 08 were re-run live, once each, through the real engine with the corrected threshold now actually loaded (`calibrated-thresholds.generated.js` was regenerated, 6.1) — both reproduced their original scores exactly (03 → 20, 08 → 75). The correction changes the number that governs the decision below; it does not change any score this document has reported.
-
-**Closing synthesis, now on the correct threshold.** Four independent lines of evidence point the same direction:
-1. **Firing-rate evidence**: non-trivial firing (19.4%), zero credited matches, zero borderline, across 140 real attempts — reclassified against the corrected threshold, still zero flips.
-2. **The single real production data point** recorded earlier this session (`Container orchestration`/`Kubernetes`, 0.7276 — 0.0823 below even the corrected 0.8099).
-3. **Fixture 08**: the closest real near-threshold pair available in the project (Δ0.0125 under the corrected qualifications threshold, which the correction didn't change) — did not flip across 10 real calls.
-4. **Fixture 09's inferred attempts**: six real attempts, closest miss now Δ0.0030 under the corrected threshold — the nearest of any measurement in this document, and still a miss.
-
-None of this proves the documented cross-session drift (0.8701→0.8782, qualifications) can never flip a score — that remains real, separate, measured evidence. What it shows: across every real attempt made this session, under both the flawed and the corrected threshold, none crossed. Per 5.4's own decision rule (*"near-zero firing means remove it, a non-trivial BORDERLINE count means the instability is real"*): firing is non-trivial, borderline is genuinely, repeatedly zero — now measured against the right number. This is the fullest evidence base fixture-level testing can give; the decision itself stays yours.
+Fixture 08's qualification-field comparison uses `QUAL_SIMILARITY_THRESHOLD`, which the audit (6.1) found **was not affected** by the layer-1-collapse defect — its result (0.865785, Δ0.0125 below threshold, stable across 10 runs) stands as originally reported.
 
 ---
 
@@ -241,16 +285,18 @@ Full output: `scripts/verify-rules-r1-r6.mjs`.
 **Proves, with real evidence, not assumption:**
 - The scoring formulas in 5.3 are implemented exactly as specified — 7 of 8 fixtures matched hand-derivation on the first try; fixture 02 caught a real error in my own derivation, not the engine's.
 - **Extraction resists hallucination under deliberately adversarial input** (fixture 09) — a CV built specifically to tempt the model into inventing "Node.js" from Express context, and buzzword-baiting several more, produced zero invented skills. A genuinely positive result, not a gap.
-- `SKILL_SIMILARITY_THRESHOLD` was miscalibrated by a pair layer 3 can't evaluate (6.1) — found, audited across the full hard-negative set (1/15 affected), fixed at the source (`scripts/calibrate-thresholds.mjs`), and re-confirmed live: every fixture score in this document is unchanged under the corrected value.
-- The WS6.1 calibration finding (short technical terms defeat this embedding model) reproduces on realistic CVs, not just calibration pairs — and now also on the single closest real near-threshold case available (fixture 08), on six real grounding-credit attempts (fixture 09), and survives the threshold correction itself (still 100% false-negative on true_match at 0.8099) — four independent confirmations.
-- Rank stability and end-to-end score stability hold against the hardest real near-threshold case this project could produce (fixture 08, 10 runs, real wall-clock spacing, corrected threshold) — not a general proof of determinism (see below), but no longer an untested claim either.
-- `verifyTerm()`'s `verified` and `unverifiable` states both fire correctly on real data, including under adversarial CV phrasing designed to trip them.
+- `SKILL_SIMILARITY_THRESHOLD` was miscalibrated by a pair layer 3 couldn't evaluate (6.1) — found, audited across the full hard-negative set (1/15 affected), fixed at the source (`scripts/calibrate-thresholds.mjs`), and re-confirmed live: every fixture score in this document is unchanged under the corrected value.
+- **5.4 is resolved**: `matchTermSet()`'s embedding fallback is removed (matching is normalisation-plus-exact-match only); `verifyTerm()`'s embedding fallback (5.6) is deliberately kept, on the opposite-failure-mode reasoning recorded in 5.4. Removal confirmed live, real pipeline, against real fixtures — 01/03/08 all reproduce their original scores exactly, with fixture 03 now spending zero embedding calls on comparisons that were always going to fail.
+- The WS6.1 calibration finding (short technical terms defeat this embedding model) reproduces on realistic CVs, not just calibration pairs — and now also on the single closest real near-threshold case available (fixture 08), on six real grounding-credit attempts (fixture 09), and survives the threshold correction itself (still 100% false-negative on true_match at 0.8099) — four independent confirmations, all recorded in 5.4.
+- Rank stability and end-to-end score stability hold against the hardest real near-threshold case this project could produce (fixture 08, 10 runs, real wall-clock spacing, corrected threshold) — precisely stated as determinism **given a fixed CandidateProfile** (σ = 0.00, 100-run unit test), not a claim that `verifyTerm()`'s embedding fallback can never introduce variance (5.4 records exactly why that residual is accepted, not eliminated).
+- `verifyTerm()`'s `verified` and `unverifiable` states both fire correctly on real data, including under adversarial CV phrasing designed to trip them, and its `firedEmbedding`/`borderline` instrumentation is now what 5.4's decision record actually tracks (relabeled from the removed matching-layer counters, not left permanently zero).
 - 5.9's head-tail truncation fallback correctly preserves scorable content on two structurally different long-CV shapes (19k and 18k chars).
 - WS3's failure states (image-only, corrupt, dead-Worker) all produce the required non-silent, non-blaming behavior, verified in a real browser against the real production app, including a full outage→retry→recovery cycle.
 - R1–R7 access control holds.
 
 **Does not prove, and shouldn't be read as proving:**
-- General end-to-end determinism, or that NO near-threshold comparison can ever flip a score — fixture 08 is one real case, not exhaustive, and WS6.1's own cross-session drift (0.8701→0.8782) remains real, separate, unresolved evidence that flips can happen between sessions even though this one didn't.
+- General end-to-end determinism, or that NO near-threshold comparison can ever flip a score — fixture 08 is one real case, not exhaustive, and WS6.1's own cross-session drift (0.8701→0.8782) remains real, separate, unresolved evidence that flips can happen between sessions even though this one didn't. `verifyTerm()`'s embedding fallback was kept specifically because this residual is real, not because it's been ruled out.
 - That the layer-1-collapse audit found every possible calibration defect — it checked hard negatives (the pairs that set the threshold) specifically, not every pair in every set, because that's the class of defect that actually changes runtime behaviour.
 - `inferred` firing on any real CV in production — extraction not over-claiming (a good result) is also the reason `inferred` stays unexercised end-to-end; the mechanism is proven correct on real embeddings, its real-world trigger rate is a separate, open question.
+- That qualification-field matching is unaffected by the 5.4 removal in every possible case — `matchTermSet()` is shared infrastructure between skill and qualification-field matching, so the removal applies to both; it happens to be score-neutral on every fixture tested here because the qualification-side layer-3 comparisons tested (fixture 08, and 03/05's field mismatches) never cleared threshold either way, not because the two are structurally guaranteed to always agree.
 - Coverage of F4 as password-protected specifically — **still an open gap, stated plainly, not silently dropped**: F4 here is a corrupt/truncated file, not an encrypted one. No library in this project's toolchain (`pdf-lib`, confirmed) writes encrypted PDFs, and building real PDF encryption by hand was judged too large a side-task for this evidence round. Deferred, with the reason on record, same as CLAUDE.md 6.3's own framing of it.

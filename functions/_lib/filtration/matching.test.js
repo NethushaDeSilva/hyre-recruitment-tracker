@@ -29,67 +29,55 @@ describe("normalizeTerm", () => {
   });
 });
 
-// A mock that only knows the vectors a given test sets up — throws on any
-// unexpected string so a test can never silently pass on the wrong input.
-function mockEmbed(table) {
-  return async (texts) => texts.map((t) => {
-    if (!(t in table)) throw new Error(`mockEmbed: no vector configured for "${t}"`);
-    return table[t];
-  });
-}
-const unit = (cosineValue) => [cosineValue, Math.sqrt(1 - cosineValue * cosineValue)];
-const REF = [1, 0];
-
+// matchTermSet — layer 3 (embedding) was REMOVED 2026-09-12 (5.4, see
+// test-fixtures/ws6-results.md). Normalisation-or-nothing: a required term
+// either matches some candidate term after normalizeTerm(), or it's missing.
+// No embedTexts dependency at all any more — the function is synchronous.
 describe("matchTermSet", () => {
-  it("matches via normalisation alone and never calls embedTexts (5.5 economics)", async () => {
-    const embedTexts = async () => { throw new Error("should not be called"); };
-    const result = await matchTermSet(["React"], ["React.js"], { embedTexts, threshold: 0.8 });
-    expect(result.matched).toEqual([{ required: "React", found: "React.js", layer: "normalisation", similarity: 1 }]);
+  it("matches via normalisation", () => {
+    const result = matchTermSet(["React"], ["React.js"]);
+    expect(result.matched).toEqual([{ required: "React", found: "React.js" }]);
     expect(result.missing).toEqual([]);
-    expect(result.counters).toEqual({ normalisation: 1, embedding: 0, none: 0, borderline: 0 });
   });
 
-  it("falls through to embedding when no normalised match exists, credits strictly above threshold", async () => {
-    const embedTexts = mockEmbed({ "Container orchestration": REF, "Kubernetes": unit(0.9) });
-    const result = await matchTermSet(["Container orchestration"], ["Kubernetes"], { embedTexts, threshold: 0.85 });
-    expect(result.matched).toHaveLength(1);
-    expect(result.matched[0].layer).toBe("embedding");
-    expect(result.matched[0].similarity).toBeCloseTo(0.9, 5);
-    expect(result.counters).toEqual({ normalisation: 0, embedding: 1, none: 0, borderline: 0 });
-  });
-
-  it("does not credit a similarity at or below threshold", async () => {
-    const embedTexts = mockEmbed({ "Unrelated Term": REF, "Something Else": unit(0) });
-    const result = await matchTermSet(["Unrelated Term"], ["Something Else"], { embedTexts, threshold: 0.5 });
+  it("is synchronous and takes no embedding dependency — there is nothing left to fall through to", () => {
+    // matchTermSet no longer accepts (or needs) an embedTexts/threshold arg.
+    // A genuine semantic equivalence with no shared normalized form (the
+    // exact case layer 3 used to handle) now stays missing, full stop —
+    // that's the point of the removal, not an oversight.
+    const result = matchTermSet(["Container orchestration"], ["Kubernetes"]);
     expect(result.matched).toEqual([]);
-    expect(result.missing).toEqual(["Unrelated Term"]);
-    expect(result.counters.none).toBe(1);
+    expect(result.missing).toEqual(["Container orchestration"]);
   });
 
-  // The exact-boundary case (similarity === threshold) is covered precisely
-  // in thresholds.test.js via clearsThreshold() with clean decimal values —
-  // testing it here too would mean deriving a cosine of exactly 0.5 from
-  // sqrt(0.75), which floating point cannot represent exactly and makes the
-  // test flaky rather than meaningful. matchTermSet delegates to the same
-  // clearsThreshold() (see import above), so that coverage applies here too.
-
-  it("flags BORDERLINE on both sides of the threshold, independent of match outcome", async () => {
-    const above = mockEmbed({ Required: REF, Candidate: unit(0.505) });
-    const resultAbove = await matchTermSet(["Required"], ["Candidate"], { embedTexts: above, threshold: 0.5 });
-    expect(resultAbove.matched).toHaveLength(1);
-    expect(resultAbove.counters.borderline).toBe(1);
-
-    const below = mockEmbed({ Required: REF, Candidate: unit(0.495) });
-    const resultBelow = await matchTermSet(["Required"], ["Candidate"], { embedTexts: below, threshold: 0.5 });
-    expect(resultBelow.matched).toEqual([]);
-    expect(resultBelow.counters.borderline).toBe(1);
-
-    const far = mockEmbed({ Required: REF, Candidate: unit(0.9) });
-    const resultFar = await matchTermSet(["Required"], ["Candidate"], { embedTexts: far, threshold: 0.5 });
-    expect(resultFar.counters.borderline).toBe(0);
+  it("does not credit a lexically/semantically related but non-identical term", () => {
+    const result = matchTermSet(["MySQL"], ["PostgreSQL"]);
+    expect(result.matched).toEqual([]);
+    expect(result.missing).toEqual(["MySQL"]);
   });
 
-  it("BORDERLINE_BAND is 0.01, sized from the observed 6.4 threshold shift", () => {
+  it("matches multiple required terms independently, case/whitespace-insensitively", () => {
+    const result = matchTermSet(["React", "Node.js", "Docker"], ["  react  ", "NodeJS"]);
+    expect(result.matched).toEqual([
+      { required: "React", found: "  react  " },
+      { required: "Node.js", found: "NodeJS" },
+    ]);
+    expect(result.missing).toEqual(["Docker"]);
+  });
+
+  it("handles empty inputs without throwing", () => {
+    expect(matchTermSet([], ["React"])).toEqual({ matched: [], missing: [] });
+    expect(matchTermSet(["React"], [])).toEqual({ matched: [], missing: ["React"] });
+  });
+});
+
+// BORDERLINE_BAND now serves verification.js's verifyTerm() (5.6) — the only
+// remaining embedding-threshold comparison in the scoring path. Its own
+// tests live in verification.test.js; this just confirms the constant
+// itself is still here and unchanged, since matching.js is where it's
+// defined and exported from.
+describe("BORDERLINE_BAND", () => {
+  it("is 0.01, sized from the observed 6.4 threshold shift", () => {
     expect(BORDERLINE_BAND).toBe(0.01);
   });
 });

@@ -958,6 +958,8 @@ interviews/{interviewId}
   status: 'pending_confirmation' | 'confirmed' | 'declined' | 'completed'
 ```
 
+**Deviation, confirmed 2026-09-16: no separate `interviewers/{userId}` collection was built.** `domain` and `levels` are fields on the existing `users/{uid}` staff-identity doc instead. A second collection keyed on the same uid would duplicate identity that already lives in `users` and require keeping the two in sync on every staff change — exactly what WS1's "reconcile rather than duplicate" principle (§6, position/candidate data shape) already argues against for this codebase. `availability/{userId}` and `interviews/{interviewId}` are unaffected — those are genuinely new entities with no existing home, not identity, so they're built as their own collections exactly as specced above.
+
 `state` is **computed at read time, never stored**:
 
 ```js
@@ -972,6 +974,8 @@ function availabilityState(record, now) {
 Computing on read means a lapsed declaration cannot linger as stale truth because a background job failed.
 
 **Validity window: 14 days.** Chosen deliberately — long enough not to nag interviewers weekly, short enough that a declaration cannot survive a change of project assignment. Record the reasoning; an arbitrary number invites the question.
+
+**Timezone — a declared window is wall-clock, a commitment is an instant, and they are stored differently on purpose.** "Tuesdays 2–4pm" is a wall-clock intention tied to the person who declared it, not the browser later reading it. `availability/{userId}.timeZone` (IANA identifier, e.g. `Asia/Colombo`) is captured from `Intl.DateTimeFormat().resolvedOptions().timeZone` at the moment they save, and `slots[].startTime`/`endTime` are interpreted in that stored zone forever after — never re-interpreted against whoever's browser is viewing the calendar. `interviews/{interviewId}.scheduledAt` (and every other commitment) is the opposite: a genuine absolute instant, stored as epoch ms with no zone attached, exactly like every other timestamp in this codebase (`ms()`/`at()` in `store.js`). Comparing a wall-clock window against an absolute instant — "is this candidate slot inside Priya's declared Tuesday window" — requires converting one into the other's terms; `src/lib/wallClock.js` does this via the standard Intl round-trip technique (format a UTC guess in the target zone, correct the guess by the observed offset) rather than a hardcoded IANA literal, so nothing here breaks for a team member whose OS zone differs from the rest of the team. This is what "one timezone for this release" means in practice: display and comparison are zone-*aware*, not zone-*hardcoded* — the team happening to share one physical zone today is not something the code assumes.
 
 ---
 

@@ -40,6 +40,10 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   const [department, setDepartment] = useState("");
   const [description, setDescription] = useState("");
   const [minQualification, setMinQualification] = useState("");
+  // WS8 §8.1.4 — seniority; drives interview stage count + eligible
+  // interviewer level once scheduling reaches this position. Optional: only
+  // matters for a position that ends up using WS8 scheduling.
+  const [level, setLevel] = useState("");
   // WS5 5.2 — structured scoring requirements, separate from minQualification
   // above (that one's the candidate-side ladder hint; these feed the engine).
   const [qualLevel, setQualLevel] = useState(""); // "" | "6" | "7" | "8"
@@ -78,6 +82,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setDepartment(position.department || "");
     setDescription(position.description || "");
     setMinQualification(position.minQualification || "");
+    setLevel(position.level || "");
     const rq = position.requirements?.requiredQualification;
     setQualLevel(rq?.level ? String(rq.level) : "");
     setQualField(rq?.field || "");
@@ -96,6 +101,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setDepartment("");
     setDescription("");
     setMinQualification("");
+    setLevel("");
     setQualLevel("");
     setQualField("");
     setRequiredSkillsText("");
@@ -128,7 +134,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     };
     if (isEdit) {
       await updatePosition(position.id, {
-        title, department, description, minQualification,
+        title, department, description, minQualification, level,
         closesAt: endOfDayMs(closeDate),
         headcount: Number(headcount),
         hiringManagerUid,
@@ -140,7 +146,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
       return;
     }
     const pos = await addPosition({
-      title, department, description, minQualification,
+      title, department, description, minQualification, level,
       closesAt: endOfDayMs(closeDate),
       headcount: Number(headcount),
       hiringManagerUid,
@@ -201,13 +207,24 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
           </Field>
         </div>
 
-        <Field label="Minimum qualification (optional)">
-          <Select value={minQualification} onChange={(e) => setMinQualification(e.target.value)}>
-            <option value="">No minimum — accept everyone</option>
-            {QUALIFICATIONS.map((q) => <option key={q} value={q}>{q} or above</option>)}
-          </Select>
-          <p className="mt-1 text-xs text-muted-foreground">Applicants below this get a ⚠️ hint on their card — they're never auto-rejected.</p>
-        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Minimum qualification (optional)">
+            <Select value={minQualification} onChange={(e) => setMinQualification(e.target.value)}>
+              <option value="">No minimum — accept everyone</option>
+              {QUALIFICATIONS.map((q) => <option key={q} value={q}>{q} or above</option>)}
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">Applicants below this get a ⚠️ hint on their card — they're never auto-rejected.</p>
+          </Field>
+          <Field label="Seniority level (optional)">
+            <Select value={level} onChange={(e) => setLevel(e.target.value)}>
+              <option value="">Not set</option>
+              <option value="intern">Intern</option>
+              <option value="junior">Junior</option>
+              <option value="senior">Senior</option>
+            </Select>
+            <p className="mt-1 text-xs text-muted-foreground">Used by interview scheduling to size the interview stages.</p>
+          </Field>
+        </div>
 
         <div className="space-y-4 rounded-lg border border-border bg-secondary/40 p-4">
           <div className="space-y-1">

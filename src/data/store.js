@@ -22,6 +22,8 @@ import { departmentCode } from "@/lib/departments";
 import { isOpenNow } from "@/lib/positions";
 import { createRescoreRun, executeRescoreRun, snapshotKey } from "@/lib/rescoreBatch";
 import { scoringHeaders } from "@/lib/scoringAuth";
+import { createDeclaredAvailabilityProvider, AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
+import { browserTimeZone } from "@/lib/wallClock";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
 function pickColor(name) {
@@ -202,6 +204,10 @@ const mapPosition = (d) => {
   return {
     id: d.id, title: x.title, department: x.department, description: x.description || "",
     status: x.status || "Open", stages: x.stages || DEFAULT_PIPELINE, minQualification: x.minQualification || "",
+    // WS8 §8.1.4 — seniority, drives interview stage count + eligible
+    // interviewer level. Optional: most positions have nothing to do with
+    // DevOps scheduling (§8.0) and shouldn't be forced to pick one.
+    level: x.level || "",
     // WS5 5.2 — structured scoring requirements, separate from minQualification
     // above (a legacy free-text hint across the full O/L-to-PhD ladder; this
     // one is the engine's strict input and only exists once a position has
@@ -657,7 +663,7 @@ export async function addPosition({
   title, department, description, stages, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
   createdByRole = "", createdByUid = "", createdByName = "",
-  requirements = null, shortlistThreshold = 0,
+  requirements = null, shortlistThreshold = 0, level = "",
 }) {
   // HR is the recruitment authority now, so a newly opened vacancy goes live
   // immediately — there's no separate Management approval step anymore. That
@@ -672,6 +678,7 @@ export async function addPosition({
     status,
     stages: stages && stages.length ? stages : DEFAULT_PIPELINE,
     minQualification,
+    level,
     requirements,
     shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
     // mandatory auto-close date: the position closes itself once this passes
@@ -712,7 +719,7 @@ export async function addPosition({
 export async function updatePosition(id, {
   title, department, description, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
-  requirements = null, shortlistThreshold = 0,
+  requirements = null, shortlistThreshold = 0, level = "",
 }) {
   const current = positions.find((p) => p.id === id);
   if (!current) throw new Error(`updatePosition: no position ${id}`);
@@ -732,6 +739,7 @@ export async function updatePosition(id, {
     department: department.trim(),
     description: (description || "").trim(),
     minQualification,
+    level,
     requirements,
     shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
     closesAt: closesAt ? new Date(closesAt) : null,
@@ -1057,6 +1065,87 @@ export async function ensureUserId(uid) {
   }
   return userId;
 }
+
+// --- WS8 interviewer specialisation (fields on users/{uid}, not a separate
+// collection — see CLAUDE.md WS8 §8.3 deviation note) ------------------------
+// Scoped to DevOps only (§8.0); `levels` is which seniorities they're eligible
+// to interview at, reusing the intern/junior/senior vocabulary the pipeline
+// already uses informally (JUNIOR_PIPELINE).
+export async function updateStaffSpecialisation(uid, { domain = "devops", levels = [] } = {}) {
+  if (!firebaseReady || !uid) return;
+  await setDoc(doc(db, "users", uid), { domain, levels }, { merge: true });
+}
+
+// --- WS8 declared availability (self-declared, never inferred) -------------
+function mapAvailabilityDoc(x) {
+  return {
+    timeZone: x.timeZone || "",
+    slots: x.slots || [],
+    exceptions: x.exceptions || [],
+    declaredAt: ms(x.declaredAt),
+    validUntil: ms(x.validUntil),
+    onLeave: false, // reserved for a whole-record leave flag; today leave is per-date via exceptions
+  };
+}
+
+/** The signed-in user's own declared availability, or null if never declared. */
+export async function getAvailability(uid) {
+  if (!firebaseReady || !uid) return null;
+  const snap = await getDoc(doc(db, "availability", uid));
+  return snap.exists() ? mapAvailabilityDoc(snap.data()) : null;
+}
+
+// Staff declare their OWN weekly recurring windows + one-off exceptions —
+// never someone else's (enforced by firestore.rules, not just this client).
+// Re-declaring always refreshes timeZone/declaredAt/validUntil: WS8 §8.3's
+// 14-day validity window exists so a stale declaration can't outlive a change
+// of project assignment, so every save is a FRESH, dated claim, never a quiet
+// edit of an old one that leaves declaredAt looking older than it should.
+export async function saveAvailability(uid, { slots = [], exceptions = [] } = {}) {
+  if (!firebaseReady || !uid) return;
+  const now = new Date();
+  await setDoc(doc(db, "availability", uid), {
+    timeZone: browserTimeZone(),
+    slots,
+    exceptions,
+    declaredAt: now,
+    validUntil: new Date(now.getTime() + AVAILABILITY_VALIDITY_MS),
+  });
+}
+
+// Real Firestore-backed DeclaredAvailabilityProvider (src/lib/availability.js)
+// — the interface exists so a real calendar source can replace this later
+// (CLAUDE.md WS8 §8.8, deferred) without touching any consumer. `interviews`
+// has no documents yet until WS8 Part C ships the assignment flow that
+// creates them; querying it now is harmless (an empty snapshot), not an error,
+// and saves Part B from re-wiring this plumbing.
+const availabilityProvider = createDeclaredAvailabilityProvider({
+  fetchAvailabilityDocs: async (staffIds) => {
+    if (!firebaseReady || !staffIds.length) return {};
+    const snaps = await Promise.all(staffIds.map((id) => getDoc(doc(db, "availability", id))));
+    const out = {};
+    staffIds.forEach((id, i) => { if (snaps[i].exists()) out[id] = mapAvailabilityDoc(snaps[i].data()); });
+    return out;
+  },
+  fetchCommitments: async (staffIds, { fromMs, toMs }) => {
+    if (!firebaseReady || !staffIds.length) return {};
+    // Firestore 'in' caps at 30 values — comfortably above §8.0's DevOps-only
+    // interviewer pool for this release.
+    const snap = await getDocs(query(collection(db, "interviews"), where("interviewerId", "in", staffIds.slice(0, 30))));
+    const out = {};
+    snap.docs.forEach((d) => {
+      const x = d.data();
+      if (!["pending_confirmation", "confirmed"].includes(x.status)) return;
+      const startMs = ms(x.scheduledAt);
+      const endMs = startMs + (x.durationMs || 60 * 60 * 1000);
+      if (endMs <= fromMs || startMs >= toMs) return;
+      (out[x.interviewerId] ||= []).push({ startMs, endMs, source: "interview" });
+    });
+    return out;
+  },
+});
+/** Calendar-ready availability for a set of staff over a date range — see DeclaredAvailabilityProvider. */
+export const getStaffAvailability = (staffIds, range) => availabilityProvider.getAvailability(staffIds, range);
 
 // Which collection holds this application id? A HIRED person's row lives in
 // /employees, everyone else in /applications — so updates (comments, edits)

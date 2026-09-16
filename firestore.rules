@@ -75,11 +75,57 @@ service cloud.firestore {
       // Update your own profile, but you can NEVER change your own role. Your
       // readable User ID (userId) is write-ONCE: it may be minted when absent
       // (the app self-heals it on first sign-in) but can never be altered after.
+      // WS8 §8.1/§8.3: `domain`/`levels` (interviewer specialisation) live on
+      // this doc rather than a separate `interviewers` collection (CLAUDE.md
+      // WS8 §8.3 deviation note) — self-write is allowed the same way name/
+      // avatarColor/title already are; nothing about them is security-critical
+      // the way `role` is, so they don't need their own narrower rule.
       allow update: if signedIn() && request.auth.uid == uid
                     && request.resource.data.role == resource.data.role
                     && (!('userId' in resource.data)
                         || request.resource.data.userId == resource.data.userId);
       allow delete: if false;
+    }
+
+    // --- WS8 declared availability (one per staff member, self-declared) ---
+    // A person's own schedule claim — never inferred, never written by anyone
+    // but them. HR gets read-all (needed for the calendar view, §8.2a) but NOT
+    // write access to someone else's declaration: HR editing another person's
+    // availability would make it HR's claim wearing that person's name, which
+    // is indistinguishable from fabrication if it's ever wrong. HR's real
+    // power is the manual override on the BOOKING itself (§15), a separate,
+    // clearly-attributed action — not silently rewriting someone's calendar.
+    match /availability/{staffUid} {
+      allow read: if isStaff();
+      // isStaff() here, not just a uid match — a Candidate has an auth.uid
+      // too, and without this check they could write themselves a doc at
+      // availability/{their-own-uid}. Meaningless data (nothing ever reads a
+      // candidate's own uid out of this collection) but it's exactly the kind
+      // of stray write the rest of this ruleset is written to prevent by
+      // construction rather than by nothing-happens-to-read-it luck.
+      allow create, update: if isStaff() && request.auth.uid == staffUid
+                    && request.resource.data.timeZone is string
+                    && request.resource.data.timeZone.size() > 0;
+      allow delete: if false; // re-declaring supersedes; deleting would just create a false `unknown` gap
+    }
+
+    // --- WS8 interviews (scheduling requests + booked interviews) ---
+    // create: staff only (either the automated-assignment trigger or HR's
+    // manual override, §15 — both run under a staff session). update: staff
+    // (advancing/booking), or the assigned interviewer responding to their
+    // own pending request (accept/decline, §13) — scoped to status + booking
+    // fields only, so an interviewer can't silently reassign themselves off a
+    // request or rewrite the proposed slot while "declining" it.
+    match /interviews/{interviewId} {
+      allow read: if isStaff()
+        || (signedIn() && resource.data.interviewerId == request.auth.uid);
+      allow create: if isStaff();
+      allow update: if isStaff()
+        || (signedIn() && resource.data.interviewerId == request.auth.uid
+            && resource.data.status == 'pending_confirmation'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+            && request.resource.data.status in ['confirmed', 'declined']);
+      allow delete: if false; // a declined/expired request is history, not erased — mirrors applications/employees
     }
 
     // --- positions ---

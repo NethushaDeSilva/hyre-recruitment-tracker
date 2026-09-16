@@ -39,6 +39,7 @@ const MATRIX = {
   downloadCv: [ROLES.HR, ROLES.MANAGEMENT],
   submitFeedback: [ROLES.INTERVIEWER, ROLES.HR, ROLES.MANAGEMENT], // Sprint 2
   exportReports: [ROLES.HR, ROLES.MANAGEMENT], // Sprint 2
+  manageOwnAvailability: [ROLES.HR, ROLES.INTERVIEWER, ROLES.MANAGEMENT], // WS8 §8.2 — declare your own schedule
 
   // candidate side
   apply: [ROLES.CANDIDATE],

@@ -33,6 +33,7 @@ const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Company = lazy(() => import("@/pages/Company"));
 const Team = lazy(() => import("@/pages/Team"));
+const Availability = lazy(() => import("@/pages/Availability"));
 const Help = lazy(() => import("@/pages/Help"));
 
 const RouteLoading = () => (
@@ -83,6 +84,7 @@ export default function App() {
             {/* company — internal, staff only */}
             <Route path="/company" element={<RequireRole roles={STAFF}><Company /></RequireRole>} />
             <Route path="/team" element={<RequireRole roles={STAFF}><Team /></RequireRole>} />
+            <Route path="/availability" element={<RequireRole roles={STAFF}><Availability /></RequireRole>} />
 
             {/* everyone */}
             <Route path="/profile" element={<Profile />} />

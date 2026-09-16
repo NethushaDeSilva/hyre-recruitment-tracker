@@ -13,16 +13,25 @@ const MAX_CHARS = 2000;
  * @returns {Promise<number[][]>} embeddings, same order as `texts`
  */
 export async function runEmbeddings(env, texts) {
-  const clean = texts
-    .filter((t) => typeof t === "string" && t.trim())
-    .slice(0, MAX_TEXTS)
-    .map((t) => t.trim().slice(0, MAX_CHARS));
-  if (!clean.length) return [];
-
-  const result = await env.AI.run(EMBEDDING_MODEL, { text: clean });
-  const embeddings = result?.data;
-  if (!Array.isArray(embeddings) || embeddings.length !== clean.length) {
-    throw new Error("Embedding model returned an unexpected shape.");
+  if (!Array.isArray(texts) || texts.some(t => typeof t !== "string" || !t.trim())) {
+    throw new Error("Invalid embedding input: expected nonempty strings.");
   }
+  const embeddings = [];
+  for (let start = 0; start < texts.length; start += MAX_TEXTS) {
+    const originals = texts.slice(start, start + MAX_TEXTS).map(t => t.trim());
+    const result = await env.AI.run(EMBEDDING_MODEL, { text: originals.map(t => t.slice(0, MAX_CHARS)) });
+    if (!Array.isArray(result?.data) || result.data.length !== originals.length ||
+        result.data.some(v => !Array.isArray(v) || !v.length || v.some(n => !Number.isFinite(n)))) {
+      throw new Error("Embedding model returned an unexpected shape or count.");
+    }
+    result.data.forEach((vector, i) => {
+      // Preserve the numeric-array API used by calibration. Metadata travels
+      // with each vector through the per-request cache; HTTP emits it separately.
+      const copy = [...vector];
+      if (originals[i].length > MAX_CHARS) copy.inputTruncated = true;
+      embeddings.push(copy);
+    });
+  }
+  if (embeddings.length !== texts.length) throw new Error("Embedding count mismatch.");
   return embeddings;
 }

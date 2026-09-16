@@ -27,7 +27,7 @@ export async function onRequestPost({ request, env }) {
 
   try {
     const embeddings = await runEmbeddings(env, input);
-    return json({ embeddings }, 200);
+    return json({ embeddings, truncatedInputIndexes: embeddings.flatMap((v, i) => v.inputTruncated ? [i] : []) }, 200);
   } catch (e) {
     return json({ error: e.message || "Embedding model call failed." }, 502);
   }

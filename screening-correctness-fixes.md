@@ -17,6 +17,14 @@ failed; existing matching tests and Node/React regressions passed.
 
 ## Approved sequence
 
+Step 2 implements sequential 100-text embedding chunks, exact count validation,
+and positional vector truncation metadata carried through cached verification
+into the assessment's inputTruncated flag. The HTTP embedding route serializes
+truncated indexes separately, preserving its numeric embeddings contract.
+Extraction array caps now return outputCapped/outputCappedFields. Step 4 connects
+these flags to eligibility and persists extraction quality on candidate profiles.
+Before the embedding fix, all four new completeness/metadata regressions failed.
+
 1. AngularJS normalization and regressions.
 2. Ordered embedding chunks, count validation, nonfatal truncation flags.
 3. Applied-only batches and reconciliation; count saves after acknowledgment.

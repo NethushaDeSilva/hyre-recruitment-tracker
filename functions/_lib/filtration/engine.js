@@ -185,6 +185,7 @@ export async function scoreApplication(candidate, requirements, deps) {
   return {
     overallScore,
     capApplied,
+    ...(allVerifications.some(v => v.inputTruncated) ? { inputTruncated: true } : {}),
     breakdown: {
       qualifications: qualBreakdown,
       coreSkills: { score: core.score, max: core.max, matched: core.matched, missing: core.missing },

@@ -220,9 +220,13 @@ const str = (v) => (typeof v === "string" ? v.trim() : "");
 const nullableStr = (v) => { const s = str(v); return s ? s : null; };
 
 function normalizeParse(obj) {
+  const outputCappedFields = Object.entries({ education: 20, experience: 20, skills: 40, certifications: 20, languages: 20 })
+    .filter(([key, limit]) => Array.isArray(obj[key]) && obj[key].length > limit).map(([key]) => key);
   const education = Array.isArray(obj.education) ? obj.education.slice(0, 20) : [];
   const experience = Array.isArray(obj.experience) ? obj.experience.slice(0, 20) : [];
   return {
+    outputCapped: outputCappedFields.length > 0,
+    outputCappedFields,
     fullName: str(obj.fullName),
     email: str(obj.email),
     phone: str(obj.phone),

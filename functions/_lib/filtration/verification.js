@@ -85,6 +85,7 @@ export async function verifyTerm(term, extractedText, { embedTexts, threshold })
   }
 
   const vectors = await embedUnique([t, ...sentences.map((s) => s.text)], embedTexts);
+  const inputTruncated = [...vectors.values()].some(v => v?.inputTruncated === true);
   const termVec = vectors.get(t);
   let best = null;
   if (termVec) {
@@ -97,9 +98,9 @@ export async function verifyTerm(term, extractedText, { embedTexts, threshold })
   }
   const borderline = !!best && Math.abs(best.similarity - threshold) <= BORDERLINE_BAND;
   if (best && clearsThreshold(best.similarity, threshold)) {
-    return { term: t, status: "inferred", evidence: best.sentence.text, offset: best.sentence.offset, confidence: best.similarity, firedEmbedding: true, borderline };
+    return { term: t, status: "inferred", evidence: best.sentence.text, offset: best.sentence.offset, confidence: best.similarity, firedEmbedding: true, borderline, ...(inputTruncated ? { inputTruncated: true } : {}) };
   }
-  return { term: t, status: "unverifiable", evidence: null, offset: null, confidence: best ? best.similarity : 0, firedEmbedding: true, borderline };
+  return { term: t, status: "unverifiable", evidence: null, offset: null, confidence: best ? best.similarity : 0, firedEmbedding: true, borderline, ...(inputTruncated ? { inputTruncated: true } : {}) };
 }
 
 /** Verify a batch of already-matched terms against one CV's extracted text. */

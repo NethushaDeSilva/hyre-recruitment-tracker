@@ -8,6 +8,16 @@ const unit = (cosineValue) => [cosineValue, Math.sqrt(1 - cosineValue * cosineVa
 const REF = [1, 0];
 const NOW = () => new Date("2026-09-10T12:00:00Z");
 
+it("carries long-input uncertainty through verification and the shared candidate cache", async () => {
+  const env = { AI: { run: async (_, { text }) => ({ data: text.map(() => [1, 0]) }) } };
+  const candidate = { skills: ["React"], education: [], totalYearsExperience: 0, extractedText: "x".repeat(2100) };
+  const results = await scoreVacancyApplications({
+    candidates: [{ ...candidate, candidateId: "a" }, { ...candidate, candidateId: "b" }],
+    requirements: { requiredSkills: ["React"], niceToHave: [], minYearsExperience: 0 }, env,
+  });
+  expect(results.map(r => r.result.inputTruncated)).toEqual([true, true]);
+});
+
 // A fake Workers AI binding: records every call and returns vectors from a
 // lookup table, positionally aligned to the (already-deduped) input — the
 // same contract runEmbeddings() expects of the real env.AI.run.

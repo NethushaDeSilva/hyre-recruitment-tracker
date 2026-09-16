@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { cheapTextChecks, truncateForModel, MIN_CHARS, TRUNCATION_BUDGET, TRUNCATION_HALF } from "./cv-ai.js";
+import { cheapTextChecks, truncateForModel, parseCvProfile, MIN_CHARS, TRUNCATION_BUDGET, TRUNCATION_HALF } from "./cv-ai.js";
+
+it("keeps capped extraction usable and reports every capped field", async () => {
+  const env = { AI: { run: async () => ({ response: { skills: Array(41).fill("React"), education: Array(21).fill({ awardType: "BSc" }) } }) } };
+  const profile = await parseCvProfile(env, "CV content");
+  expect(profile.skills).toHaveLength(40);
+  expect(profile.education).toHaveLength(20);
+  expect(profile.outputCapped).toBe(true);
+  expect(profile.outputCappedFields).toEqual(["education", "skills"]);
+});
 
 describe("cheapTextChecks", () => {
   it("rejects text under MIN_CHARS as too-short", () => {

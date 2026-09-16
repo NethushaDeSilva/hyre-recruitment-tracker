@@ -17,7 +17,7 @@ import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, Sli
 import { useHyreData, advanceStage, rejectCandidate, bulkReject, rescoreVacancy } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
-import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
+import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage, isSchedulableStage } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
 import { sortApplications } from "../../functions/_lib/filtration/engine.js";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -30,6 +30,7 @@ import RejectModal from "@/components/RejectModal";
 import StageConfigModal from "@/components/StageConfigModal";
 import OpenPositionModal from "@/components/OpenPositionModal";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
+import ProposeInterviewModal from "@/components/ProposeInterviewModal";
 
 export default function PositionDetail() {
   const { id } = useParams();
@@ -45,6 +46,7 @@ export default function PositionDetail() {
   const [detail, setDetail] = useState(null);
   const [mustReview, setMustReview] = useState(false); // tells the detail modal to show the "review first" banner
   const [reviewFor, setReviewFor] = useState(null);    // candidate id showing the inline "review first" hint on its card
+  const [scheduleTarget, setScheduleTarget] = useState(null); // WS8 — { candidate, stageId } once they land in a schedulable stage
   // Applied-stage bulk select (HR only) — tick applicants and move them together.
   const [picked, setPicked] = useState(() => new Set());
   // board search (HR only) — live, filters by name/skills/role/company/field.
@@ -160,6 +162,10 @@ export default function PositionDetail() {
   // comment + score first (enforced in store.advanceStage). If it's missing we open
   // the candidate's profile and show a "review first" message instead of moving.
   const attemptMove = async (c) => {
+    // Computed BEFORE the move — c.stage is still the OLD stage here, so this
+    // is exactly "the stage they're about to land in," which is what WS8's
+    // trigger (isSchedulableStage) needs to check.
+    const landingStage = nextStage(position.stages, c.stage);
     const res = await advanceStage(c.id, actor);
     if (res && res.ok === false && res.reason === "review-required") {
       setReviewFor(c.id);
@@ -175,6 +181,10 @@ export default function PositionDetail() {
           ? `${displayName(c)} hired — employee ID ${res.employeeId} issued.`
           : `${displayName(c)} hired.`
       );
+    } else if (res?.ok && isSchedulableStage(position, landingStage)) {
+      // WS8 §8/8.6 — the trigger. Candidate just reached a stage that needs a
+      // scheduled interviewer; propose a slot now, not on some later screen.
+      setScheduleTarget({ candidate: c, stageId: landingStage });
     }
   };
 
@@ -533,6 +543,15 @@ export default function PositionDetail() {
         mustReview={mustReview}
         scoreDoc={detail ? scores.get(detail.id) : null}
         onClose={() => { setDetail(null); setMustReview(false); setReviewFor(null); }}
+        onSchedule={setScheduleTarget}
+      />
+      <ProposeInterviewModal
+        open={!!scheduleTarget}
+        candidate={scheduleTarget?.candidate}
+        position={position}
+        stageId={scheduleTarget?.stageId}
+        stageLabel={scheduleTarget ? resolveStage(position, scheduleTarget.stageId).label : ""}
+        onClose={() => setScheduleTarget(null)}
       />
       <RejectModal
         open={!!rejectTarget}

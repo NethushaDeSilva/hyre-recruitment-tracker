@@ -6,12 +6,22 @@ import { useEffect, useState } from "react";
 import { Bell, Check } from "lucide-react";
 import { useHyreData, markNotificationRead } from "@/data/store";
 import { formatDate } from "@/lib/format";
+import InterviewRequestModal from "@/components/InterviewRequestModal";
 
 export default function NotificationBell() {
   const { notifications } = useHyreData();
   const [open, setOpen] = useState(false);
+  const [interviewRequestsOpen, setInterviewRequestsOpen] = useState(false);
   const list = notifications || [];
   const unread = list.filter((n) => !n.read);
+
+  const openNotification = (n) => {
+    if (!n.read) markNotificationRead(n.id);
+    if (n.type === "interview_request") {
+      setInterviewRequestsOpen(true);
+      setOpen(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -59,7 +69,7 @@ export default function NotificationBell() {
                 list.map((n) => (
                   <button
                     key={n.id}
-                    onClick={() => !n.read && markNotificationRead(n.id)}
+                    onClick={() => openNotification(n)}
                     className={`flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-secondary ${!n.read ? "bg-primary/[0.05]" : ""}`}
                   >
                     <div className="flex w-full items-center gap-2">
@@ -74,6 +84,7 @@ export default function NotificationBell() {
           </div>
         </>
       )}
+      <InterviewRequestModal open={interviewRequestsOpen} onClose={() => setInterviewRequestsOpen(false)} />
     </div>
   );
 }

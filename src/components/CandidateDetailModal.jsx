@@ -12,10 +12,11 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { can } from "@/lib/permissions";
-import { stageLabelOf, canActOnStageFor, nextStage, resolveStage } from "@/lib/stages";
+import { stageLabelOf, canActOnStageFor, nextStage, resolveStage, isSchedulableStage } from "@/lib/stages";
 import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl, openDataUrl, humanSize } from "@/lib/file";
 import { reconsiderCandidate, addComment, deleteComment, advanceStage, sendOffer, respondToOffer } from "@/data/store";
+import InterviewStatusPanel from "@/components/InterviewStatusPanel";
 
 const OFFER_STATUS_TONE = { sent: "#2563EB", accepted: "#16A34A", declined: "#DC2626", negotiating: "#A9781A" };
 const OFFER_STATUS_LABEL = { sent: "Sent — awaiting response", accepted: "Accepted", declined: "Declined", negotiating: "Negotiating" };
@@ -58,7 +59,7 @@ function describe(e) {
   }
 }
 
-export default function CandidateDetailModal({ open, onClose, candidate, position, positionTitle, mustReview = false, scoreDoc = null }) {
+export default function CandidateDetailModal({ open, onClose, candidate, position, positionTitle, mustReview = false, scoreDoc = null, onSchedule }) {
   const { user } = useAuth();
   const toast = useToast();
   const [draft, setDraft] = useState("");
@@ -142,12 +143,20 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   };
 
   const moveNext = async () => {
+    // Captured BEFORE the move — c.stage is still the OLD stage, so this is
+    // "the stage they're about to land in." Same WS8 trigger PositionDetail's
+    // own board button uses (attemptMove) — this pop-out is a second entry
+    // point into the same move, so it needs the same trigger, not a copy that
+    // quietly skips it.
+    const landingStage = nextId;
     setMoving(true);
     const res = await advanceStage(c.id, actor);
     setMoving(false);
     if (res && res.ok === false) return; // e.g. review-required — button stays put
     if (res?.hired) {
       toast.success(res.employeeId ? `${displayName(c)} hired — employee ID ${res.employeeId} issued.` : `${displayName(c)} hired.`);
+    } else if (res?.ok && onSchedule && position && isSchedulableStage(position, landingStage)) {
+      onSchedule({ candidate: c, stageId: landingStage });
     }
     onClose(); // done — back to whatever list this was opened from (board or AI results)
   };
@@ -506,6 +515,8 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           </div>
         )}
         <Row label="Cover note" value={c.coverNote} />
+
+        <InterviewStatusPanel candidate={c} position={position} />
 
         {/* audit history */}
         {history.length > 0 && (

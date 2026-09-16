@@ -31,8 +31,14 @@ export default function CandidatesTableHead({ sort, toggleSort, setSort, positio
         <col className="w-[100px]" />
         <col className="w-[260px]" />
         <col className="w-[140px]" />
-        <col className="w-[110px]" />
-        <col className="w-[90px]" />
+        {/* Qualification/Experience: measured against the longest value each
+            column actually needs to hold live -- "Bachelor's Degree" (155px)
+            and "Less than 1 year" (139px), text-sm in a px-4 cell -- plus a
+            few px of buffer. Rarer, longer values ("Professional
+            Certification") still truncate; HoverScrollText's ellipsis (see
+            HoverScrollText.jsx) is what keeps that from reading as broken. */}
+        <col className="w-[160px]" />
+        <col className="w-[145px]" />
         <col className="w-[100px]" />
         <col className="w-[80px]" />
       </colgroup>

@@ -53,9 +53,32 @@ export function HoverScrollText({ text, className, as: As = "div" }) {
       onBlur={handleLeave}
       tabIndex={overflowing ? 0 : undefined}
       title={reduced && overflowing ? text : undefined}
-      className={cn("overflow-hidden whitespace-nowrap outline-none", className)}
+      className={cn(
+        "relative overflow-hidden whitespace-nowrap outline-none",
+        // Named group (not the bare "group" convention) so this never collides
+        // with an ancestor row/card that also uses group-hover for its own
+        // reason -- only fades for the reveal THIS instance triggers.
+        overflowing && !reduced && "group/hst",
+        className
+      )}
     >
       <span ref={innerRef} className="inline-block will-change-transform">{text}</span>
+      {/* A hard clip with no ellipsis reads as broken, not truncated. Purely
+          a visible affordance -- doesn't touch the scroll-reveal mechanism
+          above. Fades out during the hover/focus reveal (the slide already
+          shows the full text then); stays put under prefers-reduced-motion,
+          where hover never reveals anything to make way for it. */}
+      {overflowing && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute inset-y-0 right-0 flex items-center",
+            !reduced && "transition-opacity duration-150 group-hover/hst:opacity-0 group-focus-within/hst:opacity-0"
+          )}
+        >
+          …
+        </span>
+      )}
     </As>
   );
 }

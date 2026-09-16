@@ -224,7 +224,11 @@ export default function CandidatesTable() {
       {/* table */}
       <Card className="mt-5 overflow-hidden p-0">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1150px] table-fixed text-sm">
+          {/* min-w grew with the Qualification/Experience columns (+50/+55px,
+              see CandidatesTableHead.jsx) -- accepted per-audit: the table's
+              own scroll region starts a bit sooner at 100% zoom, the page
+              body still never scrolls. */}
+          <table className="w-full min-w-[1255px] table-fixed text-sm">
             <CandidatesTableHead
               sort={sort}
               toggleSort={toggleSort}

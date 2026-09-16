@@ -108,8 +108,13 @@ export default function CandidatesTableRow({ c, checked, toggleGroup, titleFor, 
               onClick={(e) => { e.stopPropagation(); onOpenCandidate(a); }}
               className="rounded-md border border-border/60 bg-background px-2.5 py-1.5 transition-colors hover:border-primary/40"
             >
-              <div className="flex items-center gap-2">
-                <HoverScrollText text={titleFor(a.positionId)} className="min-w-0 max-w-[45%] shrink font-medium text-foreground" />
+              <div className="flex flex-wrap items-center gap-2">
+                {/* min-w floor measured against "Senior Software Engineer" (195px,
+                    text-sm font-medium) — longer than any live position title — so
+                    the badges beside it can't squeeze it to an unreadable sliver.
+                    Once the title hits the floor, flex-wrap drops the badges to
+                    their own line instead of continuing to starve it. */}
+                <HoverScrollText text={titleFor(a.positionId)} className="min-w-[195px] max-w-[45%] shrink font-medium text-foreground" />
                 <StageBadge stageId={a.stage} />
                 <EligibilityStatusTag score={scores.get(a.id)} position={positionFor(a.positionId)} candidate={a} />
                 {/* emailVerified is explicit false only once actually checked at apply

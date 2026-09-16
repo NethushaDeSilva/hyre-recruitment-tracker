@@ -294,7 +294,11 @@ export default function PositionDetail() {
               className="w-full bg-transparent text-foreground placeholder:text-[#94A3B8] focus:outline-none"
             />
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
+          {/* min-w-0 (not shrink-0) is the actual fix: shrink-0 was blocking this
+              box from ever being squeezed into a narrower line, so its own
+              flex-wrap never had a reason to engage — the box just ran off the
+              viewport at full width instead of reflowing its children. */}
+          <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
             <SlidersHorizontal size={13} className="text-muted-foreground" />
             <label className="font-semibold text-foreground">Shortlist</label>
             <input

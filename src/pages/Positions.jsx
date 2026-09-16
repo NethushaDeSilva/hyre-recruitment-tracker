@@ -146,7 +146,7 @@ export default function Positions() {
                   <StatusPill status={eff} />
                 </div>
 
-                <div className="flex items-center gap-5">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
                   <div className="flex items-baseline gap-1.5">
                     <span className="text-lg font-extrabold text-foreground">{cands.length}</span>
                     <span className="text-[13px] text-muted-foreground">candidates</span>

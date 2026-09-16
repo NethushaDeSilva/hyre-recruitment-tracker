@@ -156,7 +156,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
     <Modal open={open} onClose={onClose} width={640} title="Candidate details" subtitle={positionTitle ? `Applied for ${positionTitle}` : ""}>
       <div className="space-y-6">
         {/* header */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Avatar name={displayName(c)} color={c.avatarColor} size={52} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -222,7 +222,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
 
         {/* CV file */}
         {c.cvDataUrl ? (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background px-4 py-3">
             <div className="flex min-w-0 items-center gap-2.5">
               <FileText size={20} className="shrink-0 text-primary" />
               <div className="min-w-0">

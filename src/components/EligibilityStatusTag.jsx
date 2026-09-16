@@ -21,8 +21,8 @@ export default function EligibilityStatusTag({ score, position, candidate, class
   const reason = eligibility.reasons?.[0]?.message || "";
 
   return (
-    <Tooltip label={reason ? `${LABELS[eligibility.status]} — ${reason}` : LABELS[eligibility.status]}>
-      <span className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold ${cls} ${className}`}>
+    <Tooltip label={reason ? `${LABELS[eligibility.status]} — ${reason}` : LABELS[eligibility.status]} className="shrink-0">
+      <span className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-bold ${cls} ${className}`}>
         <Icon size={12} strokeWidth={2.5} /> {short}
       </span>
     </Tooltip>

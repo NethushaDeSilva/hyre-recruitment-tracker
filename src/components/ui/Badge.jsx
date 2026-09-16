@@ -7,7 +7,7 @@ export function StageBadge({ stageId }) {
   if (!s) return null;
   return (
     <span
-      className="stage-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+      className="stage-pill inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold"
       style={{ background: s.badgeBg, color: s.badgeFg, "--pill": s.dot }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.dot }} />
@@ -28,7 +28,7 @@ export function StatusPill({ status }) {
   const label = status === "Pending" ? "Pending approval" : status;
   return (
     <span
-      className="stage-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
+      className="stage-pill inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold"
       style={{ background: s.bg, color: s.fg, "--pill": s.dot }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.dot }} />

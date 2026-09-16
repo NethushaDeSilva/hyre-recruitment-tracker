@@ -17,6 +17,16 @@ failed; existing matching tests and Node/React regressions passed.
 
 ## Approved sequence
 
+Step 3 rejects oversized requests (413 with every ID outstanding), validates
+unique IDs, and returns exact reconciliation. Normal rescore is Applied-only.
+The client uses RESCORE_BATCH_SIZE=10, one in-flight request, acknowledged writes
+before the next batch, and bounded retries retaining the original requirements
+and profiles. A transaction refuses to overwrite a later-stage assessment or
+save an obsolete requirements snapshot as fresh. In-memory retry state survives
+another Retry click, not a browser reload; after reload a new run is explicit.
+Three new endpoint regressions failed before the fix; batching tests verify
+save acknowledgment, retry snapshots, duplicate responses, and partial failure.
+
 Step 2 implements sequential 100-text embedding chunks, exact count validation,
 and positional vector truncation metadata carried through cached verification
 into the assessment's inputTruncated flag. The HTTP embedding route serializes

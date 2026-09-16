@@ -19,6 +19,7 @@ import { db, firebaseReady } from "@/firebase/config";
 import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta } from "@/lib/stages";
 import { departmentCode } from "@/lib/departments";
 import { isOpenNow } from "@/lib/positions";
+import { createRescoreRun, executeRescoreRun, snapshotKey } from "@/lib/rescoreBatch";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
 function pickColor(name) {
@@ -757,14 +758,27 @@ export async function updatePosition(id, {
  * /api/rescore-vacancy Function, sharing one embedding cache across every
  * candidate (5.5).
  */
+const rescoreRuns = new Map();
+const rescoreBusy = new Set();
 export async function rescoreVacancy(positionId) {
+  if (rescoreBusy.has(positionId)) return { ok: false, error: "A rescore is already running for this position." };
+  rescoreBusy.add(positionId);
+  try {
+    return await rescoreApplied(positionId);
+  } catch (e) {
+    return { ok: false, error: e.message || "Rescoring failed. Retry to resume." };
+  } finally {
+    rescoreBusy.delete(positionId);
+  }
+}
+async function rescoreApplied(positionId) {
   if (!firebaseReady) return { ok: false, error: "Not available in demo mode." };
   const position = positions.find((p) => p.id === positionId);
   if (!position) return { ok: false, error: "Position not found." };
   if (!position.requirements) return { ok: false, error: "This vacancy has no structured requirements set." };
 
   const appsSnap = await getDocs(query(collection(db, "applications"), where("positionId", "==", positionId)));
-  const apps = appsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const apps = appsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(a => a.stage === "applied");
   if (!apps.length) return { ok: true, scored: 0, failed: 0 };
 
   // Each application's scorable profile lives on its IDENTITY doc, not the
@@ -784,30 +798,42 @@ export async function rescoreVacancy(positionId) {
     };
   });
 
-  const res = await fetch("/api/rescore-vacancy", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ candidates: candidatesPayload, requirements: position.requirements }),
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok || !data?.ok) {
-    return { ok: false, error: data?.error || `HTTP ${res.status}` };
+  let run = rescoreRuns.get(positionId);
+  if (run && snapshotKey(run.requirements) !== snapshotKey(position.requirements)) {
+    rescoreRuns.delete(positionId);
+    return { ok: false, error: "Requirements changed. Previous retry snapshot discarded; start a new rescore." };
   }
-
-  let scored = 0;
-  let failed = 0;
-  await Promise.all(
-    data.results.map((r) => {
-      const ref = doc(db, "applicationScores", r.candidateId);
-      if (r.status === "scored") {
-        scored++;
-        return setDoc(ref, { positionId, status: "scored", stale: false, ...r.result });
+  if (!run) {
+    run = createRescoreRun(candidatesPayload, position.requirements);
+    rescoreRuns.set(positionId, run);
+  }
+  const summary = await executeRescoreRun(run, {
+    send: async body => {
+      const res = await fetch("/api/rescore-vacancy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        const error = new Error(data?.error || `HTTP ${res.status}`);
+        error.fatal = [400, 401, 403, 413].includes(res.status);
+        throw error;
       }
-      failed++;
-      return setDoc(ref, { positionId, status: "failed", stale: false, error: r.error, scoredAt: new Date().toISOString() });
-    })
-  );
-  return { ok: true, scored, failed };
+      return data;
+    },
+    persist: async (applicationId, result, requirements) => {
+      await runTransaction(db, async tx => {
+        const pos = await tx.get(doc(db, "positions", positionId));
+        const app = await tx.get(doc(db, "applications", applicationId));
+        if (!pos.exists() || snapshotKey(pos.data().requirements) !== snapshotKey(requirements) || !app.exists() || app.data().stage !== "applied" || app.data().positionId !== positionId) {
+          const error = new Error("Application stage or requirements changed. Start a new rescore; historical assessments were not overwritten.");
+          error.fatal = true;
+          rescoreRuns.delete(positionId);
+          throw error;
+        }
+        tx.set(doc(db, "applicationScores", applicationId), { ...result, positionId, status: "scored", stale: false, requirementsSnapshot: requirements });
+      });
+    },
+  });
+  if (summary.ok) rescoreRuns.delete(positionId);
+  return summary;
 }
 
 // Fields that belong to the PERSON (shared across every application they ever

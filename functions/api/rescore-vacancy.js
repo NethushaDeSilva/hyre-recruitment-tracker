@@ -15,7 +15,7 @@
 //   -> { ok: true, results: [{candidateId, status:"scored"|"failed", result?, error?}] }
 //   -> { ok: false, reason: "no-requirements" | "failed", error?: string }
 
-import { scoreVacancyApplications, ScoringError } from "../_lib/filtration-ai.js";
+import { scoreVacancyApplications } from "../_lib/filtration-ai.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://hyre-hiring.pages.dev",
@@ -26,7 +26,14 @@ const ALLOWED_ORIGINS = new Set([
 // 100+ CVs per vacancy is the MVP's stated realistic volume (CLAUDE.md
 // section 3) — this cap gives headroom above that while bounding one
 // Function invocation's CPU time (5.5).
-const MAX_CANDIDATES = 300;
+export const MAX_CANDIDATES = 300;
+
+function reconcile(batchId, results) {
+  return { batchId, requested: results.length,
+    completed: results.filter(r => r.status === "completed").length,
+    failed: results.filter(r => r.status === "failed").length,
+    outstanding: results.filter(r => r.status === "outstanding").length, results };
+}
 
 function corsHeaders(origin) {
   return {
@@ -55,22 +62,29 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, reason: "failed", error: "Invalid JSON body" }, 400, cors);
   }
 
-  const candidates = Array.isArray(body.candidates) ? body.candidates.slice(0, MAX_CANDIDATES) : [];
+  const candidates = Array.isArray(body?.candidates) ? body.candidates : [];
+  const batchId = body?.batchId;
+  if (typeof batchId !== "string" || !batchId.trim() || candidates.some(c => !c || typeof c.candidateId !== "string" || !c.candidateId.trim()) ||
+      new Set(candidates.map(c => c.candidateId)).size !== candidates.length) {
+    return json({ ok: false, error: "A batchId and unique application IDs are required." }, 400, cors);
+  }
+  const unprocessed = reason => reconcile(batchId, candidates.map(c => ({ applicationId: c.candidateId, status: "outstanding", reason })));
+  if (candidates.length > MAX_CANDIDATES) return json({ ok: false, ...unprocessed("batch-too-large"), error: `Maximum ${MAX_CANDIDATES} applications per request.` }, 413, cors);
   const requirements = body.requirements && typeof body.requirements === "object" ? body.requirements : null;
   if (!candidates.length) return json({ ok: false, reason: "failed", error: "No candidates to score." }, 400, cors);
   if (!requirements || !Array.isArray(requirements.requiredSkills) || !requirements.requiredSkills.length) {
-    return json({ ok: false, reason: "no-requirements", error: "Vacancy has no structured requirements to score against." }, 200, cors);
+    return json({ ok: false, ...unprocessed("no-requirements"), error: "Vacancy has no structured requirements to score against." }, 400, cors);
   }
 
   try {
-    const results = await scoreVacancyApplications({ candidates, requirements, env });
-    return json({ ok: true, results }, 200, cors);
+    const scored = await scoreVacancyApplications({ candidates, requirements, env });
+    const results = scored.map(r => r.status === "scored"
+      ? { applicationId: r.candidateId, status: "completed", result: r.result }
+      : { applicationId: r.candidateId, status: "failed", error: { code: "SCORING_FAILED", message: r.error, retryable: true } });
+    return json({ ok: true, ...reconcile(batchId, results) }, 200, cors);
   } catch (e) {
-    if (e instanceof ScoringError) {
-      return json({ ok: false, reason: "no-requirements", error: e.message }, 200, cors);
-    }
     console.error("rescore-vacancy:", e);
-    return json({ ok: false, reason: "failed", error: e.message || "Batch scoring failed." }, 200, cors);
+    return json({ ok: false, ...unprocessed("batch-failed"), error: e.message || "Batch scoring failed." }, 503, cors);
   }
 }
 

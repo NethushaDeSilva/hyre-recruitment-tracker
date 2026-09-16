@@ -12,7 +12,7 @@
 // step 0. A candidate in a custom stage is actioned by Management (deployed rules
 // treat unknown stages as management-only) — per-role custom stages are Sprint 2.
 import { useState, useEffect, useMemo } from "react";
-import { Lock, Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, ArrowLeft, Search, Loader2, Users, CheckCheck } from "lucide-react";
+import { Lock, Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, ArrowLeft, Search, Loader2, Users, CheckCheck, HelpCircle } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
 import { Modal } from "@/components/ui/Modal";
@@ -22,7 +22,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { STAGES, CONFIGURABLE_STAGES } from "@/lib/stages";
 import { ROLES, ROLE_LABELS, can } from "@/lib/permissions";
 import { ROLE_USERS, cleanTitle } from "@/context/auth-config";
-import { savePipeline, useHyreData } from "@/data/store";
+import { savePipeline, useHyreData, getAvailabilityStates } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 
 const ADDABLE_BUILTIN = [...CONFIGURABLE_STAGES, "hold"];
@@ -151,8 +151,26 @@ export default function StageConfigModal({ open, position, onClose }) {
     return () => { alive = false; };
   }, [open, canAssign]);
 
-  // Workload across ALL positions (fewest-first ordering + assignment-count status).
-  const workload = useMemo(() => {
+  // Assignment counts across ALL positions — kept as two SEPARATE numbers so
+  // "already true" and "you just clicked this, unsaved" can never blend into
+  // one silently-changing badge. savedWorkload reads stageAssignees ONLY,
+  // for every position including the one open here — never the in-progress
+  // `assign` local state. pendingWorkload additionally substitutes `assign`
+  // for the position being edited (today's in-session picture, used for the
+  // least-busy-first sort — a person you just loaded up in this session
+  // SHOULD sort as busier, that ordering isn't the bug). The badge itself
+  // must render savedWorkload plus the delta, never pendingWorkload alone.
+  const savedWorkload = useMemo(() => {
+    const m = {};
+    for (const p of positions) {
+      for (const v of Object.values(p.stageAssignees || {})) {
+        const arr = Array.isArray(v) ? v : v ? [v] : [];
+        for (const a of arr) if (a?.uid) m[a.uid] = (m[a.uid] || 0) + 1;
+      }
+    }
+    return m;
+  }, [positions]);
+  const pendingWorkload = useMemo(() => {
     const m = {};
     for (const p of positions) {
       const src = p.id === position?.id ? assign : p.stageAssignees || {};
@@ -163,6 +181,19 @@ export default function StageConfigModal({ open, position, onClose }) {
     }
     return m;
   }, [positions, assign, position?.id]);
+
+  // WS8 §8.2 — declared/undeclared per person, same unknown-means-unknown
+  // treatment as the interview calendar. Fetched once the staff roster is
+  // known; re-fetched if the roster changes (e.g. after a slow load resolves).
+  const [availabilityStates, setAvailabilityStates] = useState({});
+  useEffect(() => {
+    if (!open || staff.length === 0) return;
+    let alive = true;
+    getAvailabilityStates(staff.map((s) => s.uid))
+      .then((res) => { if (alive) setAvailabilityStates(res); })
+      .catch((e) => console.error("getAvailabilityStates:", e));
+    return () => { alive = false; };
+  }, [open, staff]);
 
   // --- structure editing (step 0) ---
   const move = (i, dir) => setRows((prev) => {
@@ -286,7 +317,9 @@ export default function StageConfigModal({ open, position, onClose }) {
           selected={assign[current.id] || []}
           lockedElsewhere={assignedElsewhere}
           q={q} setQ={setQ}
-          workload={workload} loading={staffLoading} error={staffError}
+          savedWorkload={savedWorkload} pendingWorkload={pendingWorkload}
+          availabilityStates={availabilityStates}
+          loading={staffLoading} error={staffError}
           onToggle={(p) => toggle(current.id, p)}
           onSetMany={(people) => setMany(current.id, people)}
           stepInfo={`Step ${step} of ${lastStep}`}
@@ -366,7 +399,7 @@ function PipelineStep({ rows, assign, move, rename, remove, adding, setAdding, n
 }
 
 // ---------------------------------------------------------------- steps 1..N
-function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, workload, loading, error, onToggle, onSetMany, stepInfo }) {
+function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, savedWorkload, pendingWorkload, availabilityStates, loading, error, onToggle, onSetMany, stepInfo }) {
   const roleLabel = ROLE_LABELS[stage.owner] || stage.owner;
   const selIds = new Set(selected.map((s) => s.uid));
   const needle = q.trim().toLowerCase();
@@ -383,10 +416,11 @@ function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, wor
   const isLocked = (s) => !!lockedElsewhere[s.uid] && !selIds.has(s.uid);
   const shown = (needle ? roster.filter((s) => s.name.toLowerCase().includes(needle) || (s.title || "").toLowerCase().includes(needle)) : roster.slice())
     .sort((a, b) => {
-      // selectable first, then least-busy, then alphabetical
+      // selectable first, then least-busy (this session's effective load —
+      // saved + whatever you've picked so far), then alphabetical
       const lockDiff = (isLocked(a) ? 1 : 0) - (isLocked(b) ? 1 : 0);
       if (lockDiff) return lockDiff;
-      const la = workload[a.uid] || 0, lb = workload[b.uid] || 0;
+      const la = pendingWorkload[a.uid] || 0, lb = pendingWorkload[b.uid] || 0;
       if (la !== lb) return la - lb;
       return a.name.localeCompare(b.name);
     });
@@ -433,7 +467,9 @@ function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, wor
       <ul className="max-h-[52vh] min-h-[220px] divide-y divide-border overflow-y-auto rounded-xl border border-border">
         {shown.map((s) => {
           const on = selIds.has(s.uid);
-          const busy = workload[s.uid] || 0;
+          const saved = savedWorkload[s.uid] || 0;
+          const pendingDelta = (pendingWorkload[s.uid] || 0) - saved;
+          const avState = availabilityStates[s.uid]; // undefined while loading
           const lockedStage = isLocked(s) ? lockedElsewhere[s.uid] : null;
           return (
             <li key={s.uid}>
@@ -442,7 +478,7 @@ function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, wor
                 onClick={() => !lockedStage && onToggle(s)}
                 disabled={!!lockedStage}
                 title={lockedStage ? `Already assigned to “${lockedStage}” — one person runs one stage per vacancy` : undefined}
-                className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${lockedStage ? "cursor-not-allowed opacity-55" : on ? "bg-primary/5" : "hover:bg-secondary/60"}`}
+                className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-left transition-colors ${lockedStage ? "cursor-not-allowed opacity-55" : on ? "bg-primary/5" : "hover:bg-secondary/60"}`}
               >
                 <input type="checkbox" readOnly checked={on} disabled={!!lockedStage} className="h-4 w-4 shrink-0 accent-primary" />
                 <Avatar name={s.name} color={colorFor(s.name)} size={34} />
@@ -450,19 +486,31 @@ function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, wor
                   <span className="block truncate text-sm font-semibold text-foreground">{s.name}</span>
                   <span className="block truncate text-[12px] text-muted-foreground">{s.title || roleLabel}</span>
                 </span>
-                <span className="flex shrink-0 items-center gap-1.5 text-[11px]">
-                  {lockedStage ? (
-                    <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold text-muted-foreground">On “{lockedStage}”</span>
-                  ) : (
-                    <>
-                      {/* This measures stage-assignment COUNT, not real availability — no
-                          dates/times/commitments are known here. Real availability is a
-                          separate, later feature; do not repurpose this into one. */}
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: busy ? "#D97706" : "#16A34A" }} />
-                      <span className={busy ? "text-[#B45309]" : "text-[#16A34A]"}>{busy ? `${busy} assignment${busy === 1 ? "" : "s"}` : "No assignments"}</span>
-                    </>
-                  )}
-                </span>
+                {lockedStage ? (
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                    On “{lockedStage}”
+                  </span>
+                ) : (
+                  <span className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                    <AvailabilityBadge state={avState} />
+                    {/* This measures stage-TEAM-membership count across positions — a
+                        pipeline-configuration figure, not real-time booking load. WS8
+                        Part C's "fewest current assignments" ranking is a different,
+                        separate number computed from the interviews collection — do
+                        not repurpose this one into that. */}
+                    <span className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: saved ? "#D97706" : "#16A34A" }} />
+                      <span className={saved ? "text-[#B45309]" : "text-[#16A34A]"}>
+                        {saved ? `${saved} assignment${saved === 1 ? "" : "s"}` : "No assignments"}
+                      </span>
+                      {pendingDelta !== 0 && (
+                        <span className="font-semibold text-primary">
+                          · {pendingDelta > 0 ? "+" : ""}{pendingDelta} pending
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                )}
               </button>
             </li>
           );
@@ -488,6 +536,33 @@ function StepChip({ active, done, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+// WS8 §8.2 — same unknown-means-unknown vocabulary as the interview calendar
+// legend (InterviewCalendarLegend.jsx): a "?" icon, never a colour, for a
+// person who hasn't declared anything or whose declaration lapsed. Undeclared
+// must never look like "free" or blend in with a real declared state.
+function AvailabilityBadge({ state }) {
+  if (!state) return <span className="w-[64px] shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">…</span>;
+  if (state === "unknown") {
+    return (
+      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-muted-foreground">
+        <HelpCircle size={12} strokeWidth={2.5} /> Undeclared
+      </span>
+    );
+  }
+  if (state === "unavailable") {
+    return (
+      <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-[#DC2626]">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#DC2626]" /> Unavailable
+      </span>
+    );
+  }
+  return (
+    <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-[#16A34A]">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#16A34A]" /> Declared
+    </span>
   );
 }
 

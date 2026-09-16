@@ -22,7 +22,7 @@ import { departmentCode } from "@/lib/departments";
 import { isOpenNow } from "@/lib/positions";
 import { createRescoreRun, executeRescoreRun, snapshotKey } from "@/lib/rescoreBatch";
 import { scoringHeaders } from "@/lib/scoringAuth";
-import { createDeclaredAvailabilityProvider, AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
+import { createDeclaredAvailabilityProvider, availabilityState, AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
 import { browserTimeZone } from "@/lib/wallClock";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
@@ -1172,6 +1172,20 @@ const availabilityProvider = createDeclaredAvailabilityProvider({
 });
 /** Calendar-ready availability for a set of staff over a date range — see DeclaredAvailabilityProvider. */
 export const getStaffAvailability = (staffIds, range) => availabilityProvider.getAvailability(staffIds, range);
+
+/**
+ * Just the declared/unknown/unavailable STATE for a set of staff — no
+ * materialized slots, no commitments. Used anywhere that needs to show
+ * "has this person told us anything about their schedule" (StageConfigModal's
+ * assignment picker) without paying for a full calendar-range fetch.
+ */
+export async function getAvailabilityStates(uids) {
+  if (!firebaseReady || !uids.length) return {};
+  const snaps = await Promise.all(uids.map((id) => getDoc(doc(db, "availability", id))));
+  const out = {};
+  uids.forEach((id, i) => { out[id] = availabilityState(snaps[i].exists() ? mapAvailabilityDoc(snaps[i].data()) : null); });
+  return out;
+}
 
 // Which collection holds this application id? A HIRED person's row lives in
 // /employees, everyone else in /applications — so updates (comments, edits)

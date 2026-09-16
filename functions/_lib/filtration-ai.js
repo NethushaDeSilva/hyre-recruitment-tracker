@@ -12,6 +12,7 @@
 import { runEmbeddings, EMBEDDING_MODEL } from "./embeddings.js";
 import { scoreApplication, scoreApplications, ENGINE_VERSION, ScoringError } from "./filtration/engine.js";
 import { getThresholds } from "./filtration/thresholds.js";
+import { ELIGIBILITY_VERSION, CORRECTNESS_VERSION } from "./filtration/eligibility.js";
 
 export { ScoringError };
 
@@ -23,6 +24,8 @@ function buildMeta(candidate, now) {
     skillThreshold: SKILL_SIMILARITY_THRESHOLD,
     qualThreshold: QUAL_SIMILARITY_THRESHOLD,
     engineVersion: ENGINE_VERSION,
+    eligibilityVersion: ELIGIBILITY_VERSION,
+    correctnessVersion: CORRECTNESS_VERSION,
     scoredAt: now().toISOString(),
   };
 }

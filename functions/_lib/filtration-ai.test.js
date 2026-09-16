@@ -67,6 +67,8 @@ describe("scoreOneApplication — meta is assembled after the engine returns", (
       skillThreshold: getThresholds().SKILL_SIMILARITY_THRESHOLD,
       qualThreshold: getThresholds().QUAL_SIMILARITY_THRESHOLD,
       engineVersion: ENGINE_VERSION,
+      eligibilityVersion: 1,
+      correctnessVersion: 1,
       scoredAt: "2026-09-10T12:00:00.000Z",
     });
   });

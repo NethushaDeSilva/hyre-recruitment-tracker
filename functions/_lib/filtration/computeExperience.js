@@ -17,7 +17,7 @@ const MONTH_NAMES = {
 const ONGOING_WORDS = new Set(["present", "current", "currently", "now", "ongoing", "date", "todate", "to date"]);
 
 /** "2019-03" | "03/2019" | "March 2019" | "Mar 2019" | "2019" -> {year, month} (month 0-11), or null. */
-function parseMonthYear(raw) {
+export function parseMonthYear(raw) {
   const s = String(raw || "").trim().toLowerCase().replace(/[.,]/g, "");
   if (!s) return null;
 

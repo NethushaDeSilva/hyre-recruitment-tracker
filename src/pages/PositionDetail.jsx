@@ -1,3 +1,5 @@
+import { canBulkSelect } from "@/lib/scoreStaleness";
+import AssessmentStatus from "@/components/AssessmentStatus";
 // Position detail — the pipeline board. Columns = the position's configured
 // stages. Recruitment is a multi-stage filter: each stage is owned by a role
 // (HR screening → Department review → interviews → Final interview), and only the
@@ -126,7 +128,7 @@ export default function PositionDetail() {
 
   // --- Applied-stage bulk move (HR only) ---
   // Works on the applicants currently shown in Applied (so it respects the filter).
-  const appliedShown = filtered.filter((c) => c.stage === "applied");
+  const appliedShown = filtered.filter((c) => c.stage === "applied" && canBulkSelect(scores.get(c.id), position, c));
   const appliedPicked = appliedShown.filter((c) => picked.has(c.id));
   const allAppliedPicked = appliedShown.length > 0 && appliedPicked.length === appliedShown.length;
   const appliedNext = nextStage(position.stages, "applied");
@@ -148,7 +150,7 @@ export default function PositionDetail() {
   const movePickedToNext = async () => {
     const ids = appliedPicked.map((c) => c.id);
     setPicked(new Set());
-    await Promise.all(ids.map((id) => advanceStage(id, actor))); // no note — it's just an application
+    await Promise.all(ids.map((id) => advanceStage(id, actor, { screeningBulk: true }))); // no note — it's just an application
   };
 
   return (
@@ -314,6 +316,7 @@ export default function PositionDetail() {
                           <input
                             type="checkbox"
                             checked={picked.has(c.id)}
+                            disabled={!canBulkSelect(scores.get(c.id), position, c)}
                             onChange={() => togglePick(c.id)}
                             aria-label={`Select ${displayName(c)}`}
                             className="mt-2.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"
@@ -334,6 +337,7 @@ export default function PositionDetail() {
                           </div>
                         </button>
                       </div>
+                      <AssessmentStatus score={scores.get(c.id)} position={position} candidate={c} />
                       {position.minQualification && c.highestQualification && (
                         <EligibilityTag candidateQual={c.highestQualification} minQual={position.minQualification} />
                       )}
@@ -400,6 +404,7 @@ export default function PositionDetail() {
         position={position}
         positionTitle={position.title}
         mustReview={mustReview}
+        scoreDoc={detail ? scores.get(detail.id) : null}
         onClose={() => { setDetail(null); setMustReview(false); setReviewFor(null); }}
       />
       <RejectModal

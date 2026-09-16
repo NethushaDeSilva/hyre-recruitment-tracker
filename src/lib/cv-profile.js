@@ -5,6 +5,8 @@
 // AI ranking keep working unmodified; the full structured data is stored too.
 const EXPERIENCE_RANGES = ["No experience", "Less than 1 year", "1–3 years", "3–5 years", "5–10 years", "10+ years"];
 
+import { extractionQuality } from "../../functions/_lib/filtration/extractionQuality.js";
+
 function bucketExperience(years) {
   const y = Number(years) || 0;
   if (y <= 0) return EXPERIENCE_RANGES[0];
@@ -52,6 +54,7 @@ export function profileToCandidateFields(profile) {
   const currentJob = experience.find((e) => !e.endDate) || experience[0] || null;
   const firstEd = profile.education?.[0];
   return {
+    extractionQuality: extractionQuality(profile, profile.extractionInputTruncated),
     name: profile.fullName || "",
     location: profile.location || "",
     highestQualification: matchQualification(profile.education),

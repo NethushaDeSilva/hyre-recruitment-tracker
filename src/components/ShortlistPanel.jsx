@@ -154,7 +154,7 @@ export default function ShortlistPanel({ position, applications, scores, onOpenC
                   {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
               </div>
-              {isOpen && <div className="mt-3"><ScoreBreakdown score={e.result} /></div>}
+              {isOpen && <div className="mt-3"><ScoreBreakdown score={e.result} position={position} candidate={e.c} /></div>}
             </div>
           );
         })}

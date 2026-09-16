@@ -8,6 +8,50 @@
 // hand-typed copy that could silently fall out of sync.
 import { ENGINE_VERSION } from "../../functions/_lib/filtration/engine.js";
 import { getThresholds } from "../../functions/_lib/filtration/thresholds.js";
+import { assessEligibility, CORRECTNESS_VERSION } from "../../functions/_lib/filtration/eligibility.js";
+import { normalizeTerm } from "../../functions/_lib/filtration/matching.js";
+import { snapshotKey } from "./rescoreBatch.js";
+
+export function correctionReviewReason(score, candidate, position) {
+  if (!score || score.meta?.correctnessVersion === CORRECTNESS_VERSION) return "";
+  const blocks = [score.breakdown?.coreSkills, score.breakdown?.preferredSkills];
+  if (blocks.some(b => b?.matched?.some(r => /angular/i.test(r.required) && normalizeTerm(r.required) !== normalizeTerm(r.found)))) {
+    return "Legacy Angular/AngularJS credit needs targeted reassessment.";
+  }
+  if ([...(position?.requirements?.requiredSkills || []), ...(position?.requirements?.niceToHave || [])].some(s => /^angular[.\s]*js/i.test(s))) {
+    return "Legacy AngularJS normalization needs targeted reassessment.";
+  }
+  if (score.instrumentation?.verification?.embedding > 0) {
+    const text = candidate?.cvExtractedText;
+    if (!text) return "Legacy embedding completeness cannot be established; review this assessment.";
+    const sentences = String(text).match(/[^.!?\n]+[.!?\n]*/g) || [];
+    if (sentences.length > 99 || sentences.some(s => s.trim().length > 2000)) return "Legacy embedding inputs may have been truncated; targeted reassessment needed.";
+  }
+  return "";
+}
+
+export function assessmentEligibility(score, position, candidate) {
+  const review = message => ({ status: "needs_review", reasons: [{ code: "ASSESSMENT_REVIEW", status: "needs_review", message }] });
+  if (!score || score.status !== "scored") return review("Eligibility has not been assessed.");
+  if (isScoreStale(score)) return review(staleReason(score));
+  const correction = correctionReviewReason(score, candidate, position);
+  if (correction) return review(correction);
+  if (score.eligibility) return score.eligibility;
+  // Never fabricate correspondence between old evidence and new requirements.
+  // When a snapshot exists, derive eligibility locally without an AI rescore.
+  if (candidate && position?.requirements && score.requirementsSnapshot && snapshotKey(score.requirementsSnapshot) === snapshotKey(position.requirements)) {
+    return assessEligibility(candidate, position.requirements, score);
+  }
+  return review("Legacy score retained; mandatory eligibility needs review (no matching requirements snapshot).");
+}
+
+export function canBulkSelect(score, position, candidate) {
+  return score?.status === "scored" && !isScoreStale(score) &&
+    score.overallScore >= (position?.shortlistThreshold ?? 0) &&
+    assessmentEligibility(score, position, candidate).status === "meets";
+}
+
+
 
 /**
  * @param {object|null} score - an applicationScores document (or null/undefined

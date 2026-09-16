@@ -17,6 +17,23 @@ failed; existing matching tests and Node/React regressions passed.
 
 ## Approved sequence
 
+Step 4 adds eligibility independently of score arithmetic. Any known input or
+output truncation forces needs_review. Missing/uncertain experience, unverified
+skills and uncertain qualifications cannot establish eligibility; definite
+experience deficits do not get compensated by a high numerical score. Required
+degree level and field must belong to the same qualification. Eligibility and
+correctness metadata have separate versions; ENGINE_VERSION stays 1.0.0.
+
+Old scores remain visible. Missing eligibility is not numerical staleness.
+Legacy results with a matching requirements snapshot can be assessed locally;
+without sufficient provenance they require review, not a compulsory full rescore.
+Old AngularJS and potentially truncated embedding assessments are flagged for
+targeted reassessment. Bulk progression requires threshold plus meets status;
+individual human overrides remain distinct from an eligibility decision.
+
+The sole existing test failure in step 4 was the exact metadata-object assertion,
+which required the two new metadata fields. Numerical assertions were unchanged.
+
 Step 3 rejects oversized requests (413 with every ID outstanding), validates
 unique IDs, and returns exact reconciliation. Normal rescore is Applied-only.
 The client uses RESCORE_BATCH_SIZE=10, one in-flight request, acknowledged writes

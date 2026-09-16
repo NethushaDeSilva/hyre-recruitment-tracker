@@ -1,3 +1,4 @@
+import ScoreBreakdown from "@/components/ScoreBreakdown";
 // Full CV / application detail for a candidate — opened from the candidates
 // table and the board. Shows every structured field, the attached CV, the
 // rejection record (if any) and the full audit history of pipeline decisions.
@@ -57,7 +58,7 @@ function describe(e) {
   }
 }
 
-export default function CandidateDetailModal({ open, onClose, candidate, position, positionTitle, mustReview = false }) {
+export default function CandidateDetailModal({ open, onClose, candidate, position, positionTitle, mustReview = false, scoreDoc = null }) {
   const { user } = useAuth();
   const toast = useToast();
   const [draft, setDraft] = useState("");
@@ -431,6 +432,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           </div>
         )}
 
+        {scoreDoc?.status === "scored" && <ScoreBreakdown score={scoreDoc} position={position} candidate={c} />}
         {/* structured fields */}
         <div className="grid grid-cols-2 gap-4">
           <Row label="Position" value={positionTitle} />

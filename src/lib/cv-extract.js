@@ -256,7 +256,7 @@ export async function parseCvContent(text) {
     }
     const data = await res.json();
     if (!data?.ok || !data.profile) return null;
-    return data.profile;
+    return { ...data.profile, extractionInputTruncated: !!data.truncationApplied };
   } catch (err) {
     console.error("[cv-extract] parse-cv call failed:", err.message);
     return null;

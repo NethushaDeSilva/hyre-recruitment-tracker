@@ -1,3 +1,4 @@
+import { canBulkSelect } from "@/lib/scoreStaleness";
 // Candidates table (HR / Management) — every ACTIVE applicant across all
 // positions in a sortable table. Hired candidates live on Employees; rejected
 // candidates live on Rejected — this table only ever holds people still in
@@ -157,7 +158,7 @@ export default function CandidatesTable() {
   // candidates can span different positions, so eligibility and the next-stage
   // label are computed per-candidate from THEIR OWN position's pipeline.
   const movable = selectedRows.filter(
-    (c) => c.stage === "applied" && canActOnStageFor(user, positionFor(c.positionId), "applied")
+    (c) => c.stage === "applied" && canActOnStageFor(user, positionFor(c.positionId), "applied") && canBulkSelect(scores.get(c.id), positionFor(c.positionId), c)
   );
   const moveLabels = [...new Set(
     movable
@@ -195,7 +196,7 @@ export default function CandidatesTable() {
   const moveSelected = async () => {
     const ids = movable.map((c) => c.id);
     clearSelection();
-    await Promise.all(ids.map((id) => advanceStage(id, actor)));
+    await Promise.all(ids.map((id) => advanceStage(id, actor, { screeningBulk: true })));
     toast.success(`Moved ${ids.length} candidate${ids.length === 1 ? "" : "s"} to ${moveLabel}.`);
   };
 
@@ -297,6 +298,7 @@ export default function CandidatesTable() {
         candidate={selected && (candidates.find((x) => x.id === selected.id) || selected)}
         position={selected ? positionFor(selected.positionId) : null}
         positionTitle={selected ? titleFor(selected.positionId) : ""}
+        scoreDoc={selected ? scores.get(selected.id) : null}
       />
       <RejectModal
         open={bulkRejectOpen}

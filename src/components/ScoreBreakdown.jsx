@@ -4,6 +4,7 @@
 // nothing here recomputes or reinterprets a number the engine already gave.
 import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/lib/format";
+import AssessmentStatus from "@/components/AssessmentStatus";
 
 function Bar({ score, max }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (score / max) * 100)) : 0;
@@ -54,12 +55,13 @@ function SkillsBlock({ title, block }) {
   );
 }
 
-export default function ScoreBreakdown({ score }) {
+export default function ScoreBreakdown({ score, position, candidate }) {
   const { overallScore, capApplied, breakdown, meta } = score;
   const qual = breakdown.qualifications;
 
   return (
     <div className="space-y-4 rounded-lg border border-border bg-background p-4">
+      <AssessmentStatus score={{ ...score, status: "scored" }} position={position} candidate={candidate} detailed />
       <div className="flex items-center justify-between">
         <span className="text-sm font-bold text-foreground">Score breakdown</span>
         <span className="text-lg font-extrabold text-primary">{overallScore}<span className="text-xs font-medium text-muted-foreground">/100</span></span>

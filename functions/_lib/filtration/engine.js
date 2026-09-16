@@ -23,6 +23,7 @@ import {
   creditWeightForStatus,
 } from "./scoring.js";
 import { getThresholds } from "./thresholds.js";
+import { assessEligibility } from "./eligibility.js";
 
 // The version identifier stamped into meta.engineVersion — by the CALLER, not
 // here (see the note on scoreApplication's return below). Exported so
@@ -165,6 +166,7 @@ export async function scoreApplication(candidate, requirements, deps) {
 
     qualBreakdown = {
       score: qual.score, max: qual.max, levelMet: qual.levelMet, matched: qual.matched,
+      verificationStatus: qualVerification?.status || null,
       ...(needsReview ? { needsReview: true, reviewReason } : {}),
       // Only present when there's an actual matched claim to point at —
       // "field-not-extracted" has no specific claim, just an absence.
@@ -182,7 +184,7 @@ export async function scoreApplication(candidate, requirements, deps) {
   const allVerifications = qualVerification ? [...core.verification, ...preferred.verification, qualVerification] : [...core.verification, ...preferred.verification];
   const verification = tallyVerification(allVerifications);
 
-  return {
+  const assessment = {
     overallScore,
     capApplied,
     ...(allVerifications.some(v => v.inputTruncated) ? { inputTruncated: true } : {}),
@@ -205,6 +207,7 @@ export async function scoreApplication(candidate, requirements, deps) {
       borderline: verification.borderline,
     },
   };
+  return { ...assessment, eligibility: assessEligibility(candidate, requirements, assessment) };
 }
 
 /**

@@ -1,3 +1,4 @@
+import { canBulkSelect } from "@/lib/scoreStaleness";
 // THE single data seam for Hyre — the one module the whole UI talks to for data.
 // When Firebase is configured, positions & candidates live in Firestore and are
 // kept in sync with real-time onSnapshot listeners; mutations write to Firestore.
@@ -374,6 +375,8 @@ function joinFlat(identity, app) {
     linkedIn: idn.linkedIn || "",
     coverNote: app.coverNote || "",
     totalYearsExperience: idn.totalYearsExperience || 0,
+    extractionQuality: idn.extractionQuality || null,
+    cvTruncation: app.cvTruncation || null,
     education: idn.education || [],
     experienceEntries: idn.experienceEntries || [],
     certifications: idn.certifications || [],
@@ -794,6 +797,10 @@ async function rescoreApplied(positionId) {
       skills: (idn.skills || "").split(",").map((s) => s.trim()).filter(Boolean),
       education: idn.education || [],
       totalYearsExperience: idn.totalYearsExperience || 0,
+      extractionQuality: idn.extractionQuality || null,
+      experienceEntries: idn.experienceEntries || [],
+      needsReview: !!a.needsReview,
+      cvTruncation: a.cvTruncation || null,
       extractedText: idn.cvExtractedText || "",
     };
   });
@@ -840,6 +847,7 @@ async function rescoreApplied(positionId) {
 // make) rather than to one specific application. Keep in sync with what
 // profileToCandidateFields() (WS4) and ApplyModal actually send.
 const IDENTITY_FIELDS = new Set([
+  "extractionQuality",
   "phone", "location", "fieldOfStudy", "highestQualification", "experience",
   "currentRole", "currentCompany", "skills", "linkedIn",
   "totalYearsExperience", "education", "experienceEntries", "certifications", "languages",
@@ -1089,10 +1097,13 @@ const commentId = (cm) => cm.byUid || cm.by || "";
  * is exempt (it's just an application). The review is copied onto the history
  * entry so it shows in the candidate's timeline.
  */
-export async function advanceStage(candidateId, actor) {
+export async function advanceStage(candidateId, actor, opts = {}) {
   const cand = candidates.find((c) => c.id === candidateId);
   if (!cand) return { ok: false, reason: "not-found" };
   const pos = positions.find((p) => p.id === cand.positionId);
+  if (cand.stage === "applied" && (opts.screeningBulk || opts.overrideBulk) && !canBulkSelect(scores.get(candidateId), pos, cand)) {
+    return { ok: false, reason: "mandatory-eligibility-required" };
+  }
   const nx = nextStage(pos ? pos.stages : DEFAULT_PIPELINE, cand.stage);
   if (!nx) return { ok: false, reason: "terminal" };
 

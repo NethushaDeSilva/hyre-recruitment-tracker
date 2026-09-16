@@ -159,7 +159,7 @@ export default function Positions() {
                     <button
                       onClick={(e) => act(e, () => navigate(`/positions/${pos.id}?stage=applied`))}
                       title="Jump to the Applied column on this position's board"
-                      className="ml-auto inline-flex items-center gap-1 rounded-full bg-[#FBF1DC] px-2 py-0.5 text-[12px] font-bold text-[#A9781A] transition-colors hover:bg-[#F5E4B8] dark:bg-[#A9781A]/20 dark:text-[#F5D77E] dark:hover:bg-[#A9781A]/30"
+                      className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-[#FBF1DC] px-2 py-0.5 text-[12px] font-bold text-[#A9781A] transition-colors hover:bg-[#F5E4B8] dark:bg-[#A9781A]/20 dark:text-[#F5D77E] dark:hover:bg-[#A9781A]/30"
                     >
                       <Clock size={11} /> {appliedCount} at Applied
                     </button>

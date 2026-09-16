@@ -147,7 +147,7 @@ export default function Employees() {
                     className="cursor-pointer border-b border-border/70 transition-colors last:border-0 hover:bg-background"
                   >
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 rounded-md bg-[#16A34A]/12 px-2 py-1 font-mono text-xs font-bold tracking-wide text-[#15803D]">
+                      <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md bg-[#16A34A]/12 px-2 py-1 font-mono text-xs font-bold tracking-wide text-[#15803D]">
                         <BadgeCheck size={13} /> {e.employeeId || "—"}
                       </span>
                     </td>

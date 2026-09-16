@@ -118,7 +118,7 @@ export default function CandidatesTableRow({ c, checked, toggleGroup, titleFor, 
                     than claiming a status we don't actually know. */}
                 {a.emailVerified === false && (
                   <span
-                    className="shrink-0 inline-flex items-center gap-1 rounded bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]"
+                    className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded bg-[#FBF1DC] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]"
                     title="This candidate's email hasn't been verified yet — the application itself is never blocked for this."
                   >
                     <MailWarning size={10} /> Email unverified

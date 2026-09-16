@@ -1076,6 +1076,32 @@ export async function updateStaffSpecialisation(uid, { domain = "devops", levels
   await setDoc(doc(db, "users", uid), { domain, levels }, { merge: true });
 }
 
+/**
+ * WS8 §8.2a — the DevOps interviewer directory the calendar view draws from.
+ * Unlike listStaff() (name/role/email only, used for generic staff pickers),
+ * this projects the fields the calendar actually needs: avatarColor (so a
+ * person's calendar bars match the same color they have everywhere else in
+ * the app — no separate calendar-only palette) and domain/levels (§8.0/§8.1
+ * scoping + the level filter). Scoped to domain === "devops" — per §8.0,
+ * scheduling only concerns this one domain for this release.
+ */
+export async function listInterviewers() {
+  if (!firebaseReady) return [];
+  const snap = await getDocs(collection(db, "users"));
+  return snap.docs
+    .map((d) => {
+      const x = d.data();
+      return {
+        uid: d.id,
+        name: x.displayName || x.email || "Team member",
+        avatarColor: x.avatarColor || "#64748B",
+        domain: x.domain || "",
+        levels: x.levels || [],
+      };
+    })
+    .filter((u) => u.domain === "devops");
+}
+
 // --- WS8 declared availability (self-declared, never inferred) -------------
 function mapAvailabilityDoc(x) {
   return {

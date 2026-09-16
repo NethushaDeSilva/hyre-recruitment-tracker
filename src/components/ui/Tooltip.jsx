@@ -5,7 +5,7 @@
 import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 
-export function Tooltip({ label, children, className = "" }) {
+export function Tooltip({ label, children, className = "", style }) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const ref = useRef(null);
@@ -29,6 +29,7 @@ export function Tooltip({ label, children, className = "" }) {
       onFocus={open}
       onBlur={close}
       tabIndex={0}
+      style={style}
       className={`inline-flex cursor-help outline-none ${className}`}
     >
       {children}

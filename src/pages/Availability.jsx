@@ -9,6 +9,7 @@ import { Check, Clock, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getAvailability, saveAvailability, updateStaffSpecialisation } from "@/data/store";
 import { AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
+import { timeAgo } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Field, Select, Input } from "@/components/ui/Field";
 
@@ -22,19 +23,6 @@ const pad = (n) => String(n).padStart(2, "0");
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const emptySlot = () => ({ dayOfWeek: 1, startTime: "09:00", endTime: "17:00" });
 const emptyException = () => ({ date: todayStr(), type: "leave", reason: "" });
-
-// "Updated 2 hours ago" / "Updated 16 days ago" — WS8 §8.5's freshness copy.
-function timeAgo(ms) {
-  if (!ms) return "";
-  const diff = Date.now() - ms;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} minute${mins === 1 ? "" : "s"} ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} ago`;
-}
 
 export default function Availability() {
   const { user } = useAuth();

@@ -230,7 +230,7 @@ export default function CandidatesTable() {
             {positions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </Select>
           {!position && (
-            <span className="text-xs font-medium text-muted-foreground">Select a position to sort by match.</span>
+            <span className="text-xs font-medium text-muted-foreground">Select a position to sort by score.</span>
           )}
           {activeFilters && (
             <button onClick={clearFilters} className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-primary hover:bg-secondary">

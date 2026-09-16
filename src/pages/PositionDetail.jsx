@@ -1,17 +1,25 @@
-import { canBulkSelect } from "@/lib/scoreStaleness";
+import { canBulkSelect, isScoreStale, staleReason, notScoredReason, scorePillClass } from "@/lib/scoreStaleness";
 import AssessmentStatus from "@/components/AssessmentStatus";
 // Position detail — the pipeline board. Columns = the position's configured
 // stages. Recruitment is a multi-stage filter: each stage is owned by a role
 // (HR screening → Department review → interviews → Final interview), and only the
 // owning role (or Management) can advance/reject a candidate in that stage.
-import { useState } from "react";
+//
+// The Applied column doubles as the WS5 5.8 shortlist (previously a separate
+// Board/Shortlist tab — merged in so "the screen that turns 100 CVs into a
+// workable list" IS the Applied column, not a second view of it). HR-only:
+// the sort-by-score, threshold hide, and score pill below only ever change
+// what HR sees — Interviewers/Management keep the Applied column exactly as
+// it always rendered, natural order, unfiltered, matching every other column.
+import { useMemo, useState, useEffect } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search } from "lucide-react";
-import { useHyreData, advanceStage, rejectCandidate, bulkReject } from "@/data/store";
+import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, SlidersHorizontal, RefreshCw, AlertCircle } from "lucide-react";
+import { useHyreData, advanceStage, rejectCandidate, bulkReject, rescoreVacancy } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
 import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
+import { sortApplications } from "../../functions/_lib/filtration/engine.js";
 import { useToast } from "@/components/ui/ToastProvider";
 import { Button } from "@/components/ui/Button";
 import { StatusPill } from "@/components/ui/Badge";
@@ -23,7 +31,6 @@ import StageConfigModal from "@/components/StageConfigModal";
 import OpenPositionModal from "@/components/OpenPositionModal";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
 import EligibilityTag from "@/components/EligibilityTag";
-import ShortlistPanel from "@/components/ShortlistPanel";
 
 export default function PositionDetail() {
   const { id } = useParams();
@@ -31,10 +38,6 @@ export default function PositionDetail() {
   const stageFilter = searchParams.get("stage"); // e.g. ?stage=applied — "N at Applied" link from the Positions grid
   const { user } = useAuth();
   const { positions, candidates, scores, loading } = useHyreData();
-  // Board = the pipeline Kanban. Shortlist (WS5 5.8) = Applied-stage
-  // applications ranked by score — "the screen that turns 100 CVs into a
-  // workable list." HR only, matching the rest of this toolbar's scoping.
-  const [view, setView] = useState("board");
   const [addOpen, setAddOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -47,6 +50,13 @@ export default function PositionDetail() {
   const [picked, setPicked] = useState(() => new Set());
   // board search (HR only) — live, filters by name/skills/role/company/field.
   const [q, setQ] = useState("");
+  // WS5 5.8 shortlist threshold — pure client-side view filter (HR only).
+  // Never written to Firestore by moving the slider; initialises from the
+  // position's stored default and resets only when navigating to a
+  // DIFFERENT position, so it never fights a live Firestore update mid-session.
+  const [threshold, setThreshold] = useState(0);
+  const [rescoring, setRescoring] = useState(false);
+  const [rescoreMsg, setRescoreMsg] = useState("");
   // UI chrome: the header shrinks as you scroll the board (reclaims space).
   const [collapsed, setCollapsed] = useState(false);
   // Collapse past 44px of board scroll, expand back under 16px (hysteresis stops flicker).
@@ -61,6 +71,49 @@ export default function PositionDetail() {
   const toast = useToast();
 
   const position = positions.find((p) => p.id === id);
+
+  // Reset the threshold to this position's stored default only when the
+  // position actually changes (never on every Firestore update, or a live
+  // HR drag would get silently overwritten mid-session).
+  useEffect(() => {
+    setThreshold(position?.shortlistThreshold ?? 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position?.id]);
+
+  // Cross-application indicator (Part 2) — built once from the FULL,
+  // already-loaded `candidates` stream (every application across every
+  // position staff can see; no extra Firestore read, no N+1 per card).
+  // personId -> [{ positionId }] across the whole store, deduped later.
+  const applicationsByPerson = useMemo(() => {
+    const map = new Map();
+    for (const c of candidates) {
+      if (!c.personId) continue;
+      if (!map.has(c.personId)) map.set(c.personId, []);
+      map.get(c.personId).push(c.positionId);
+    }
+    return map;
+  }, [candidates]);
+  // Other positions this candidate applied to, visible to THIS viewer only
+  // (positionVisibleTo) — an Interviewer must never learn the title of a
+  // position they aren't assigned to via a third party's application. Omit
+  // entirely (no placeholder, no count) when nothing is visible.
+  const otherPositionTitlesFor = (c) => {
+    if (!c.personId || !position) return [];
+    const ids = [...new Set(applicationsByPerson.get(c.personId) || [])].filter((pid) => pid !== position.id);
+    return ids
+      .map((pid) => positions.find((p) => p.id === pid))
+      .filter((p) => p && positionVisibleTo(p, user))
+      .map((p) => p.title);
+  };
+  // "also applied to X" / "X and Y" / "X, Y +N more" — capped so a person
+  // with many applications never blows out a 240px card.
+  const otherPositionsLabel = (titles) => {
+    if (titles.length === 0) return "";
+    if (titles.length === 1) return `also applied to ${titles[0]}`;
+    if (titles.length === 2) return `also applied to ${titles[0]} and ${titles[1]}`;
+    return `also applied to ${titles[0]}, ${titles[1]} +${titles.length - 2} more`;
+  };
+
   if (loading) {
     return <div className="grid h-full place-items-center p-4 sm:p-7 text-sm text-muted-foreground">Loading…</div>;
   }
@@ -126,9 +179,43 @@ export default function PositionDetail() {
     }
   };
 
+  // --- WS5 5.8: Applied column = the shortlist (merged in, not a second view) ---
+  // HR only (isHR gate below) — Interviewers/Management get the applied stage
+  // in its plain, unsorted, unfiltered order, same as any other column.
+  // sortApplications is the exact WS5 5.8 tie-break chain (score desc, core
+  // skills desc, id asc) — reused, not reimplemented, and it already sorts
+  // unscored entries last rather than as a 0 (rule 6).
+  const appliedStageAll = filtered.filter((c) => c.stage === "applied");
+  const appliedEntries = appliedStageAll.map((c) => {
+    const s = scores.get(c.id);
+    return { candidateId: c.id, status: s?.status === "scored" ? "scored" : "unscored", result: s?.status === "scored" ? s : undefined, c };
+  });
+  const appliedOrdered = sortApplications(appliedEntries);
+  // Threshold HIDES, never removes — a scored-below-threshold entry is
+  // dropped from what renders, but never from `filtered`/`cands`/Firestore.
+  // Unscored entries are never subject to the threshold at all (rule 6).
+  const appliedVisibleEntries = appliedOrdered.filter((e) => e.status !== "scored" || e.result.overallScore >= threshold);
+  const appliedVisibleIds = new Set(appliedVisibleEntries.map((e) => e.candidateId));
+  const appliedHiddenByThreshold = appliedOrdered.length - appliedVisibleEntries.length;
+  const appliedUnscoredCount = appliedOrdered.filter((e) => e.status !== "scored").length;
+  const appliedStaleCount = appliedOrdered.filter((e) => e.status === "scored" && isScoreStale(scores.get(e.candidateId))).length;
+  const runRescore = async () => {
+    setRescoring(true);
+    setRescoreMsg("");
+    const res = await rescoreVacancy(position.id);
+    setRescoring(false);
+    setRescoreMsg(res.ok ? `Re-scored ${res.scored} application${res.scored === 1 ? "" : "s"}${res.failed ? `, ${res.failed} failed` : ""}.` : res.error);
+  };
+
   // --- Applied-stage bulk move (HR only) ---
-  // Works on the applicants currently shown in Applied (so it respects the filter).
-  const appliedShown = filtered.filter((c) => c.stage === "applied" && canBulkSelect(scores.get(c.id), position, c));
+  // Eligible = visible under the current threshold/search AND canBulkSelect
+  // (score fresh, meets eligibility). A candidate the threshold hides falls
+  // out of appliedVisibleEntries and therefore out of appliedShown, so
+  // appliedPicked (below) drops it automatically the next render — no
+  // separate "clear selection on filter change" effect needed.
+  const appliedShown = isHR
+    ? appliedVisibleEntries.filter((e) => canBulkSelect(scores.get(e.candidateId), position, e.c)).map((e) => e.c)
+    : [];
   const appliedPicked = appliedShown.filter((c) => picked.has(c.id));
   const allAppliedPicked = appliedShown.length > 0 && appliedPicked.length === appliedShown.length;
   const appliedNext = nextStage(position.stages, "applied");
@@ -148,7 +235,9 @@ export default function PositionDetail() {
     });
   const clearPicked = () => setPicked(new Set());
   const movePickedToNext = async () => {
-    const ids = appliedPicked.map((c) => c.id);
+    // Recheck at execution (point 7) — never trust the picked Set alone,
+    // even though appliedPicked is already filtered through appliedShown.
+    const ids = appliedPicked.filter((c) => canBulkSelect(scores.get(c.id), position, c)).map((c) => c.id);
     setPicked(new Set());
     await Promise.all(ids.map((id) => advanceStage(id, actor, { screeningBulk: true }))); // no note — it's just an application
   };
@@ -191,10 +280,13 @@ export default function PositionDetail() {
         )}
       </div>
 
-      {/* search + Board/Shortlist toggle — HR only. */}
+      {/* search + Applied-column shortlist threshold — HR only. The threshold
+          slider is a pure client-side view filter: it only ever calls
+          setThreshold (local state), never a store mutator — nothing here
+          writes to Firestore or touches a stage/record. */}
       {isHR && (
         <div className={`relative z-30 flex flex-wrap items-center gap-2.5 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
-          <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
+          <div className="flex min-w-[160px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
             <Search size={15} className="shrink-0 text-muted-foreground" />
             <input
               value={q}
@@ -203,32 +295,42 @@ export default function PositionDetail() {
               className="w-full bg-transparent text-foreground placeholder:text-[#94A3B8] focus:outline-none"
             />
           </div>
-          <div className="flex shrink-0 items-center rounded-md border border-border bg-card p-0.5 text-xs font-bold">
-            {[["board", "Board"], ["shortlist", `Shortlist (${cands.filter((c) => c.stage === "applied").length})`]].map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => setView(id)}
-                className={`rounded px-3 py-1.5 transition-colors ${view === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary"}`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
+            <SlidersHorizontal size={13} className="text-muted-foreground" />
+            <label className="font-semibold text-foreground">Shortlist</label>
+            <input
+              type="range" min={0} max={100} step={5} value={threshold}
+              onChange={(e) => setThreshold(Number(e.target.value))}
+              className="w-24 accent-primary"
+            />
+            <span className="w-9 font-bold tabular-nums text-foreground">{threshold}+</span>
+            <span className="text-muted-foreground">
+              {appliedVisibleEntries.length} shown · {appliedHiddenByThreshold} below threshold
+              {appliedUnscoredCount > 0 && <> · {appliedUnscoredCount} unscored</>}
+            </span>
+            {appliedStaleCount > 0 && (
+              <span className="rounded bg-[#FBF1DC] px-1.5 py-0.5 font-bold text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]">
+                {appliedStaleCount} stale
+              </span>
+            )}
+            <button
+              onClick={runRescore}
+              disabled={rescoring}
+              className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/[0.06] px-2 py-1 font-bold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+            >
+              <RefreshCw size={11} className={rescoring ? "animate-spin" : ""} /> {rescoring ? "Re-scoring…" : "Re-score all"}
+            </button>
           </div>
         </div>
       )}
-
-      {isHR && view === "shortlist" ? (
-        <div className={`min-h-0 flex-1 overflow-auto pb-2 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-4"}`}>
-          <ShortlistPanel
-            position={position}
-            applications={cands.filter((c) => c.stage === "applied")}
-            scores={scores}
-            onOpenCandidate={setDetail}
-            onEditPosition={() => setEditOpen(true)}
-          />
+      {isHR && rescoreMsg && <p className="mt-1.5 text-xs text-muted-foreground">{rescoreMsg}</p>}
+      {isHR && !position.requirements && (
+        <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#F0DFA6] bg-[#FBF1DC] px-3 py-2 text-[13px] text-[#8A6314] dark:border-[#5a4a1a] dark:bg-[#3a2f0f] dark:text-[#F5D77E]">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <span>This vacancy has no requirements set, so Applied applications can't be scored. <button onClick={() => setEditOpen(true)} className="font-semibold underline">Edit position</button></span>
         </div>
-      ) : (
-      <>
+      )}
+
       {stageFilter && visibleColumns.length === 1 && (
         <div className="mt-3 flex items-center gap-2 text-[13px] font-medium text-muted-foreground">
           Filtered to <span className="font-bold text-foreground">{resolveStage(position, visibleColumns[0]).label}</span>
@@ -241,7 +343,11 @@ export default function PositionDetail() {
       <div onScroll={onBoardScroll} className={`flex min-h-0 flex-1 items-start gap-4 overflow-auto overscroll-contain pb-2 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-4"}`}>
         {visibleColumns.map((stageId) => {
           const stage = resolveStage(position, stageId);
-          const inStage = filtered.filter((c) => c.stage === stageId);
+          // Applied, HR only: ranked by score (WS5 5.8 tie-break) and
+          // threshold-hidden — everyone else sees the plain, unsorted stage.
+          const inStage = stageId === "applied" && isHR
+            ? appliedOrdered.filter((e) => appliedVisibleIds.has(e.candidateId)).map((e) => e.c)
+            : filtered.filter((c) => c.stage === stageId);
           const ownerLabel = stage.owner ? ROLE_LABELS[stage.owner] : null;
           const team = assigneesFor(position, stageId);
           // Show up to two names so a team never looks like a single (reverted)
@@ -334,9 +440,32 @@ export default function PositionDetail() {
                               )}
                             </div>
                             <div className="truncate text-xs text-muted-foreground">{c.appliedRole || "Candidate"}</div>
+                            {otherPositionsLabel(otherPositionTitlesFor(c)) && (
+                              <div className="truncate text-[10px] text-muted-foreground/60">{otherPositionsLabel(otherPositionTitlesFor(c))}</div>
+                            )}
                           </div>
                         </button>
                       </div>
+                      {isHR && stageId === "applied" && (
+                        scores.get(c.id)?.status === "scored" ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${scorePillClass(scores.get(c.id).overallScore)}`}>
+                              {scores.get(c.id).overallScore}
+                            </span>
+                            {isScoreStale(scores.get(c.id)) && (
+                              <span title={staleReason(scores.get(c.id))} className="rounded bg-[#FBF1DC] px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]">
+                                Stale
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <AlertCircle size={11} className="shrink-0" />
+                            Not scored — {notScoredReason(scores.get(c.id), position)}
+                            <button onClick={runRescore} className="font-semibold text-primary hover:underline">Retry</button>
+                          </div>
+                        )
+                      )}
                       <AssessmentStatus score={scores.get(c.id)} position={position} candidate={c} />
                       {position.minQualification && c.highestQualification && (
                         <EligibilityTag candidateQual={c.highestQualification} minQual={position.minQualification} />
@@ -392,8 +521,6 @@ export default function PositionDetail() {
           );
         })}
       </div>
-      </>
-      )}
 
       <AddCandidateModal open={addOpen} onClose={() => setAddOpen(false)} position={position} />
       <StageConfigModal open={configOpen} position={position} onClose={() => setConfigOpen(false)} />

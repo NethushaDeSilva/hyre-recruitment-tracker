@@ -47,6 +47,9 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   const [requiredSkillsText, setRequiredSkillsText] = useState("");
   const [minYearsExperience, setMinYearsExperience] = useState("0");
   const [niceToHaveText, setNiceToHaveText] = useState("");
+  // Board/Applied-column view filter default (WS5 5.8) — a sibling of
+  // requirements, never part of the scoring comparison itself.
+  const [shortlistThreshold, setShortlistThreshold] = useState("0");
   const [closeDate, setCloseDate] = useState("");
   const [headcount, setHeadcount] = useState("1");
   const [hiringManagerUid, setHiringManagerUid] = useState("");
@@ -81,6 +84,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setRequiredSkillsText((position.requirements?.requiredSkills || []).join(", "));
     setMinYearsExperience(String(position.requirements?.minYearsExperience ?? 0));
     setNiceToHaveText((position.requirements?.niceToHave || []).join(", "));
+    setShortlistThreshold(String(position.shortlistThreshold ?? 0));
     setCloseDate(msToDateStr(position.closesAt));
     setHeadcount(String(position.headcount || 1));
     setHiringManagerUid(position.hiringManagerUid || "");
@@ -97,6 +101,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setRequiredSkillsText("");
     setMinYearsExperience("0");
     setNiceToHaveText("");
+    setShortlistThreshold("0");
     setCloseDate("");
     setHeadcount("1");
     setHiringManagerUid("");
@@ -129,6 +134,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
         hiringManagerUid,
         hiringManagerName: manager?.name || "",
         requirements,
+        shortlistThreshold: Number(shortlistThreshold) || 0,
       });
       close();
       return;
@@ -144,6 +150,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
       createdByUid: user?.uid || "",
       createdByName: user?.name || "",
       requirements,
+      shortlistThreshold: Number(shortlistThreshold) || 0,
     });
     close();
     nav(`/positions/${pos.id}`);
@@ -257,6 +264,13 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
             </p>
           )}
         </div>
+
+        <Field label="Default shortlist threshold (optional)">
+          <Input type="number" min={0} max={100} value={shortlistThreshold} onChange={(e) => setShortlistThreshold(e.target.value)} />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Starting point for the Applied column's shortlist slider — HR can still move it per-session. It only hides low scorers from view; nothing is rejected or moved.
+          </p>
+        </Field>
 
         <Field label="Auto-close date">
           <Input type="date" value={closeDate} min={todayStr()} onChange={(e) => setCloseDate(e.target.value)} />

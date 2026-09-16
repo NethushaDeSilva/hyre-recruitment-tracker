@@ -54,13 +54,13 @@ export default function CandidatesTableHead({ sort, toggleSort, setSort, positio
             <button
               onClick={() => position && setSort({ key: "match", dir: "desc" })}
               disabled={!position}
-              title={!position ? "Select a position to sort by match" : undefined}
+              title={!position ? "Select a position to sort by score" : undefined}
               className={cn(
                 "inline-flex items-center gap-1 font-semibold",
                 position ? "text-foreground hover:text-primary" : "cursor-not-allowed text-muted-foreground opacity-50"
               )}
             >
-              Match
+              Score
               {sort.key === "match" ? <ChevronDown size={13} /> : <ChevronUp size={13} className="opacity-20" />}
             </button>
           </th>

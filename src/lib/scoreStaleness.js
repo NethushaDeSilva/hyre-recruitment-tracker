@@ -84,8 +84,9 @@ export function staleReason(score) {
 
 /**
  * Why an application shows no score, for the "not scored" state (10.1: never a
- * 0, never blank). Shared by ShortlistPanel and the Candidates Match column so
- * the reason text can't drift between the two places it's shown.
+ * 0, never blank). Shared by the Applied column (PositionDetail) and the
+ * Candidates Score column so the reason text can't drift between the two
+ * places it's shown.
  * @param {object|null} scoreDoc - an applicationScores doc, or null/undefined
  * @param {object|null} position - the position this application is against
  */

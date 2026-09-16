@@ -21,9 +21,14 @@ import { cn } from "@/lib/utils";
 function MatchPill({ position, scoreDoc, isOpen, onToggle }) {
   const scored = scoreDoc?.status === "scored";
   if (!scored) {
+    const reason = notScoredReason(scoreDoc, position);
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-        <AlertCircle size={10} /> Not scored — {notScoredReason(scoreDoc, position)}
+      <span
+        title={`Not scored — ${reason}`}
+        className="flex max-w-full items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground"
+      >
+        <AlertCircle size={10} className="shrink-0" />
+        <span className="truncate">Not scored — {reason}</span>
       </span>
     );
   }

@@ -208,6 +208,11 @@ const mapPosition = (d) => {
     // exists once a position has been created/edited under the new form).
     // null on every position created before this shipped — never guessed at.
     requirements: x.requirements || null,
+    // Board/Applied-column view filter default (client-side only — see
+    // canBulkSelect() in scoreStaleness.js and the PositionDetail toolbar).
+    // Deliberately a SIBLING of requirements, never inside it: editing this
+    // must never trip updatePosition()'s requirements-changed staleness check.
+    shortlistThreshold: x.shortlistThreshold || 0,
     // mandatory auto-close date (ms) — the vacancy closes itself once this passes
     closesAt: x.closesAt ? ms(x.closesAt) : 0,
     // headcount target vs. how many have been hired into this requisition so far —
@@ -652,7 +657,7 @@ export async function addPosition({
   title, department, description, stages, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
   createdByRole = "", createdByUid = "", createdByName = "",
-  requirements = null,
+  requirements = null, shortlistThreshold = 0,
 }) {
   // HR is the recruitment authority now, so a newly opened vacancy goes live
   // immediately — there's no separate Management approval step anymore. That
@@ -668,6 +673,7 @@ export async function addPosition({
     stages: stages && stages.length ? stages : DEFAULT_PIPELINE,
     minQualification,
     requirements,
+    shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
     // mandatory auto-close date: the position closes itself once this passes
     closesAt: closesAt ? new Date(closesAt) : null,
     headcount: Math.max(1, Number(headcount) || 1),
@@ -706,7 +712,7 @@ export async function addPosition({
 export async function updatePosition(id, {
   title, department, description, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
-  requirements = null,
+  requirements = null, shortlistThreshold = 0,
 }) {
   const current = positions.find((p) => p.id === id);
   if (!current) throw new Error(`updatePosition: no position ${id}`);
@@ -716,6 +722,9 @@ export async function updatePosition(id, {
   // there's no live scoring surface left to protect there.
   if (current.status === "Open") assertPublishableRequirements(requirements);
 
+  // Staleness is keyed on requirements ONLY — shortlistThreshold is a sibling
+  // field computed and diffed separately, and never enters this comparison,
+  // so editing it alone can never mark a score stale.
   const requirementsChanged = JSON.stringify(current.requirements || null) !== JSON.stringify(requirements || null);
 
   const data = {
@@ -724,6 +733,7 @@ export async function updatePosition(id, {
     description: (description || "").trim(),
     minQualification,
     requirements,
+    shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
     closesAt: closesAt ? new Date(closesAt) : null,
     headcount: Math.max(1, Number(headcount) || 1),
     hiringManagerUid,

@@ -248,7 +248,9 @@ export default function Profile() {
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[#E0A422]/40 bg-[#E0A422]/10 p-3.5">
             <MailWarning size={16} className="shrink-0 text-[#B4791A]" />
             <p className="flex-1 text-[13px] text-foreground">
-              Verify your email to {user?.role === "Candidate" ? "keep your account secure" : "unlock HR functions"}.
+              {/* Staff are provisioned by an administrator, so this is a
+                  courtesy prompt only — nothing is locked behind it. */}
+              Verify your email to {user?.role === "Candidate" ? "keep your account secure" : "confirm this address is yours"}.
             </p>
             <button
               type="button"

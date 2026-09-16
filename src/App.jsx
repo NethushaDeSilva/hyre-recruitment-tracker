@@ -10,7 +10,6 @@ import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ROLES } from "@/lib/permissions";
 import RequireAuth from "@/components/RequireAuth";
 import RequireRole from "@/components/RequireRole";
-import RequireVerified from "@/components/RequireVerified";
 import AppLayout from "@/components/layout/AppLayout";
 import WorkerHealthBanner from "@/components/WorkerHealthBanner";
 
@@ -67,22 +66,23 @@ export default function App() {
           >
             <Route path="/app" element={<Home />} />
 
-            {/* staff — the internal tracker. RequireVerified sits INSIDE RequireRole
-                (role first, then verification) and only ever gates staff — it's a
-                no-op for a Candidate, who is never blocked for being unverified. */}
-            <Route path="/positions" element={<RequireRole roles={STAFF}><RequireVerified><Positions /></RequireVerified></RequireRole>} />
-            <Route path="/positions/:id" element={<RequireRole roles={STAFF}><RequireVerified><PositionDetail /></RequireVerified></RequireRole>} />
-            <Route path="/candidates" element={<RequireRole roles={RECRUITERS}><RequireVerified><CandidatesTable /></RequireVerified></RequireRole>} />
-            <Route path="/employees" element={<RequireRole roles={RECRUITERS}><RequireVerified><Employees /></RequireVerified></RequireRole>} />
-            <Route path="/rejected" element={<RequireRole roles={RECRUITERS}><RequireVerified><Rejected /></RequireVerified></RequireRole>} />
+            {/* staff — the internal tracker. Not gated on emailVerified: staff are
+                provisioned by an administrator who assigns the role explicitly in
+                Firestore, which is a stronger guarantee than a mail round-trip —
+                there is nothing for a provisioned account to prove. */}
+            <Route path="/positions" element={<RequireRole roles={STAFF}><Positions /></RequireRole>} />
+            <Route path="/positions/:id" element={<RequireRole roles={STAFF}><PositionDetail /></RequireRole>} />
+            <Route path="/candidates" element={<RequireRole roles={RECRUITERS}><CandidatesTable /></RequireRole>} />
+            <Route path="/employees" element={<RequireRole roles={RECRUITERS}><Employees /></RequireRole>} />
+            <Route path="/rejected" element={<RequireRole roles={RECRUITERS}><Rejected /></RequireRole>} />
 
             {/* candidate — the applicant portal */}
             <Route path="/jobs" element={<RequireRole roles={[ROLES.CANDIDATE]}><Jobs /></RequireRole>} />
             <Route path="/applications" element={<RequireRole roles={[ROLES.CANDIDATE]}><MyApplications /></RequireRole>} />
 
             {/* company — internal, staff only */}
-            <Route path="/company" element={<RequireRole roles={STAFF}><RequireVerified><Company /></RequireVerified></RequireRole>} />
-            <Route path="/team" element={<RequireRole roles={STAFF}><RequireVerified><Team /></RequireVerified></RequireRole>} />
+            <Route path="/company" element={<RequireRole roles={STAFF}><Company /></RequireRole>} />
+            <Route path="/team" element={<RequireRole roles={STAFF}><Team /></RequireRole>} />
 
             {/* everyone */}
             <Route path="/profile" element={<Profile />} />

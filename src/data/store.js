@@ -21,6 +21,7 @@ import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta } from 
 import { departmentCode } from "@/lib/departments";
 import { isOpenNow } from "@/lib/positions";
 import { createRescoreRun, executeRescoreRun, snapshotKey } from "@/lib/rescoreBatch";
+import { scoringHeaders } from "@/lib/scoringAuth";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
 function pickColor(name) {
@@ -816,7 +817,7 @@ async function rescoreApplied(positionId) {
   }
   const summary = await executeRescoreRun(run, {
     send: async body => {
-      const res = await fetch("/api/rescore-vacancy", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const res = await fetch("/api/rescore-vacancy", { method: "POST", headers: await scoringHeaders(), body: JSON.stringify(body) });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) {
         const error = new Error(data?.error || `HTTP ${res.status}`);

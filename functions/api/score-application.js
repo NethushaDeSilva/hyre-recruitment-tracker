@@ -20,9 +20,11 @@
 //   -> { ok: false, reason: "no-requirements" | "failed", error?: string }
 
 import { scoreOneApplication, ScoringError } from "../_lib/filtration-ai.js";
+import { requireStaff } from "../_lib/staff-auth.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://hyre-hiring.pages.dev",
+  "https://screening-correctness.hyre-hiring.pages.dev",
   "http://localhost:5173",
   "http://localhost:4173",
 ]);
@@ -31,7 +33,7 @@ function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     Vary: "Origin",
   };
 }
@@ -46,6 +48,8 @@ export async function onRequestPost({ request, env }) {
   const origin = request.headers.get("Origin");
   if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
   const cors = origin ? corsHeaders(origin) : {};
+  const denied = await requireStaff(request, env, cors);
+  if (denied) return denied;
 
   let body;
   try {

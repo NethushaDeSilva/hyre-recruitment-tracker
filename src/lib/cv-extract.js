@@ -265,6 +265,7 @@ export async function parseCvContent(text) {
 
 // --- WS5: score automatically once WS4 parsing completes -------------------
 
+import { scoringHeaders } from "./scoringAuth";
 const SCORE_URL = resolveApiBase(import.meta.env.VITE_CV_SCORE_URL, "/api/score-application", "VITE_CV_SCORE_URL");
 
 /** Confirm the scoring Worker (WS5) is actually deployed and reachable. */
@@ -290,12 +291,13 @@ export async function scoreCvAgainst(profile, extractedText, requirements) {
   try {
     const res = await fetch(SCORE_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await scoringHeaders(),
       body: JSON.stringify({
         candidate: {
           skills: profile.skills || [],
           education: profile.education || [],
           totalYearsExperience: profile.totalYearsExperience || 0,
+          extractionQuality: profile.extractionQuality || null,
           extractedText: extractedText || "",
         },
         requirements,

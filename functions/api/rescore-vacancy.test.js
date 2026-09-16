@@ -1,4 +1,7 @@
-import { it, expect } from "vitest";
+import { it, expect, vi } from "vitest";
+// Batch-contract tests start after authorization. Real token validation and
+// endpoint denial are covered separately in staff-auth/scoring-auth tests.
+vi.mock("../_lib/staff-auth.js", () => ({ requireStaff: async () => null }));
 import { onRequestPost } from "./rescore-vacancy.js";
 
 const candidates = n => Array.from({ length: n }, (_, i) => ({ candidateId: `app-${i}`, skills: ["React"], extractedText: "React", education: [], totalYearsExperience: 1 }));

@@ -17,6 +17,40 @@ failed; existing matching tests and Node/React regressions passed.
 
 ## Approved sequence
 
+Step 5 authenticates only score-application/rescore-vacancy. Firebase RS256 ID
+tokens are verified against Google's public keys, project issuer/audience,
+expiry/issued-at/auth-time and subject; current Firestore user role must be HR,
+Interviewer or Management. Missing/invalid credentials return 401, nonstaff 403,
+and unavailable authorization services fail closed with 503. Origin checks remain.
+validate-cv and parse-cv retain their existing candidate-accessible behavior.
+No rate-limiting mechanism was found in those two handlers; none is claimed here.
+
+jose 6.2.8 was already installed transitively and is now pinned as a direct runtime
+dependency. Before client token wiring, clean commit e3290da passed 116 tests and
+a production build; deployed preview 9fcfebe7 served /, /login, /positions,
+/candidates, /jobs and its JS/CSS assets. These are HTTP smoke checks, not an
+authenticated browser walkthrough. Production was not redeployed.
+
+Four endpoint-auth regressions failed before wiring. Afterwards, the three batch
+contract tests failed with 401 as expected and were given an authorized boundary
+mock; signature and denial tests remain separate and exercise real cryptography.
+
+Final verification: 131 tests pass in both the working tree and a clean checkout;
+the clean checkout builds and the deployed Functions bundle compiles. Final
+preview https://47e35494.hyre-hiring.pages.dev (alias
+https://screening-correctness.hyre-hiring.pages.dev) serves the five page paths
+and referenced assets. Both scoring endpoints return 401 without a token and
+200 for a real, existing demo HR Firebase ID token. The authorized smoke requests
+score a synthetic literal-only profile and perform no Firestore writes.
+Candidate validation/parsing POSTs without credentials reach their normal
+missing-text validation (400), not staff authorization. No production deployment,
+historical-score migration, recalibration or bulk rescore was performed.
+
+Known verification limits: no authenticated browser walkthrough or long-CV load
+test against Workers AI was performed. Batch size 10 is the initial setting, not
+a measured throughput guarantee. Retry snapshots are held in browser memory;
+reloading starts a new run. Existing bundle-size warnings remain.
+
 Step 4 adds eligibility independently of score arithmetic. Any known input or
 output truncation forces needs_review. Missing/uncertain experience, unverified
 skills and uncertain qualifications cannot establish eligibility; definite

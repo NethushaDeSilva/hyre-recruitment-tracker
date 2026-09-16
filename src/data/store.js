@@ -203,9 +203,9 @@ const mapPosition = (d) => {
     id: d.id, title: x.title, department: x.department, description: x.description || "",
     status: x.status || "Open", stages: x.stages || DEFAULT_PIPELINE, minQualification: x.minQualification || "",
     // WS5 5.2 — structured scoring requirements, separate from minQualification
-    // above (that one drives the candidate-side EligibilityTag hint across the
-    // full O/L-to-PhD ladder; this one is the engine's strict input and only
-    // exists once a position has been created/edited under the new form).
+    // above (a legacy free-text hint across the full O/L-to-PhD ladder; this
+    // one is the engine's strict input and only exists once a position has
+    // been created/edited under the new form).
     // null on every position created before this shipped — never guessed at.
     requirements: x.requirements || null,
     // Board/Applied-column view filter default (client-side only — see

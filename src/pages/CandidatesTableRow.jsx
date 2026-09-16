@@ -9,7 +9,7 @@ import { StageBadge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl } from "@/lib/file";
-import EligibilityTag from "@/components/EligibilityTag";
+import EligibilityStatusTag from "@/components/EligibilityStatusTag";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 import { HoverScrollText } from "@/components/ui/HoverScrollText";
 import { isScoreStale, staleReason, notScoredReason, scorePillClass } from "@/lib/scoreStaleness";
@@ -51,7 +51,7 @@ function MatchPill({ position, scoreDoc, isOpen, onToggle }) {
   );
 }
 
-export default function CandidatesTableRow({ c, checked, toggleGroup, titleFor, positionFor, minQualFor, scores, onOpenCandidate }) {
+export default function CandidatesTableRow({ c, checked, toggleGroup, titleFor, positionFor, scores, onOpenCandidate }) {
   const [openScoreId, setOpenScoreId] = useState(null); // which application's breakdown is expanded
 
   return (
@@ -111,7 +111,7 @@ export default function CandidatesTableRow({ c, checked, toggleGroup, titleFor, 
               <div className="flex items-center gap-2">
                 <HoverScrollText text={titleFor(a.positionId)} className="min-w-0 max-w-[45%] shrink font-medium text-foreground" />
                 <StageBadge stageId={a.stage} />
-                <EligibilityTag candidateQual={c.highestQualification} minQual={minQualFor(a.positionId)} />
+                <EligibilityStatusTag score={scores.get(a.id)} position={positionFor(a.positionId)} candidate={a} />
                 {/* emailVerified is explicit false only once actually checked at apply
                     time (WS2 layer 2) — undefined (legacy applications, or HR-added
                     candidates with no verification to speak of) stays silent rather

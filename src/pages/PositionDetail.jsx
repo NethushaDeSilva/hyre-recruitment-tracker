@@ -30,7 +30,6 @@ import RejectModal from "@/components/RejectModal";
 import StageConfigModal from "@/components/StageConfigModal";
 import OpenPositionModal from "@/components/OpenPositionModal";
 import CandidateDetailModal from "@/components/CandidateDetailModal";
-import EligibilityTag from "@/components/EligibilityTag";
 
 export default function PositionDetail() {
   const { id } = useParams();
@@ -467,9 +466,6 @@ export default function PositionDetail() {
                         )
                       )}
                       <AssessmentStatus score={scores.get(c.id)} position={position} candidate={c} />
-                      {position.minQualification && c.highestQualification && (
-                        <EligibilityTag candidateQual={c.highestQualification} minQual={position.minQualification} />
-                      )}
 
                       {c.stage === "hired" ? (
                         <div className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#E7F6EC] py-2 text-xs font-bold text-[#16A34A]">

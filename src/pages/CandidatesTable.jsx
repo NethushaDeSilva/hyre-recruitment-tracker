@@ -1,13 +1,13 @@
-import { canBulkSelect } from "@/lib/scoreStaleness";
 // Candidates table (HR / Management) — every ACTIVE applicant across all
 // positions in a sortable table. Hired candidates live on Employees; rejected
 // candidates live on Rejected — this table only ever holds people still in
 // the pipeline. Filter by position or free-text search, sort by any column,
-// download/view each CV.
+// download/view each CV. Stage changes happen on the position board, where
+// there's stage context — this is a cross-position lookup, not a workspace.
 import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { useHyreData, advanceStage, bulkReject } from "@/data/store";
-import { resolveStage, nextStage, canActOnStageFor, visiblePositions } from "@/lib/stages";
+import { useHyreData, bulkReject } from "@/data/store";
+import { canActOnStageFor, visiblePositions } from "@/lib/stages";
 import { useAuth } from "@/context/AuthContext";
 import { useStaggerReveal } from "@/hooks/useStaggerReveal";
 import { QUALIFICATIONS, EXPERIENCE_RANGES } from "@/lib/application";
@@ -50,8 +50,7 @@ export default function CandidatesTable() {
   const [bulkRejectOpen, setBulkRejectOpen] = useState(false);
 
   const titleFor = (id) => positions.find((p) => p.id === id)?.title || "—";
-  const positionFor = (id) => positions.find((p) => p.id === id) || null; // for the detail modal's Move-to-next-stage
-  const minQualFor = (id) => positions.find((p) => p.id === id)?.minQualification || "";
+  const positionFor = (id) => positions.find((p) => p.id === id) || null;
 
   // Match is only sortable once a single position scopes every row to exactly
   // one score (see the "Select a position" notice next to the filter) — a
@@ -146,35 +145,16 @@ export default function CandidatesTable() {
 
   // --- bulk selection (the "select all" tick acts on the current page) ---
   // `checked` still stores APPLICATION ids underneath — a grouped row's checkbox
-  // just toggles every application belonging to that person at once, so the bulk
-  // move logic below (which is inherently per-application) needs no changes.
+  // just toggles every application belonging to that person at once, so the
+  // reject logic below (which is inherently per-application) needs no changes.
   const selectedRows = rows.filter((c) => checked.has(c.id));
   const pageApplicationIds = pageGroups.flatMap((g) => g.applications.map((a) => a.id));
   const pageAllChecked = pageApplicationIds.length > 0 && pageApplicationIds.every((id) => checked.has(id));
 
-  // Bulk "move to next stage" — Applied only (mirrors the position board's bulk
-  // move: no review/score note required, it's just an application), and only for
-  // candidates this user is actually allowed to act on in that stage. Selected
-  // candidates can span different positions, so eligibility and the next-stage
-  // label are computed per-candidate from THEIR OWN position's pipeline.
-  const movable = selectedRows.filter(
-    (c) => c.stage === "applied" && canActOnStageFor(user, positionFor(c.positionId), "applied") && canBulkSelect(scores.get(c.id), positionFor(c.positionId), c)
-  );
-  const moveLabels = [...new Set(
-    movable
-      .map((c) => {
-        const pos = positionFor(c.positionId);
-        const ns = pos && nextStage(pos.stages, "applied");
-        return ns ? resolveStage(pos, ns).label : null;
-      })
-      .filter(Boolean)
-  )];
-  const moveLabel = moveLabels.length === 1 ? moveLabels[0] : "next stage";
-
   // Bulk reject — any selected candidate the acting user owns the current
-  // stage of (Management: any stage). Same permission gate as move, reused
-  // rather than re-derived, and rejectCandidate/bulkReject in store.js is the
-  // one path both this and the position board's bulk reject write through.
+  // stage of (Management: any stage). Same permission gate the position
+  // board's bulk reject uses, and rejectCandidate/bulkReject in store.js is
+  // the one path both write through.
   const rejectable = selectedRows.filter((c) => canActOnStageFor(user, positionFor(c.positionId), c.stage));
 
   const toggleGroup = (group) =>
@@ -192,13 +172,6 @@ export default function CandidatesTable() {
       return next;
     });
   const clearSelection = () => setChecked(new Set());
-
-  const moveSelected = async () => {
-    const ids = movable.map((c) => c.id);
-    clearSelection();
-    await Promise.all(ids.map((id) => advanceStage(id, actor, { screeningBulk: true })));
-    toast.success(`Moved ${ids.length} candidate${ids.length === 1 ? "" : "s"} to ${moveLabel}.`);
-  };
 
   return (
     <div className="p-4 sm:p-7">
@@ -243,11 +216,8 @@ export default function CandidatesTable() {
       {/* bulk action bar — appears once you tick people */}
       <CandidatesBulkBar
         selectedCount={selectedRows.length}
-        movable={movable}
-        moveLabel={moveLabel}
         rejectable={rejectable}
         onClear={clearSelection}
-        onMove={moveSelected}
         onReject={() => setBulkRejectOpen(true)}
       />
 
@@ -277,7 +247,6 @@ export default function CandidatesTable() {
                     toggleGroup={toggleGroup}
                     titleFor={titleFor}
                     positionFor={positionFor}
-                    minQualFor={minQualFor}
                     scores={scores}
                     onOpenCandidate={setSelected}
                   />

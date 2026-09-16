@@ -6,7 +6,7 @@
 //  Step 1..N "Assign"     — one screen PER stage. Management sees only that
 //                           stage's eligible people and ticks the TEAM who will
 //                           run it (multi-select checkboxes, with title +
-//                           availability). Proceed moves to the next stage.
+//                           assignment count). Proceed moves to the next stage.
 //
 // Assignment is Management-only; HR can edit the pipeline structure but only sees
 // step 0. A candidate in a custom stage is actioned by Management (deployed rules
@@ -122,7 +122,7 @@ export default function StageConfigModal({ open, position, onClose }) {
             // already saved on a stage into an unremovable "ghost".
             .filter((u) => [ROLES.HR, ROLES.INTERVIEWER, ROLES.MANAGEMENT].includes(u.role));
           // Safety net: collapse any remaining same-name people within a role so a
-          // person can never show twice (one "available", one "busy").
+          // person can never show twice (one with fewer assignments, one with more).
           const seen = new Set();
           const list = [];
           for (const u of raw) {
@@ -151,7 +151,7 @@ export default function StageConfigModal({ open, position, onClose }) {
     return () => { alive = false; };
   }, [open, canAssign]);
 
-  // Workload across ALL positions (fewest-first ordering + Available/Busy status).
+  // Workload across ALL positions (fewest-first ordering + assignment-count status).
   const workload = useMemo(() => {
     const m = {};
     for (const p of positions) {
@@ -426,7 +426,7 @@ function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, wor
 
       {selectable.length > 0 && (
         <button onClick={toggleAllShown} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary hover:underline">
-          <CheckCheck size={14} /> {allShownSelected ? "Clear all shown" : `Select all ${selectable.length} available`}
+          <CheckCheck size={14} /> {allShownSelected ? "Clear all shown" : `Select all ${selectable.length}`}
         </button>
       )}
 

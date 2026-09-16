@@ -1007,6 +1007,8 @@ Given the eligible pool — correct domain, correct level for the vacancy's seni
 
 **It must not assign automatically.** Removing the human from "who interviews this candidate" removes accountability from a hiring decision, and "the system chose" is not an answer that survives a viva question. Same principle as WS5: the engine reports, the human decides.
 
+**"Fewest current assignments" is booking load, never pipeline-team membership — these are two different numbers with two different homes, and they must stay that way.** `StageConfigModal.jsx`'s assignment badge (the one HR sees while ticking people onto a stage's team) counts how many stages, across every position, someone has been manually configured onto — a rostering figure, computed from `stageAssignees`. It says nothing about whether that person has ever actually run an interview. The ranking in this section counts the opposite thing: how many `interviews` documents someone currently holds in `pending_confirmation`/`confirmed` status — real, live scheduling load. A person could sit on five stage-teams across five positions and never have been booked once; a person configured onto a single stage could already be double-booked. Reusing the `StageConfigModal` number for ranking would rank the first person as busier than the second, which is simply wrong. Confirmed live (2026-09-16): fixing `StageConfigModal`'s badge to distinguish saved-vs-pending selections was a real, separate bug fix, and it changed nothing about which number the ranking uses — the ranking was always going to need its own count from `interviews`, computed fresh at ranking time from that collection, never borrowed from a UI badge that was never measuring the same thing.
+
 ---
 
 #### 8.7 End-to-end, or not at all

@@ -109,23 +109,77 @@ service cloud.firestore {
       allow delete: if false; // re-declaring supersedes; deleting would just create a false `unknown` gap
     }
 
-    // --- WS8 interviews (scheduling requests + booked interviews) ---
-    // create: staff only (either the automated-assignment trigger or HR's
-    // manual override, §15 — both run under a staff session). update: staff
-    // (advancing/booking), or the assigned interviewer responding to their
-    // own pending request (accept/decline, §13) — scoped to status + booking
-    // fields only, so an interviewer can't silently reassign themselves off a
-    // request or rewrite the proposed slot while "declining" it.
+    // --- WS8 Part C interviews (automated requests + booked interviews) ---
+    // create: staff only (the assignment trigger or HR's manual override, §15
+    // — both run under a staff session; an Interviewer can trigger one too,
+    // since advancing a candidate out of an Interviewer-owned stage is a
+    // normal action for that role — see applications' ownsStage() precedent).
+    //
+    // READ and UPDATE's broad branch is isRecruiter() (HR/Management), NOT
+    // isStaff(). This was a real bug, found live: isStaff() includes the
+    // Interviewer role, so `isStaff() || (narrow interviewer-self check)`
+    // let isStaff() short-circuit true for ANY interviewer on ANY OTHER
+    // interviewer's request — the narrow branch below was correctly written
+    // but dead code, silently bypassed by the broad OR in front of it. An
+    // Interviewer must only ever touch a request where they ARE the current
+    // interviewerId, through the narrow, mechanically-constrained path — full
+    // staff-grade access to this collection belongs to HR/Management only.
+    //
+    // update, isRecruiter(): full access — HR's override, marking completed.
+    // update, the currently-requested interviewer, responding to THEIR OWN
+    // pending request — exactly two shapes, nothing else:
+    //   ACCEPT   — only `status` changes, to 'confirmed'.
+    //   DECLINE  — mechanically advances via `rankedInfo`, a uid-KEYED map
+    //     written once at creation: rankedInfo[uid].nextUid says who follows
+    //     that person in the ranking (or null if nobody does). The new
+    //     interviewerId must equal rankedInfo[OLD interviewerId].nextUid —
+    //     the interviewer can only reveal a value someone else already wrote,
+    //     never name their own replacement.
+    //     IMPORTANT: this is deliberately a KEYED map lookup, not indexing
+    //     into rankedCandidates by position. An earlier version tried
+    //     `rankedCandidates[currentRankIndex].uid` and, verified LIVE against
+    //     these deployed rules, that did NOT actually constrain the write —
+    //     a forged reassignment to an arbitrary uid was wrongly allowed
+    //     (scratch-ws8/verify-cascade-rules.mjs documents the failing and
+    //     passing runs). Keyed map access mirrors the pattern this ruleset
+    //     already trusts elsewhere (myRole() reading a doc by uid) and was
+    //     re-verified live to correctly reject a forged value before this
+    //     shipped — do not revert to positional indexing.
+    //     A second live finding: BOTH rankedInfo[uid].nextUid AND
+    //     interviewerId use "" (never `null`) to mark "nobody" — comparing
+    //     either to `null` did not evaluate as a straightforward equality
+    //     check when tested live (top-level or nested; the exact cause
+    //     wasn't isolated further once removing `null` entirely fixed it
+    //     both places). A real Firebase uid is never "", so the sentinel can
+    //     never be mistaken for a real assignment. The app's own read layer
+    //     (mapInterviewDoc in store.js) converts "" back to `null` for
+    //     consumers — this sentinel is a rules-evaluation workaround, not a
+    //     concept that should leak into the rest of the codebase.
     match /interviews/{interviewId} {
-      allow read: if isStaff()
+      allow read: if isRecruiter()
         || (signedIn() && resource.data.interviewerId == request.auth.uid);
       allow create: if isStaff();
-      allow update: if isStaff()
+      allow update: if isRecruiter()
         || (signedIn() && resource.data.interviewerId == request.auth.uid
             && resource.data.status == 'pending_confirmation'
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-            && request.resource.data.status in ['confirmed', 'declined']);
-      allow delete: if false; // a declined/expired request is history, not erased — mirrors applications/employees
+            && (
+                 (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                  && request.resource.data.status == 'confirmed')
+                 ||
+                 (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'interviewerId', 'requestedAt', 'respondedBy'])
+                  && request.resource.data.respondedBy.size() == resource.data.respondedBy.size() + 1
+                  && (
+                       (resource.data.rankedInfo[resource.data.interviewerId].nextUid != ''
+                        && request.resource.data.interviewerId == resource.data.rankedInfo[resource.data.interviewerId].nextUid
+                        && request.resource.data.status == 'pending_confirmation')
+                       ||
+                       (resource.data.rankedInfo[resource.data.interviewerId].nextUid == ''
+                        && request.resource.data.interviewerId == ''
+                        && request.resource.data.status == 'needs_attention')
+                     )
+                 )
+               ));
+      allow delete: if false; // a declined/exhausted request is history, not erased — mirrors applications/employees
     }
 
     // --- positions ---

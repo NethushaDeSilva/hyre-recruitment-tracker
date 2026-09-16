@@ -17,13 +17,15 @@ import { canBulkSelect } from "@/lib/scoreStaleness";
 import { useSyncExternalStore } from "react";
 import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
-import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta } from "@/lib/stages";
+import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta, stageOwnerRole } from "@/lib/stages";
 import { departmentCode } from "@/lib/departments";
 import { isOpenNow } from "@/lib/positions";
 import { createRescoreRun, executeRescoreRun, snapshotKey } from "@/lib/rescoreBatch";
 import { scoringHeaders } from "@/lib/scoringAuth";
 import { createDeclaredAvailabilityProvider, availabilityState, AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
 import { browserTimeZone } from "@/lib/wallClock";
+import { rankEligibleInterviewers } from "@/lib/interviewAssignment";
+import { ROLES } from "@/lib/permissions";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
 function pickColor(name) {
@@ -1094,6 +1096,7 @@ export async function listInterviewers() {
       return {
         uid: d.id,
         name: x.displayName || x.email || "Team member",
+        role: x.role || "",
         avatarColor: x.avatarColor || "#64748B",
         domain: x.domain || "",
         levels: x.levels || [],
@@ -1185,6 +1188,211 @@ export async function getAvailabilityStates(uids) {
   const out = {};
   uids.forEach((id, i) => { out[id] = availabilityState(snaps[i].exists() ? mapAvailabilityDoc(snaps[i].data()) : null); });
   return out;
+}
+
+/** Full declared-availability RECORDS (not just state) for a set of staff — what the ranking engine needs to check a specific proposed time. */
+export async function getAvailabilityRecords(uids) {
+  if (!firebaseReady || !uids.length) return {};
+  const snaps = await Promise.all(uids.map((id) => getDoc(doc(db, "availability", id))));
+  const out = {};
+  uids.forEach((id, i) => { out[id] = snaps[i].exists() ? mapAvailabilityDoc(snaps[i].data()) : null; });
+  return out;
+}
+
+// --- WS8 Part C — automated interview assignment ----------------------------
+// CLAUDE.md WS8 §8.6: "fewest current assignments" is REAL BOOKING LOAD — how
+// many interviews someone currently holds — never the pipeline-team-membership
+// count StageConfigModal shows (see that section's note, added 2026-09-16).
+// This is that real count, computed fresh from /interviews every time it's
+// needed, never cached, never borrowed from a UI badge.
+export async function getBookingCounts(uids) {
+  if (!firebaseReady || !uids.length) return {};
+  const snap = await getDocs(query(collection(db, "interviews"), where("interviewerId", "in", uids.slice(0, 30))));
+  const out = {};
+  snap.docs.forEach((d) => {
+    const x = d.data();
+    if (!["pending_confirmation", "confirmed"].includes(x.status)) return;
+    out[x.interviewerId] = (out[x.interviewerId] || 0) + 1;
+  });
+  return out;
+}
+
+function mapInterviewDoc(d) {
+  const x = d.data();
+  return {
+    id: d.id,
+    applicationId: x.applicationId || "", positionId: x.positionId || "", stageId: x.stageId || "",
+    candidateName: x.candidateName || "",
+    scheduledAt: ms(x.scheduledAt), durationMs: x.durationMs || 3600000,
+    status: x.status,
+    rankedCandidates: x.rankedCandidates || [],
+    excludedCandidates: x.excludedCandidates || [],
+    poolReason: x.poolReason || null,
+    interviewerId: x.interviewerId || null,
+    requestedAt: x.requestedAt ? ms(x.requestedAt) : 0,
+    respondedBy: x.respondedBy || [],
+    createdAt: ms(x.createdAt), createdByUid: x.createdByUid || "", createdByName: x.createdByName || "",
+    overriddenBy: x.overriddenBy || null,
+  };
+}
+const interviewMessage = (candidateName) => `New DevOps interview request${candidateName ? ` for ${candidateName}` : ""} — respond from your notifications.`;
+
+// A uid-keyed lookup of "who comes after this person in the ranking" — the
+// mechanism the decline-cascade rule reads from. Chosen over indexing into
+// `rankedCandidates` by position: live testing against the deployed rules
+// showed a POSITION-indexed check (`rankedCandidates[currentRankIndex].uid`)
+// did not actually constrain the write the way it reads — a forged
+// reassignment to an arbitrary, unranked uid was incorrectly ALLOWED. A
+// uid-KEYED map lookup (`rankedInfo[interviewerId].nextUid`) is the same
+// pattern this ruleset already trusts elsewhere (`myRole()`, `stageOwner()`
+// via a role string), verified live to actually deny a forged value — see
+// firestore.rules and scratch-ws8/verify-cascade-rules.mjs.
+// "" (never stored `null`) marks the end of the chain — a nested map field
+// compared to `null` inside firestore.rules was found, live, NOT to behave as
+// a straightforward equality check (see that file's comment); an empty
+// string sentinel sidesteps the ambiguity entirely and compares reliably.
+const NO_NEXT = "";
+const buildRankedInfo = (ranked) => {
+  const info = {};
+  ranked.forEach((r, i) => { info[r.uid] = { nextUid: ranked[i + 1]?.uid || NO_NEXT }; });
+  return info;
+};
+
+/**
+ * WS8 §8/8.6 — the TRIGGER. Called the moment a candidate lands in a
+ * schedulable stage (isSchedulableStage(), PositionDetail's move flow) with an
+ * HR-proposed slot. Ranks the eligible DevOps pool for this position's level,
+ * requests the top pick, and — critically — STORES the full ranking (and why
+ * anyone was excluded) on the record itself. Nothing about this ranking is
+ * ever recomputed later: the record IS the explanation, permanently.
+ */
+export async function createInterviewRequest({ applicationId, positionId, stageId, candidateName = "", scheduledAt, durationMs = 3600000, actor }) {
+  if (!firebaseReady) return null;
+  const position = positions.find((p) => p.id === positionId);
+  const ownerRole = stageOwnerRole(position, stageId);
+  const pool = (await listInterviewers()).filter((p) => p.role === ownerRole || p.role === ROLES.MANAGEMENT);
+  const uids = pool.map((p) => p.uid);
+  const [availabilityRecords, bookingCounts] = await Promise.all([getAvailabilityRecords(uids), getBookingCounts(uids)]);
+  const { ranked, excluded, poolReason } = rankEligibleInterviewers({ interviewers: pool, position, targetMs: scheduledAt, availabilityRecords, bookingCounts });
+
+  const data = {
+    applicationId, positionId, stageId, candidateName,
+    scheduledAt: new Date(scheduledAt), durationMs,
+    status: ranked.length ? "pending_confirmation" : "needs_attention",
+    rankedCandidates: ranked, rankedInfo: buildRankedInfo(ranked),
+    excludedCandidates: excluded, poolReason,
+    // "" (never `null`), same NO_NEXT sentinel as rankedInfo — see that
+    // constant's comment. interviewerId is compared inside firestore.rules,
+    // and a real Firebase uid is never "", so this sentinel can never be
+    // mistaken for a real assignment by any rule that checks it against
+    // request.auth.uid.
+    interviewerId: ranked.length ? ranked[0].uid : NO_NEXT,
+    requestedAt: ranked.length ? new Date() : null,
+    respondedBy: [],
+    createdAt: new Date(), createdByUid: actor?.uid || "", createdByName: actor?.name || "",
+    overriddenBy: null,
+  };
+  const ref = await addDoc(collection(db, "interviews"), data);
+  if (ranked.length) {
+    await notifyUser({ uid: ranked[0].uid, type: "interview_request", message: interviewMessage(candidateName), candidateId: applicationId, positionId });
+  }
+  return mapInterviewDoc({ id: ref.id, data: () => data });
+}
+
+/**
+ * The interviewer's own response to THEIR current pending request.
+ *   accept  → confirmed, becomes a real commitment on their calendar (the
+ *             existing DeclaredAvailabilityProvider already reads /interviews
+ *             for commitments — nothing else needs to change for that).
+ *   decline → mechanically advances via the pre-computed rankedInfo pointer
+ *             (never a fresh rank, never a value the interviewer chose) — or,
+ *             if exhausted, flips to needs_attention. Enforced again, not
+ *             just trusted, by firestore.rules (see that file's comment).
+ */
+export async function respondToInterviewRequest(interviewId, { accept, actor }) {
+  if (!firebaseReady) return { ok: false };
+  const ref = doc(db, "interviews", interviewId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { ok: false, reason: "not-found" };
+  const x = snap.data();
+  if (x.status !== "pending_confirmation") return { ok: false, reason: "not-pending" };
+  if (x.interviewerId !== (actor?.uid || "")) return { ok: false, reason: "not-yours" };
+
+  if (accept) {
+    await updateDoc(ref, { status: "confirmed" });
+    return { ok: true, status: "confirmed" };
+  }
+
+  // NO_NEXT ("") when exhausted — never `null`, matching rankedInfo's own
+  // sentinel and what firestore.rules compares interviewerId against.
+  const nextUid = x.rankedInfo?.[x.interviewerId]?.nextUid || NO_NEXT;
+  await updateDoc(ref, {
+    interviewerId: nextUid,
+    status: nextUid ? "pending_confirmation" : "needs_attention",
+    requestedAt: nextUid ? new Date() : null,
+    respondedBy: arrayUnion({ uid: actor?.uid || "", name: actor?.name || "", action: "declined", at: Date.now() }),
+  });
+  if (nextUid) {
+    await notifyUser({ uid: nextUid, type: "interview_request", message: interviewMessage(x.candidateName), candidateId: x.applicationId, positionId: x.positionId });
+  }
+  return { ok: true, status: nextUid ? "pending_confirmation" : "needs_attention" };
+}
+
+/**
+ * WS8 §15 — HR's manual override. Works standalone (a brand-new interview
+ * with no `interviewId`) or redirects an existing needs_attention record onto
+ * whoever HR picks — either way it never depends on the ranking having
+ * produced anyone, and it's the ONLY path that can hand a record to someone
+ * the ranking excluded (HR overrides are a deliberate human decision, not a
+ * ranking bypass bug).
+ */
+export async function overrideInterviewRequest({ interviewId = null, applicationId, positionId, stageId, candidateName = "", interviewerId, scheduledAt, durationMs = 3600000, actor }) {
+  if (!firebaseReady) return { ok: false };
+  const overriddenBy = { uid: actor?.uid || "", name: actor?.name || "" };
+  if (interviewId) {
+    await updateDoc(doc(db, "interviews", interviewId), {
+      interviewerId, status: "pending_confirmation", requestedAt: new Date(),
+      scheduledAt: new Date(scheduledAt), durationMs, overriddenBy,
+    });
+  } else {
+    const data = {
+      applicationId, positionId, stageId, candidateName,
+      scheduledAt: new Date(scheduledAt), durationMs,
+      status: "pending_confirmation",
+      // No ranking behind a manual pick — rankedInfo stays empty, so if this
+      // person declines it correctly falls to needs_attention (nothing to
+      // cascade to) rather than silently inventing a next candidate that was
+      // never actually ranked for this request.
+      rankedCandidates: [], rankedInfo: {}, excludedCandidates: [], poolReason: null,
+      interviewerId, requestedAt: new Date(), respondedBy: [],
+      createdAt: new Date(), createdByUid: actor?.uid || "", createdByName: actor?.name || "",
+      overriddenBy,
+    };
+    const ref = await addDoc(collection(db, "interviews"), data);
+    interviewId = ref.id;
+  }
+  await notifyUser({ uid: interviewerId, type: "interview_request", message: interviewMessage(candidateName), candidateId: applicationId, positionId });
+  return { ok: true, id: interviewId };
+}
+
+/** Every interview record for one application — HR's "needs attention" / status view. */
+export async function getInterviewsForApplication(applicationId) {
+  if (!firebaseReady || !applicationId) return [];
+  const snap = await getDocs(query(collection(db, "interviews"), where("applicationId", "==", applicationId)));
+  return snap.docs.map((d) => mapInterviewDoc(d));
+}
+
+/** One interviewer's own currently-pending requests. */
+export async function getPendingInterviewsForStaff(uid) {
+  if (!firebaseReady || !uid) return [];
+  const snap = await getDocs(query(collection(db, "interviews"), where("interviewerId", "==", uid), where("status", "==", "pending_confirmation")));
+  return snap.docs.map((d) => mapInterviewDoc(d));
+}
+
+export async function getInterview(id) {
+  if (!firebaseReady || !id) return null;
+  const snap = await getDoc(doc(db, "interviews", id));
+  return snap.exists() ? mapInterviewDoc(snap) : null;
 }
 
 // Which collection holds this application id? A HIRED person's row lives in

@@ -455,8 +455,11 @@ function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, wor
                     <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold text-muted-foreground">On “{lockedStage}”</span>
                   ) : (
                     <>
+                      {/* This measures stage-assignment COUNT, not real availability — no
+                          dates/times/commitments are known here. Real availability is a
+                          separate, later feature; do not repurpose this into one. */}
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: busy ? "#D97706" : "#16A34A" }} />
-                      <span className={busy ? "text-[#B45309]" : "text-[#16A34A]"}>{busy ? `Busy · ${busy}` : "Available"}</span>
+                      <span className={busy ? "text-[#B45309]" : "text-[#16A34A]"}>{busy ? `${busy} assignment${busy === 1 ? "" : "s"}` : "No assignments"}</span>
                     </>
                   )}
                 </span>

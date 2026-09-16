@@ -124,12 +124,25 @@ export function AuthProvider({ children }) {
           //    never be self-minted — otherwise anyone could sign in and write
           //    themselves a staff role. A missing staff doc just means limited
           //    access (the DB denies staff writes) until it is provisioned.
-          profile = { displayName: fbUser.displayName || base.name, title: base.title, role: base.role, avatarColor: base.avatarColor, photoURL: fbUser.photoURL || "", email: fbUser.email };
+          //
+          // role is ALWAYS "Candidate" here, never guessed from the email address
+          // (base.role). roleForEmail()'s domain-pattern matching used to decide
+          // this, which meant self-registering with an @hyre.com-shaped address
+          // (allowed — signup is Candidate-only, but nothing stops the email
+          // string itself) got a "Management"/"HR"/"Interviewer" client-side role,
+          // and RequireRole would render that staff shell — hollow (Firestore
+          // rules check the real stored doc, so no actual data leaked) but wrong.
+          // No stored doc now means no staff access, never a guessed one. name/
+          // title/avatarColor still use roleForEmail — cosmetic-only, not a
+          // security boundary, and a reasonable default before a real profile exists.
+          profile = { displayName: fbUser.displayName || base.name, title: base.title, role: "Candidate", avatarColor: base.avatarColor, photoURL: fbUser.photoURL || "", email: fbUser.email };
         }
       } catch (e) {
         console.error("profile load:", e);
       }
-      const resolvedRole = profile?.role || base.role;
+      // Fails closed to Candidate, never to a guessed staff role — see the no-doc
+      // branch above for why base.role must never reach here.
+      const resolvedRole = profile?.role || "Candidate";
       const userId = profile?.userId || "";
       setUser({
         uid: fbUser.uid,
@@ -244,7 +257,7 @@ export function AuthProvider({ children }) {
   };
 
   // Resend the verification link to whoever is currently signed in — used by
-  // both the staff RequireVerified gate and Login's post-register banner.
+  // Login's post-register banner and Profile's verify-email banner.
   const resendVerificationEmail = async () => {
     if (!firebaseReady || !auth.currentUser) return { ok: false, error: "Not signed in." };
     try {
@@ -263,7 +276,7 @@ export function AuthProvider({ children }) {
   // without this, a just-verified candidate's application could still be
   // rejected by the applications-create rule on a stale token. Never throws;
   // a failure here just means "we don't know yet", not "blocked" — the caller
-  // (ApplyModal, RequireVerified) must never let this stall a real user.
+  // (ApplyModal, Profile) must never let this stall a real user.
   const refreshEmailVerified = async () => {
     if (!firebaseReady || !auth.currentUser) return false;
     try {

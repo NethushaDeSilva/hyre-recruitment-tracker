@@ -1,0 +1,1750 @@
+[
+  {
+    "page": "Positions",
+    "url": "/positions",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Positions",
+    "url": "/positions",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Positions",
+    "url": "/positions",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Positions",
+    "url": "/positions",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Positions",
+    "url": "/positions",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Positions",
+    "url": "/positions",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "PositionBoard-BD01",
+    "url": "/positions/BD-01",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "PositionBoard-BD01",
+    "url": "/positions/BD-01",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "PositionBoard-BD01",
+    "url": "/positions/BD-01",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "PositionBoard-BD01",
+    "url": "/positions/BD-01",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "PositionBoard-BD01",
+    "url": "/positions/BD-01",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "PositionBoard-BD01",
+    "url": "/positions/BD-01",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Candidates",
+    "url": "/candidates",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Candidates",
+    "url": "/candidates",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Candidates",
+    "url": "/candidates",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Candidates",
+    "url": "/candidates",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Candidates",
+    "url": "/candidates",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Candidates",
+    "url": "/candidates",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Employees",
+    "url": "/employees",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Employees",
+    "url": "/employees",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 5,
+    "offenders": [
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Senior network engineer",
+        "rectRight": 583,
+        "parentRight": 931,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 67
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "Software Engineering (SE)",
+        "rectRight": 743,
+        "parentRight": 931,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 67
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "18 Aug 2026",
+        "rectRight": 840,
+        "parentRight": 931,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 67
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Regional manager",
+        "rectRight": 583,
+        "parentRight": 931,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "19 Aug 2026",
+        "rectRight": 840,
+        "parentRight": 931,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      }
+    ]
+  },
+  {
+    "page": "Employees",
+    "url": "/employees",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 6,
+    "offenders": [
+      {
+        "tag": "BUTTON",
+        "cls": "inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary",
+        "text": "Job role",
+        "rectRight": 528,
+        "parentRight": 544,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Senior network engineer",
+        "rectRight": 544,
+        "parentRight": 849,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "Software Engineering (SE)",
+        "rectRight": 673,
+        "parentRight": 849,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "18 Aug 2026",
+        "rectRight": 758,
+        "parentRight": 849,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Regional manager",
+        "rectRight": 544,
+        "parentRight": 849,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "19 Aug 2026",
+        "rectRight": 758,
+        "parentRight": 849,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      }
+    ]
+  },
+  {
+    "page": "Employees",
+    "url": "/employees",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 7,
+    "offenders": [
+      {
+        "tag": "SPAN",
+        "cls": "ml-1 text-[#94A3B8]",
+        "text": "· issued an employee ID on hire",
+        "rectRight": 322,
+        "parentRight": 344,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 37
+      },
+      {
+        "tag": "BUTTON",
+        "cls": "inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary",
+        "text": "Job role",
+        "rectRight": 516,
+        "parentRight": 532,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Senior network engineer",
+        "rectRight": 532,
+        "parentRight": 837,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "Software Engineering (SE)",
+        "rectRight": 661,
+        "parentRight": 837,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "18 Aug 2026",
+        "rectRight": 746,
+        "parentRight": 837,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Regional manager",
+        "rectRight": 532,
+        "parentRight": 837,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "19 Aug 2026",
+        "rectRight": 746,
+        "parentRight": 837,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      }
+    ]
+  },
+  {
+    "page": "Employees",
+    "url": "/employees",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 6,
+    "offenders": [
+      {
+        "tag": "BUTTON",
+        "cls": "inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary",
+        "text": "Job role",
+        "rectRight": 528,
+        "parentRight": 544,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Senior network engineer",
+        "rectRight": 544,
+        "parentRight": 849,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "Software Engineering (SE)",
+        "rectRight": 673,
+        "parentRight": 849,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "18 Aug 2026",
+        "rectRight": 758,
+        "parentRight": 849,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Regional manager",
+        "rectRight": 544,
+        "parentRight": 849,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "19 Aug 2026",
+        "rectRight": 758,
+        "parentRight": 849,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      }
+    ]
+  },
+  {
+    "page": "Employees",
+    "url": "/employees",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 6,
+    "offenders": [
+      {
+        "tag": "BUTTON",
+        "cls": "inline-flex items-center gap-1 font-semibold text-foreground hover:text-primary",
+        "text": "Job role",
+        "rectRight": 516,
+        "parentRight": 532,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Senior network engineer",
+        "rectRight": 532,
+        "parentRight": 837,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "Software Engineering (SE)",
+        "rectRight": 661,
+        "parentRight": 837,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "18 Aug 2026",
+        "rectRight": 746,
+        "parentRight": 837,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 87
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-foreground",
+        "text": "Regional manager",
+        "rectRight": 532,
+        "parentRight": 837,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      },
+      {
+        "tag": "TD",
+        "cls": "px-4 py-3 text-muted-foreground",
+        "text": "19 Aug 2026",
+        "rectRight": 746,
+        "parentRight": 837,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 65
+      }
+    ]
+  },
+  {
+    "page": "Rejected",
+    "url": "/rejected",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Rejected",
+    "url": "/rejected",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Rejected",
+    "url": "/rejected",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Rejected",
+    "url": "/rejected",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "SPAN",
+        "cls": "ml-1 text-[#94A3B8]",
+        "text": "· kept in the talent pool, never deleted",
+        "rectRight": 328,
+        "parentRight": 344,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 37
+      }
+    ]
+  },
+  {
+    "page": "Rejected",
+    "url": "/rejected",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Rejected",
+    "url": "/rejected",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "SPAN",
+        "cls": "ml-1 text-[#94A3B8]",
+        "text": "· kept in the talent pool, never deleted",
+        "rectRight": 328,
+        "parentRight": 359,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 37
+      }
+    ]
+  },
+  {
+    "page": "Company",
+    "url": "/company",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Company",
+    "url": "/company",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Company",
+    "url": "/company",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Company",
+    "url": "/company",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Company",
+    "url": "/company",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Company",
+    "url": "/company",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Team",
+    "url": "/team",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Team",
+    "url": "/team",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Team",
+    "url": "/team",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Team",
+    "url": "/team",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-1.5 text-sm text-muted-foreground",
+        "text": "Who's on the hiring team, and what each role is allowed to d",
+        "rectRight": 344,
+        "parentRight": 360,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "page": "Team",
+    "url": "/team",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Team",
+    "url": "/team",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-1.5 text-sm text-muted-foreground",
+        "text": "Who's on the hiring team, and what each role is allowed to d",
+        "rectRight": 359,
+        "parentRight": 375,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      }
+    ]
+  },
+  {
+    "page": "Profile",
+    "url": "/profile",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Profile",
+    "url": "/profile",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "Your unique account ID across Hyre as HR Recruiter · HR. It ",
+        "rectRight": 658,
+        "parentRight": 675,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      }
+    ]
+  },
+  {
+    "page": "Profile",
+    "url": "/profile",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "Your unique account ID across Hyre as HR Recruiter · HR. It ",
+        "rectRight": 650,
+        "parentRight": 667,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      }
+    ]
+  },
+  {
+    "page": "Profile",
+    "url": "/profile",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 3,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "text-xs text-muted-foreground",
+        "text": "PNG or JPG — we resize it for you, so file size doesn't matt",
+        "rectRight": 319,
+        "parentRight": 319,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "Your unique account ID across Hyre as HR Recruiter · HR. It ",
+        "rectRight": 302,
+        "parentRight": 319,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 48
+      },
+      {
+        "tag": "P",
+        "cls": "flex-1 text-[13px] text-foreground",
+        "text": "Verify your email to confirm this address is yours.",
+        "rectRight": 152,
+        "parentRight": 319,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 117
+      }
+    ]
+  },
+  {
+    "page": "Profile",
+    "url": "/profile",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "Your unique account ID across Hyre as HR Recruiter · HR. It ",
+        "rectRight": 658,
+        "parentRight": 675,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      }
+    ]
+  },
+  {
+    "page": "Profile",
+    "url": "/profile",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 3,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "text-xs text-muted-foreground",
+        "text": "PNG or JPG — we resize it for you, so file size doesn't matt",
+        "rectRight": 334,
+        "parentRight": 334,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "Your unique account ID across Hyre as HR Recruiter · HR. It ",
+        "rectRight": 317,
+        "parentRight": 334,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 48
+      },
+      {
+        "tag": "P",
+        "cls": "flex-1 text-[13px] text-foreground",
+        "text": "Verify your email to confirm this address is yours.",
+        "rectRight": 167,
+        "parentRight": 334,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 98
+      }
+    ]
+  },
+  {
+    "page": "Settings",
+    "url": "/settings",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings",
+    "url": "/settings",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings",
+    "url": "/settings",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings",
+    "url": "/settings",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings",
+    "url": "/settings",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings",
+    "url": "/settings",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Jobs",
+    "url": "/jobs",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "line-clamp-3 text-sm leading-relaxed text-muted-foreground",
+        "text": "Connect local branch teams with upper company leaders to mak",
+        "rectRight": 1389,
+        "parentRight": 1410,
+        "vw": 1440,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 45
+      }
+    ]
+  },
+  {
+    "page": "Jobs",
+    "url": "/jobs",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 1,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "line-clamp-3 text-sm leading-relaxed text-muted-foreground",
+        "text": "Connect local branch teams with upper company leaders to mak",
+        "rectRight": 911,
+        "parentRight": 931,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 45
+      }
+    ]
+  },
+  {
+    "page": "Jobs",
+    "url": "/jobs",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 2,
+    "offenders": [
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "text": "You're in the hiring process for one role. You can apply to ",
+        "rectRight": 675,
+        "parentRight": 692,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      },
+      {
+        "tag": "P",
+        "cls": "line-clamp-3 text-sm leading-relaxed text-muted-foreground",
+        "text": "Connect local branch teams with upper company leaders to mak",
+        "rectRight": 671,
+        "parentRight": 692,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 68
+      }
+    ]
+  },
+  {
+    "page": "Jobs",
+    "url": "/jobs",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 4,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "text-sm font-medium text-muted-foreground",
+        "text": "2 open roles · apply with the standard application",
+        "rectRight": 344,
+        "parentRight": 344,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      },
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "text": "You're in the hiring process for one role. You can apply to ",
+        "rectRight": 327,
+        "parentRight": 344,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 80
+      },
+      {
+        "tag": "A",
+        "cls": "font-semibold underline",
+        "text": "My Applications",
+        "rectRight": 316,
+        "parentRight": 327,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 37
+      },
+      {
+        "tag": "P",
+        "cls": "line-clamp-3 text-sm leading-relaxed text-muted-foreground",
+        "text": "Connect local branch teams with upper company leaders to mak",
+        "rectRight": 323,
+        "parentRight": 344,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 68
+      }
+    ]
+  },
+  {
+    "page": "Jobs",
+    "url": "/jobs",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 2,
+    "offenders": [
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "text": "You're in the hiring process for one role. You can apply to ",
+        "rectRight": 723,
+        "parentRight": 740,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 40
+      },
+      {
+        "tag": "P",
+        "cls": "line-clamp-3 text-sm leading-relaxed text-muted-foreground",
+        "text": "Connect local branch teams with upper company leaders to mak",
+        "rectRight": 719,
+        "parentRight": 740,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 68
+      }
+    ]
+  },
+  {
+    "page": "Jobs",
+    "url": "/jobs",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 3,
+    "offenders": [
+      {
+        "tag": "SPAN",
+        "cls": "",
+        "text": "You're in the hiring process for one role. You can apply to ",
+        "rectRight": 342,
+        "parentRight": 359,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 80
+      },
+      {
+        "tag": "A",
+        "cls": "font-semibold underline",
+        "text": "My Applications",
+        "rectRight": 260,
+        "parentRight": 342,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 37
+      },
+      {
+        "tag": "P",
+        "cls": "line-clamp-3 text-sm leading-relaxed text-muted-foreground",
+        "text": "Connect local branch teams with upper company leaders to mak",
+        "rectRight": 338,
+        "parentRight": 359,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 68
+      }
+    ]
+  },
+  {
+    "page": "MyApplications",
+    "url": "/applications",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "MyApplications",
+    "url": "/applications",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "MyApplications",
+    "url": "/applications",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "MyApplications",
+    "url": "/applications",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "MyApplications",
+    "url": "/applications",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "MyApplications",
+    "url": "/applications",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Profile-candidate",
+    "url": "/profile",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 2,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "This is your unique ID across Hyre — recruiters see the same",
+        "rectRight": 898,
+        "parentRight": 915,
+        "vw": 1440,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "SPAN",
+        "cls": "truncate",
+        "text": "desilvanethusha+priya@gmail.com",
+        "rectRight": 807,
+        "parentRight": 915,
+        "vw": 1440,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 20
+      }
+    ]
+  },
+  {
+    "page": "Profile-candidate",
+    "url": "/profile",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 2,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "This is your unique ID across Hyre — recruiters see the same",
+        "rectRight": 658,
+        "parentRight": 675,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "SPAN",
+        "cls": "truncate",
+        "text": "desilvanethusha+priya@gmail.com",
+        "rectRight": 567,
+        "parentRight": 675,
+        "vw": 960,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 20
+      }
+    ]
+  },
+  {
+    "page": "Profile-candidate",
+    "url": "/profile",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 2,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "This is your unique ID across Hyre — recruiters see the same",
+        "rectRight": 650,
+        "parentRight": 667,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "SPAN",
+        "cls": "truncate",
+        "text": "desilvanethusha+priya@gmail.com",
+        "rectRight": 559,
+        "parentRight": 667,
+        "vw": 720,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 20
+      }
+    ]
+  },
+  {
+    "page": "Profile-candidate",
+    "url": "/profile",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 4,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "text-xs text-muted-foreground",
+        "text": "PNG or JPG — we resize it for you, so file size doesn't matt",
+        "rectRight": 319,
+        "parentRight": 319,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "This is your unique ID across Hyre — recruiters see the same",
+        "rectRight": 302,
+        "parentRight": 319,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 48
+      },
+      {
+        "tag": "SPAN",
+        "cls": "truncate",
+        "text": "desilvanethusha+priya@gmail.com",
+        "rectRight": 211,
+        "parentRight": 319,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 20
+      },
+      {
+        "tag": "P",
+        "cls": "flex-1 text-[13px] text-foreground",
+        "text": "Verify your email to keep your account secure.",
+        "rectRight": 152,
+        "parentRight": 319,
+        "vw": 360,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 98
+      }
+    ]
+  },
+  {
+    "page": "Profile-candidate",
+    "url": "/profile",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 2,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "This is your unique ID across Hyre — recruiters see the same",
+        "rectRight": 658,
+        "parentRight": 675,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "SPAN",
+        "cls": "truncate",
+        "text": "desilvanethusha+priya@gmail.com",
+        "rectRight": 567,
+        "parentRight": 675,
+        "vw": 768,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 20
+      }
+    ]
+  },
+  {
+    "page": "Profile-candidate",
+    "url": "/profile",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 4,
+    "offenders": [
+      {
+        "tag": "P",
+        "cls": "text-xs text-muted-foreground",
+        "text": "PNG or JPG — we resize it for you, so file size doesn't matt",
+        "rectRight": 334,
+        "parentRight": 334,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 32
+      },
+      {
+        "tag": "P",
+        "cls": "mt-2 text-xs text-muted-foreground",
+        "text": "This is your unique ID across Hyre — recruiters see the same",
+        "rectRight": 317,
+        "parentRight": 334,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 48
+      },
+      {
+        "tag": "SPAN",
+        "cls": "truncate",
+        "text": "desilvanethusha+priya@gmail.com",
+        "rectRight": 226,
+        "parentRight": 334,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 20
+      },
+      {
+        "tag": "P",
+        "cls": "flex-1 text-[13px] text-foreground",
+        "text": "Verify your email to keep your account secure.",
+        "rectRight": 167,
+        "parentRight": 334,
+        "vw": 375,
+        "overflowsViewport": false,
+        "overflowsParent": false,
+        "wrapped": true,
+        "height": 78
+      }
+    ]
+  },
+  {
+    "page": "Settings-candidate",
+    "url": "/settings",
+    "zoom": "100%",
+    "width": 1440,
+    "vw": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings-candidate",
+    "url": "/settings",
+    "zoom": "150%",
+    "width": 960,
+    "vw": 960,
+    "bodyScrollWidth": 960,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings-candidate",
+    "url": "/settings",
+    "zoom": "200%",
+    "width": 720,
+    "vw": 720,
+    "bodyScrollWidth": 720,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings-candidate",
+    "url": "/settings",
+    "zoom": "400%",
+    "width": 360,
+    "vw": 360,
+    "bodyScrollWidth": 360,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings-candidate",
+    "url": "/settings",
+    "zoom": "tablet-768",
+    "width": 768,
+    "vw": 768,
+    "bodyScrollWidth": 768,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  },
+  {
+    "page": "Settings-candidate",
+    "url": "/settings",
+    "zoom": "mobile-375",
+    "width": 375,
+    "vw": 375,
+    "bodyScrollWidth": 375,
+    "bodyOverflow": false,
+    "offenderCount": 0,
+    "offenders": []
+  }
+]

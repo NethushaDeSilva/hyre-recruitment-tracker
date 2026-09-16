@@ -47,6 +47,10 @@ export function normalizeTerm(raw) {
   if (!trimmed) return "";
   if (PROTECTED_TERMS.has(trimmed)) return trimmed;
 
+  // AngularJS is a different framework from Angular. Preserve its identity
+  // BEFORE generic suffix stripping loses the distinction, including versions.
+  if (/^angular[.\s]*js(?:\s*v?\d+(?:\.\d+)*)?$/.test(trimmed)) return "angularjs";
+
   let s = trimmed;
   // Trailing .js / " js" / "js" suffix, only when something precedes it —
   // never strip a bare "js" down to nothing (that's the abbreviation "JS",

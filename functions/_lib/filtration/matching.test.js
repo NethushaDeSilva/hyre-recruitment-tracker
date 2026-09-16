@@ -34,6 +34,18 @@ describe("normalizeTerm", () => {
 // either matches some candidate term after normalizeTerm(), or it's missing.
 // No embedTexts dependency at all any more — the function is synchronous.
 describe("matchTermSet", () => {
+  it.each(["AngularJS", "Angular.js", "Angular JS", "AngularJS 1.8.3", "Angular.js v1.8", "Angular JS v1"])("keeps %s distinct from Angular in both directions", (legacy) => {
+    expect(normalizeTerm(legacy)).toBe("angularjs");
+    expect(matchTermSet(["Angular"], [legacy]).matched).toEqual([]);
+    expect(matchTermSet([legacy], ["Angular"]).matched).toEqual([]);
+    expect(matchTermSet(["AngularJS"], [legacy]).matched).toHaveLength(1);
+  });
+
+  it.each([["Node.js", "NodeJS"], ["React", "React.js"]])("preserves %s / %s equivalence", (a, b) => {
+    expect(matchTermSet([a], [b]).matched).toHaveLength(1);
+    expect(matchTermSet([b], [a]).matched).toHaveLength(1);
+  });
+
   it("matches via normalisation", () => {
     const result = matchTermSet(["React"], ["React.js"]);
     expect(result.matched).toEqual([{ required: "React", found: "React.js" }]);

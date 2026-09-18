@@ -158,11 +158,6 @@ export function AuthProvider({ children }) {
         // staff employee ID (issued out-of-band on their users/{uid} doc)
         employeeId: profile?.employeeId || "",
         employeeDept: profile?.employeeDept || "",
-        // WS8 §8.1 interviewer specialisation — self-declared on /availability,
-        // not provisioned out-of-band, so these default to empty rather than
-        // a role-based guess.
-        domain: profile?.domain || "",
-        levels: profile?.levels || [],
       });
       setLoading(false);
 

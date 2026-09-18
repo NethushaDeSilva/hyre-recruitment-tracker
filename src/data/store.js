@@ -206,10 +206,6 @@ const mapPosition = (d) => {
   return {
     id: d.id, title: x.title, department: x.department, description: x.description || "",
     status: x.status || "Open", stages: x.stages || DEFAULT_PIPELINE, minQualification: x.minQualification || "",
-    // WS8 §8.1.4 — seniority, drives interview stage count + eligible
-    // interviewer level. Optional: most positions have nothing to do with
-    // DevOps scheduling (§8.0) and shouldn't be forced to pick one.
-    level: x.level || "",
     // WS5 5.2 — structured scoring requirements, separate from minQualification
     // above (a legacy free-text hint across the full O/L-to-PhD ladder; this
     // one is the engine's strict input and only exists once a position has
@@ -665,7 +661,7 @@ export async function addPosition({
   title, department, description, stages, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
   createdByRole = "", createdByUid = "", createdByName = "",
-  requirements = null, shortlistThreshold = 0, level = "",
+  requirements = null, shortlistThreshold = 0,
 }) {
   // HR is the recruitment authority now, so a newly opened vacancy goes live
   // immediately — there's no separate Management approval step anymore. That
@@ -680,7 +676,6 @@ export async function addPosition({
     status,
     stages: stages && stages.length ? stages : DEFAULT_PIPELINE,
     minQualification,
-    level,
     requirements,
     shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
     // mandatory auto-close date: the position closes itself once this passes
@@ -721,7 +716,7 @@ export async function addPosition({
 export async function updatePosition(id, {
   title, department, description, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
-  requirements = null, shortlistThreshold = 0, level = "",
+  requirements = null, shortlistThreshold = 0,
 }) {
   const current = positions.find((p) => p.id === id);
   if (!current) throw new Error(`updatePosition: no position ${id}`);
@@ -741,7 +736,6 @@ export async function updatePosition(id, {
     department: department.trim(),
     description: (description || "").trim(),
     minQualification,
-    level,
     requirements,
     shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
     closesAt: closesAt ? new Date(closesAt) : null,
@@ -1086,24 +1080,19 @@ export async function ensureUserId(uid) {
   return userId;
 }
 
-// --- WS8 interviewer specialisation (fields on users/{uid}, not a separate
-// collection — see CLAUDE.md WS8 §8.3 deviation note) ------------------------
-// Scoped to DevOps only (§8.0); `levels` is which seniorities they're eligible
-// to interview at, reusing the intern/junior/senior vocabulary the pipeline
-// already uses informally (JUNIOR_PIPELINE).
-export async function updateStaffSpecialisation(uid, { domain = "devops", levels = [] } = {}) {
-  if (!firebaseReady || !uid) return;
-  await setDoc(doc(db, "users", uid), { domain, levels }, { merge: true });
-}
-
 /**
- * WS8 §8.2a — the DevOps interviewer directory the calendar view draws from.
- * Unlike listStaff() (name/role/email only, used for generic staff pickers),
- * this projects the fields the calendar actually needs: avatarColor (so a
- * person's calendar bars match the same color they have everywhere else in
- * the app — no separate calendar-only palette) and domain/levels (§8.0/§8.1
- * scoping + the level filter). Scoped to domain === "devops" — per §8.0,
- * scheduling only concerns this one domain for this release.
+ * WS8 §8.2a — the interviewer directory the calendar view and ranking draw
+ * from. Unlike listStaff() (name/role/email only, used for generic staff
+ * pickers), this projects avatarColor so a person's calendar bars match the
+ * same color they have everywhere else in the app — no separate
+ * calendar-only palette.
+ *
+ * §6 — specialisation/seniority levels (domain + levels on users/{uid}) were
+ * removed system-wide; this used to scope to domain === "devops" only, and
+ * ranking used to filter further by levels.includes(position.level). Now
+ * scoped to staff who can plausibly own an interview stage (Interviewer or
+ * Management) — ranking runs on declared availability and current booking
+ * load alone (see interviewAssignment.js).
  */
 export async function listInterviewers() {
   if (!firebaseReady) return [];
@@ -1116,11 +1105,9 @@ export async function listInterviewers() {
         name: x.displayName || x.email || "Team member",
         role: x.role || "",
         avatarColor: x.avatarColor || "#64748B",
-        domain: x.domain || "",
-        levels: x.levels || [],
       };
     })
-    .filter((u) => u.domain === "devops");
+    .filter((u) => u.role === ROLES.INTERVIEWER || u.role === ROLES.MANAGEMENT);
 }
 
 // --- WS8 declared availability (self-declared, never inferred) -------------
@@ -1277,12 +1264,14 @@ const buildRankedInfo = (ranked) => {
 };
 
 /**
- * WS8 §8/8.6 — the TRIGGER. Called the moment a candidate lands in a
- * schedulable stage (isSchedulableStage(), PositionDetail's move flow) with an
- * HR-proposed slot. Ranks the eligible DevOps pool for this position's level,
- * requests the top pick, and — critically — STORES the full ranking (and why
- * anyone was excluded) on the record itself. Nothing about this ranking is
- * ever recomputed later: the record IS the explanation, permanently.
+ * WS8 §8/8.6 — a candidate sits in a schedulable stage (isSchedulableStage())
+ * and HR proposes a slot from the candidate's Interview panel (§5 — no longer
+ * an automatic trigger on landing there). Ranks the eligible pool by declared
+ * availability and current booking load (§6 — specialisation/seniority
+ * levels removed), requests the top pick, and — critically — STORES the full
+ * ranking (and why anyone was excluded) on the record itself. Nothing about
+ * this ranking is ever recomputed later: the record IS the explanation,
+ * permanently.
  */
 export async function createInterviewRequest({ applicationId, positionId, stageId, candidateName = "", scheduledAt, durationMs = 3600000, actor }) {
   if (!firebaseReady) return null;
@@ -1291,7 +1280,7 @@ export async function createInterviewRequest({ applicationId, positionId, stageI
   const pool = (await listInterviewers()).filter((p) => p.role === ownerRole || p.role === ROLES.MANAGEMENT);
   const uids = pool.map((p) => p.uid);
   const [availabilityRecords, bookingCounts] = await Promise.all([getAvailabilityRecords(uids), getBookingCounts(uids)]);
-  const { ranked, excluded, poolReason } = rankEligibleInterviewers({ interviewers: pool, position, targetMs: scheduledAt, availabilityRecords, bookingCounts });
+  const { ranked, excluded, poolReason } = rankEligibleInterviewers({ interviewers: pool, targetMs: scheduledAt, availabilityRecords, bookingCounts });
 
   const data = {
     applicationId, positionId, stageId, candidateName,

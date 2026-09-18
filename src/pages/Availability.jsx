@@ -1,24 +1,18 @@
-// WS8 §8.2/§8.1 — staff declare their OWN availability and interviewer
-// specialisation here. Nobody else can edit either (firestore.rules enforces
-// this, not just this screen) — declared availability is a person's own
-// claim about their own schedule; HR's real power over a booking is the
-// manual override on the interview itself (§15), not silently editing
-// someone else's calendar.
+// WS8 §8.2 — staff declare their OWN availability here. Nobody else can edit
+// it (firestore.rules enforces this, not just this screen) — declared
+// availability is a person's own claim about their own schedule; HR's real
+// power over a booking is the manual override on the interview itself (§15),
+// not silently editing someone else's calendar.
 import { useEffect, useState } from "react";
 import { Check, Clock, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { getAvailability, saveAvailability, updateStaffSpecialisation } from "@/data/store";
+import { getAvailability, saveAvailability } from "@/data/store";
 import { AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
 import { timeAgo } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Field, Select, Input } from "@/components/ui/Field";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const LEVELS = [
-  { value: "intern", label: "Intern" },
-  { value: "junior", label: "Junior" },
-  { value: "senior", label: "Senior" },
-];
 const pad = (n) => String(n).padStart(2, "0");
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const emptySlot = () => ({ dayOfWeek: 1, startTime: "09:00", endTime: "17:00" });
@@ -26,7 +20,6 @@ const emptyException = () => ({ date: todayStr(), type: "leave", reason: "" });
 
 export default function Availability() {
   const { user } = useAuth();
-  const [levels, setLevels] = useState([]);
   const [slots, setSlots] = useState([]);
   const [exceptions, setExceptions] = useState([]);
   const [declaredAt, setDeclaredAt] = useState(0);
@@ -38,7 +31,6 @@ export default function Availability() {
   useEffect(() => {
     if (!user?.uid) return;
     let alive = true;
-    setLevels(user.levels || []);
     getAvailability(user.uid)
       .then((rec) => {
         if (!alive) return;
@@ -53,9 +45,6 @@ export default function Availability() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
-  const toggleLevel = (v) =>
-    setLevels((prev) => (prev.includes(v) ? prev.filter((l) => l !== v) : [...prev, v]));
-
   const updateSlot = (i, patch) => setSlots((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
   const removeSlot = (i) => setSlots((prev) => prev.filter((_, idx) => idx !== i));
   const updateException = (i, patch) => setExceptions((prev) => prev.map((e, idx) => (idx === i ? { ...e, ...patch } : e)));
@@ -64,10 +53,7 @@ export default function Availability() {
   const save = async () => {
     setBusy(true);
     try {
-      await Promise.all([
-        saveAvailability(user.uid, { slots, exceptions }),
-        updateStaffSpecialisation(user.uid, { domain: "devops", levels }),
-      ]);
+      await saveAvailability(user.uid, { slots, exceptions });
       setDeclaredAt(Date.now());
       setValidUntil(Date.now() + AVAILABILITY_VALIDITY_MS);
       setSaved(true);
@@ -108,32 +94,6 @@ export default function Availability() {
       )}
 
       <div className="mt-6 max-w-2xl space-y-6">
-        <div className="space-y-4 rounded-lg border border-[#E9EEF4] bg-card p-6 shadow-card">
-          <div>
-            <div className="text-[13px] font-semibold text-foreground">Specialisation</div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Scoped to DevOps for this release (CLAUDE.md WS8 §8.0). Tick every level you're eligible to interview at.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {LEVELS.map((l) => {
-              const on = levels.includes(l.value);
-              return (
-                <button
-                  key={l.value}
-                  type="button"
-                  onClick={() => toggleLevel(l.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground hover:bg-background"
-                  }`}
-                >
-                  {on && <Check size={12} strokeWidth={3} />} {l.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         <div className="space-y-4 rounded-lg border border-[#E9EEF4] bg-card p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>

@@ -99,12 +99,12 @@ export function resolveStage(position, id) {
 export const stageOwnerRole = (position, id) => resolveStage(position, id).owner || null;
 
 // WS8 §8 — does entering this stage need an interviewer scheduled? True for
-// any non-terminal, non-HR-owned stage (Interviewer or Management), but ONLY
-// on a position that has opted into scheduling by setting `level` (§8.1.4) —
-// without a level there's nothing to rank interviewer eligibility against, so
-// assignment stays the pre-WS8 manual path (StageConfigModal's stageAssignees).
+// any non-terminal, non-HR-owned stage (Interviewer or Management). Used to
+// key on position.level as an opt-in flag; specialisation/seniority levels
+// were removed (§6) and ranking now runs on availability + booking load
+// alone, so any Interviewer/Management-owned stage is schedulable.
 export function isSchedulableStage(position, stageId) {
-  if (!position?.level || !stageId) return false;
+  if (!position || !stageId) return false;
   const owner = stageOwnerRole(position, stageId);
   return owner === ROLES.INTERVIEWER || owner === ROLES.MANAGEMENT;
 }

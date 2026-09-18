@@ -166,7 +166,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     <Modal
       open={open}
       onClose={close}
-      width={520}
+      width={720}
       title={isEdit ? "Edit position" : "Open a position"}
       subtitle={isEdit ? "Update this vacancy's details and scoring requirements." : "Create a vacancy and choose its interview stages."}
       footer={
@@ -211,7 +211,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
           <Field label="Minimum qualification (optional)">
             <Select value={minQualification} onChange={(e) => setMinQualification(e.target.value)}>
               <option value="">No minimum — accept everyone</option>
-              {QUALIFICATIONS.map((q) => <option key={q} value={q}>{q} or above</option>)}
+              {QUALIFICATIONS.map((q) => <option key={q} value={q}>{q}</option>)}
             </Select>
             <p className="mt-1 text-xs text-muted-foreground">Applicants below this get a ⚠️ hint on their card — they're never auto-rejected.</p>
           </Field>
@@ -261,8 +261,8 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
             <Field label="Minimum degree level (optional)">
               <Select value={qualLevel} onChange={(e) => setQualLevel(e.target.value)}>
                 <option value="">No degree-level minimum</option>
-                <option value="6">Bachelor's (BSc/BEng/BA) or above</option>
-                <option value="7">Master's (MSc/MEng) or above</option>
+                <option value="6">Bachelor's (BSc/BEng/BA)</option>
+                <option value="7">Master's (MSc/MEng)</option>
                 <option value="8">PhD</option>
               </Select>
             </Field>

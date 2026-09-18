@@ -137,8 +137,8 @@ export default function Availability() {
         <div className="space-y-4 rounded-lg border border-[#E9EEF4] bg-card p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[13px] font-semibold text-foreground">Recurring weekly availability</div>
-              <p className="mt-0.5 text-xs text-muted-foreground">Times are in your own local time zone, captured automatically when you save.</p>
+              <div className="text-[13px] font-semibold text-foreground">Available times</div>
+              <p className="mt-0.5 text-xs text-muted-foreground">Recurring weekly windows when you're free for interviews. Times are in your own local time zone, captured automatically when you save.</p>
             </div>
             <Button variant="ghost" onClick={() => setSlots((p) => [...p, emptySlot()])} className="!px-3 !py-1.5 text-xs">
               <Plus size={14} /> Add window
@@ -165,8 +165,8 @@ export default function Availability() {
         <div className="space-y-4 rounded-lg border border-[#E9EEF4] bg-card p-6 shadow-card">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[13px] font-semibold text-foreground">One-off blocks</div>
-              <p className="mt-0.5 text-xs text-muted-foreground">Leave, or a single day you're not free — overrides your recurring windows for that date only.</p>
+              <div className="text-[13px] font-semibold text-foreground">Unavailable times</div>
+              <p className="mt-0.5 text-xs text-muted-foreground">Leave, or a single day you're not free — overrides your available times for that date only.</p>
             </div>
             <Button variant="ghost" onClick={() => setExceptions((p) => [...p, emptyException()])} className="!px-3 !py-1.5 text-xs">
               <Plus size={14} /> Add block

@@ -70,7 +70,7 @@ export default function ProposeInterviewModal({ open, candidate, position, stage
       {!result ? (
         <div className="space-y-4">
           <p className="text-[13px] text-muted-foreground">
-            Propose a slot. Hyre ranks eligible DevOps interviewers by level match, declared availability at this time, and current booking load, then requests the top pick.
+            Propose a slot. Hyre ranks eligible DevOps interviewers by declared availability at this time and current booking load, then requests the top pick.
           </p>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Date" required>

@@ -3,16 +3,21 @@
 // anyone, so it's the real fallback when it's exhausted, not a feature that
 // depends on automation having run first.
 import { useEffect, useState } from "react";
-import { AlertTriangle, Clock, CheckCircle2, Send } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle2, Send, CalendarPlus } from "lucide-react";
 import { getInterviewsForApplication, overrideInterviewRequest, listInterviewers } from "@/data/store";
-import { stageOwnerRole, resolveStage } from "@/lib/stages";
+import { stageOwnerRole, resolveStage, isSchedulableStage } from "@/lib/stages";
 import { ROLES } from "@/lib/permissions";
 import { timeAgo } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Field";
 import { useAuth } from "@/context/AuthContext";
 
-export default function InterviewStatusPanel({ candidate, position }) {
+// WS8 §5 — landing in a schedulable stage used to force ProposeInterviewModal
+// immediately, before HR had any chance to look at the calendar. Now the
+// stage move succeeds on its own and requesting an interviewer is this
+// panel's own standalone action (onRequestInterviewer), available any time —
+// not just the moment they land here.
+export default function InterviewStatusPanel({ candidate, position, onRequestInterviewer }) {
   const { user } = useAuth();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,14 +32,26 @@ export default function InterviewStatusPanel({ candidate, position }) {
   };
   useEffect(load, [candidate?.id]);
 
-  if (!position?.level || loading || records.length === 0) return null;
+  const schedulable = isSchedulableStage(position, candidate?.stage);
+  if (loading || (!schedulable && records.length === 0)) return null;
 
   return (
     <div className="space-y-3">
       <div className="text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">Interview</div>
-      {records.map((r) => (
-        <InterviewRecord key={r.id} record={r} position={position} actor={user} onChanged={load} />
-      ))}
+      {records.length === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-background px-3.5 py-3 text-[13px]">
+          <span className="text-muted-foreground">No interview requested yet.</span>
+          {onRequestInterviewer && (
+            <Button variant="subtle" onClick={onRequestInterviewer} className="shrink-0 !px-3 !py-1.5 text-xs">
+              <CalendarPlus size={13} /> Request an interviewer
+            </Button>
+          )}
+        </div>
+      ) : (
+        records.map((r) => (
+          <InterviewRecord key={r.id} record={r} position={position} actor={user} onChanged={load} />
+        ))
+      )}
     </div>
   );
 }

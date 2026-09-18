@@ -17,7 +17,7 @@ import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, Sli
 import { useHyreData, advanceStage, rejectCandidate, bulkReject, rescoreVacancy, updatePositionThreshold } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
-import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage, isSchedulableStage } from "@/lib/stages";
+import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
 import { sortApplications } from "../../functions/_lib/filtration/engine.js";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -165,10 +165,6 @@ export default function PositionDetail() {
   // comment + score first (enforced in store.advanceStage). If it's missing we open
   // the candidate's profile and show a "review first" message instead of moving.
   const attemptMove = async (c) => {
-    // Computed BEFORE the move — c.stage is still the OLD stage here, so this
-    // is exactly "the stage they're about to land in," which is what WS8's
-    // trigger (isSchedulableStage) needs to check.
-    const landingStage = nextStage(position.stages, c.stage);
     const res = await advanceStage(c.id, actor);
     if (res && res.ok === false && (res.reason === "review-required" || res.reason === "comment-required")) {
       setReviewFor(c.id);
@@ -184,11 +180,11 @@ export default function PositionDetail() {
           ? `${displayName(c)} hired — employee ID ${res.employeeId} issued.`
           : `${displayName(c)} hired.`
       );
-    } else if (res?.ok && isSchedulableStage(position, landingStage)) {
-      // WS8 §8/8.6 — the trigger. Candidate just reached a stage that needs a
-      // scheduled interviewer; propose a slot now, not on some later screen.
-      setScheduleTarget({ candidate: c, stageId: landingStage });
     }
+    // WS8 §5 — landing in a schedulable stage no longer auto-opens
+    // ProposeInterviewModal (that forced HR to guess a slot with no idea who's
+    // free). Requesting an interviewer is now a standalone action from the
+    // candidate's Interview panel (CandidateDetailModal), available any time.
   };
 
   // --- WS5 5.8: Applied column = the shortlist (merged in, not a second view) ---

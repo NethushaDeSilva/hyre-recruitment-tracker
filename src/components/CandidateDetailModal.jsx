@@ -12,7 +12,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { can } from "@/lib/permissions";
-import { stageLabelOf, canActOnStageFor, nextStage, resolveStage, isSchedulableStage } from "@/lib/stages";
+import { stageLabelOf, canActOnStageFor, nextStage, resolveStage } from "@/lib/stages";
 import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl, openDataUrl, humanSize } from "@/lib/file";
 import { reconsiderCandidate, addComment, deleteComment, advanceStage, sendOffer, respondToOffer } from "@/data/store";
@@ -156,22 +156,23 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   };
 
   const moveNext = async () => {
-    // Captured BEFORE the move — c.stage is still the OLD stage, so this is
-    // "the stage they're about to land in." Same WS8 trigger PositionDetail's
-    // own board button uses (attemptMove) — this pop-out is a second entry
-    // point into the same move, so it needs the same trigger, not a copy that
-    // quietly skips it.
-    const landingStage = nextId;
     setMoving(true);
     const res = await advanceStage(c.id, actor);
     setMoving(false);
     if (res && res.ok === false) return; // e.g. review-required — button stays put
     if (res?.hired) {
       toast.success(res.employeeId ? `${displayName(c)} hired — employee ID ${res.employeeId} issued.` : `${displayName(c)} hired.`);
-    } else if (res?.ok && onSchedule && position && isSchedulableStage(position, landingStage)) {
-      onSchedule({ candidate: c, stageId: landingStage });
     }
+    // WS8 §5 — the move succeeds on its own now; it no longer forces the
+    // Request-an-interviewer modal on landing (that made HR guess a slot with
+    // no idea who's free, exactly what the calendar exists to prevent).
+    // Requesting an interviewer is now its own action, below, available any
+    // time the candidate sits in a schedulable stage.
     onClose(); // done — back to whatever list this was opened from (board or AI results)
+  };
+
+  const requestInterviewer = () => {
+    if (onSchedule && position) onSchedule({ candidate: c, stageId: c.stage });
   };
 
   return (
@@ -546,7 +547,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
         )}
         <Row label="Cover note" value={c.coverNote} />
 
-        <InterviewStatusPanel candidate={c} position={position} />
+        <InterviewStatusPanel candidate={c} position={position} onRequestInterviewer={onSchedule ? requestInterviewer : null} />
 
         {/* audit history */}
         {history.length > 0 && (

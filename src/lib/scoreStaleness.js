@@ -47,14 +47,47 @@ export function assessmentEligibility(score, position, candidate) {
 
 // The single source of truth for "does this candidate meet the position's
 // shortlist threshold" — the Applied-column green/red colour (scorePillClass
-// below), the bulk-select gate, and the review-comment gate (advanceStage()
-// in data/store.js) all read this same comparison, so a green candidate can
-// never be one that also demands a comment. An unscored, failed or stale
-// score never counts as meeting it — never let "we can't compare" resolve to
-// "looks fine".
+// below), the bulk-select gate, and evaluateReviewGate()'s Applied-only
+// comment rule (below) all read this same comparison, so a green Applied
+// card can never be one that also demands a comment. An unscored, failed or
+// stale score never counts as meeting it — never let "we can't compare"
+// resolve to "looks fine".
 export function meetsShortlistThreshold(score, position) {
   return score?.status === "scored" && !isScoreStale(score) &&
     score.overallScore >= (position?.shortlistThreshold ?? 0);
+}
+
+// WS8 §4 (corrected) — the ONE place the review/comment gate is decided.
+// advanceStage() (data/store.js, the real enforcement) and moveBlocked
+// (CandidateDetailModal.jsx, the UI mirror) both call this so they can never
+// drift apart.
+//
+//   - stage === "applied": no score is required to leave Applied (never was).
+//     Comment text is required UNLESS this candidate already meets the
+//     position's shortlist threshold (meetsShortlistThreshold above) — an
+//     unscored/failed/stale candidate never meets it, so comment stays
+//     required for them too. This is the Applied column's own move-out
+//     decision ONLY, mirroring its green/red colour exactly.
+//   - any stage after "applied": score AND comment text are BOTH
+//     unconditionally mandatory, exactly as before the threshold rule
+//     existed. The threshold never reaches here — it's colour and the
+//     Applied move only.
+//
+// `review` is the acting user's own comment entry for the candidate's
+// CURRENT stage (or null/undefined if they haven't left one), shaped like
+// { score, text }.
+export function evaluateReviewGate({ stage, review, score, position }) {
+  const hasComment = !!(review?.text && review.text.trim());
+  if (stage === "applied") {
+    if (!meetsShortlistThreshold(score, position) && !hasComment) {
+      return { ok: false, reason: "comment-required" };
+    }
+    return { ok: true, reason: null };
+  }
+  if (!review || review.score == null || !hasComment) {
+    return { ok: false, reason: "review-required" };
+  }
+  return { ok: true, reason: null };
 }
 
 export function canBulkSelect(score, position, candidate) {

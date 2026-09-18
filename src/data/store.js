@@ -1,4 +1,4 @@
-import { canBulkSelect, meetsShortlistThreshold } from "@/lib/scoreStaleness";
+import { canBulkSelect, evaluateReviewGate } from "@/lib/scoreStaleness";
 // THE single data seam for Hyre — the one module the whole UI talks to for data.
 // When Firebase is configured, positions & candidates live in Firestore and are
 // kept in sync with real-time onSnapshot listeners; mutations write to Firestore.
@@ -1446,11 +1446,15 @@ const commentId = (cm) => cm.byUid || cm.by || "";
  * Move a candidate to the next stage of its position's pipeline (no skipping).
  * `actor` = { name, role, uid } of the user making the move.
  *
- * For every stage AFTER Applied, the acting user must first have left a
- * SCORE at the current stage — otherwise { ok:false, reason:"review-required" }.
- * Comment TEXT is only mandatory on top of that when the score is below the
- * position's shortlist threshold (WS8 §4) — otherwise { ok:false,
- * reason:"comment-required" }. Applied is exempt (it's just an application).
+ * The review/comment gate itself is decided by evaluateReviewGate()
+ * (scoreStaleness.js) — the ONE place this logic lives, also called by
+ * CandidateDetailModal's moveBlocked so the two can never drift apart. Short
+ * version: every stage after Applied needs a score AND a non-empty comment,
+ * unconditionally, same as before the threshold rule existed. Applied needs
+ * neither UNLESS this candidate's score doesn't meet the position's
+ * shortlist threshold, in which case a comment (not a score) is required —
+ * see evaluateReviewGate's own comment for the full reasoning.
+ *
  * The review is copied onto the history entry so it shows in the candidate's
  * timeline.
  */
@@ -1468,18 +1472,9 @@ export async function advanceStage(candidateId, actor, opts = {}) {
   const review = (cand.comments || []).find(
     (cm) => commentId(cm) === uidActor && cm.stage === cand.stage
   );
-  if (cand.stage !== "applied") {
-    // A score is mandatory for every move past Applied, unconditionally.
-    if (!review || review.score == null) {
-      return { ok: false, reason: "review-required" };
-    }
-    // WS8 §4 — comment TEXT is only mandatory when this score is below the
-    // position's shortlist threshold; the SAME >= comparison the
-    // Applied-column colour uses (meetsShortlistThreshold in scoreStaleness.js),
-    // so a green candidate can never be the one this blocks.
-    if (!meetsShortlistThreshold(scores.get(candidateId), pos) && !(review.text && review.text.trim())) {
-      return { ok: false, reason: "comment-required" };
-    }
+  const gate = evaluateReviewGate({ stage: cand.stage, review, score: scores.get(candidateId), position: pos });
+  if (!gate.ok) {
+    return { ok: false, reason: gate.reason };
   }
   // Ties the loop closed: nobody reaches "hired" without a candidate-accepted offer.
   if (nx === "hired" && cand.offer?.status !== "accepted") {

@@ -26,3 +26,16 @@ export const EXPERIENCE_RANGES = [
 // The QUALIFICATIONS list above is ordered lowest → highest, so an item's
 // index doubles as a simple rank for sorting the Candidates table by
 // qualification (see rank() in CandidatesTable.jsx).
+
+// WS5 5.2/5.3 — the single source for the scoring engine's degree LEVEL.
+// There used to be a second, independent "minimum degree level" dropdown
+// (6/7/8) alongside this ladder; that duplication was the actual bug (two
+// qualification inputs that could disagree). Only these three map onto the
+// engine's 6/7/8 scale — everything else, including Postgraduate Diploma
+// (deliberately not treated as degree-equivalent here), leaves
+// requiredQualification on the existing nullable/not-applicable path.
+export const QUALIFICATION_TO_DEGREE_LEVEL = {
+  "Bachelor's Degree": 6,
+  "Master's Degree": 7,
+  "PhD": 8,
+};

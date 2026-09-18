@@ -10,7 +10,7 @@ import { Field, Input, Textarea, Select } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import StagePicker from "@/components/StagePicker";
 import { buildPipeline } from "@/lib/stages";
-import { QUALIFICATIONS } from "@/lib/application";
+import { QUALIFICATIONS, QUALIFICATION_TO_DEGREE_LEVEL } from "@/lib/application";
 import { DEPARTMENT_NAMES } from "@/lib/departments";
 import { addPosition, updatePosition } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
@@ -43,15 +43,20 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   // interviewer level once scheduling reaches this position. Optional: only
   // matters for a position that ends up using WS8 scheduling.
   const [level, setLevel] = useState("");
-  // WS5 5.2 — structured scoring requirements, separate from minQualification
-  // above (that one's the candidate-side ladder hint; these feed the engine).
-  const [qualLevel, setQualLevel] = useState(""); // "" | "6" | "7" | "8"
+  // WS5 5.2/5.3 — field of study is still a distinct input; degree LEVEL is
+  // no longer a separate dropdown, it's derived from minQualification below
+  // (see QUALIFICATION_TO_DEGREE_LEVEL) so there's a single qualification
+  // input instead of two that could disagree.
   const [qualField, setQualField] = useState("");
   const [requiredSkillsText, setRequiredSkillsText] = useState("");
   const [minYearsExperience, setMinYearsExperience] = useState("0");
   const [niceToHaveText, setNiceToHaveText] = useState("");
   const [closeDate, setCloseDate] = useState("");
   const [selected, setSelected] = useState(DEFAULT_MIDDLE);
+  // WS5 5.3 — derived, not chosen: Bachelor's/Master's/PhD map onto the
+  // engine's 6/7/8 scale, everything else leaves requiredQualification null
+  // (not applicable), scored on the existing nullable/normalised path.
+  const degreeLevel = QUALIFICATION_TO_DEGREE_LEVEL[minQualification] || null;
 
   // Prefill from the position being edited. Keyed on `open` (not `position`)
   // so a background data refresh mid-edit can't clobber in-progress changes —
@@ -64,9 +69,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setDescription(position.description || "");
     setMinQualification(position.minQualification || "");
     setLevel(position.level || "");
-    const rq = position.requirements?.requiredQualification;
-    setQualLevel(rq?.level ? String(rq.level) : "");
-    setQualField(rq?.field || "");
+    setQualField(position.requirements?.requiredQualification?.field || "");
     setRequiredSkillsText((position.requirements?.requiredSkills || []).join(", "));
     setMinYearsExperience(String(position.requirements?.minYearsExperience ?? 0));
     setNiceToHaveText((position.requirements?.niceToHave || []).join(", "));
@@ -80,7 +83,6 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setDescription("");
     setMinQualification("");
     setLevel("");
-    setQualLevel("");
     setQualField("");
     setRequiredSkillsText("");
     setMinYearsExperience("0");
@@ -100,7 +102,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   const submit = async () => {
     if (!canSubmit) return;
     const requirements = {
-      requiredQualification: qualLevel ? { level: Number(qualLevel), field: qualField.trim() || null } : null,
+      requiredQualification: degreeLevel ? { level: degreeLevel, field: qualField.trim() || null } : null,
       requiredSkills: parseList(requiredSkillsText),
       minYearsExperience: Math.max(0, Number(minYearsExperience) || 0),
       niceToHave: parseList(niceToHaveText),
@@ -217,29 +219,19 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
             </Field>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Minimum degree level (optional)">
-              <Select value={qualLevel} onChange={(e) => setQualLevel(e.target.value)}>
-                <option value="">No degree-level minimum</option>
-                <option value="6">Bachelor's (BSc/BEng/BA)</option>
-                <option value="7">Master's (MSc/MEng)</option>
-                <option value="8">PhD</option>
-              </Select>
-            </Field>
-            <Field label="Field of study (optional)">
-              <Input
-                value={qualField}
-                onChange={(e) => setQualField(e.target.value)}
-                placeholder="e.g. Computer Science"
-                disabled={!qualLevel}
-              />
-            </Field>
-          </div>
-          {!qualLevel && (
-            <p className="text-xs text-muted-foreground">
-              No degree-level minimum set — every candidate clears the qualifications component. For a Diploma or A-Level minimum, use "Minimum qualification" above instead; that scale isn't covered here (see CLAUDE.md 5.2).
+          <Field label="Field of study (optional)">
+            <Input
+              value={qualField}
+              onChange={(e) => setQualField(e.target.value)}
+              placeholder="e.g. Computer Science"
+              disabled={!degreeLevel}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {degreeLevel
+                ? "Optional — leave blank to accept any field at this degree level."
+                : "Only applies when \"Minimum qualification\" above is Bachelor's, Master's or PhD."}
             </p>
-          )}
+          </Field>
         </div>
 
         <Field label="Auto-close date">

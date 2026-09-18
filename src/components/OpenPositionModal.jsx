@@ -12,9 +12,8 @@ import StagePicker from "@/components/StagePicker";
 import { buildPipeline } from "@/lib/stages";
 import { QUALIFICATIONS } from "@/lib/application";
 import { DEPARTMENT_NAMES } from "@/lib/departments";
-import { addPosition, updatePosition, listStaff } from "@/data/store";
+import { addPosition, updatePosition } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
-import { ROLES } from "@/lib/permissions";
 
 // Sensible default process: HR screening → Department review → Initial interview → Final interview.
 const DEFAULT_MIDDLE = ["screening", "dept", "interview", "final"];
@@ -51,26 +50,8 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   const [requiredSkillsText, setRequiredSkillsText] = useState("");
   const [minYearsExperience, setMinYearsExperience] = useState("0");
   const [niceToHaveText, setNiceToHaveText] = useState("");
-  // Board/Applied-column view filter default (WS5 5.8) — a sibling of
-  // requirements, never part of the scoring comparison itself.
-  const [shortlistThreshold, setShortlistThreshold] = useState("0");
   const [closeDate, setCloseDate] = useState("");
-  const [headcount, setHeadcount] = useState("1");
-  const [hiringManagerUid, setHiringManagerUid] = useState("");
-  const [managers, setManagers] = useState([]);
-  const [managersLoading, setManagersLoading] = useState(false);
   const [selected, setSelected] = useState(DEFAULT_MIDDLE);
-
-  useEffect(() => {
-    if (!open) return;
-    let alive = true;
-    setManagersLoading(true);
-    listStaff([ROLES.MANAGEMENT])
-      .then((list) => { if (alive) setManagers(list); })
-      .catch((e) => console.error("listStaff:", e))
-      .finally(() => { if (alive) setManagersLoading(false); });
-    return () => { alive = false; };
-  }, [open]);
 
   // Prefill from the position being edited. Keyed on `open` (not `position`)
   // so a background data refresh mid-edit can't clobber in-progress changes —
@@ -89,10 +70,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setRequiredSkillsText((position.requirements?.requiredSkills || []).join(", "));
     setMinYearsExperience(String(position.requirements?.minYearsExperience ?? 0));
     setNiceToHaveText((position.requirements?.niceToHave || []).join(", "));
-    setShortlistThreshold(String(position.shortlistThreshold ?? 0));
     setCloseDate(msToDateStr(position.closesAt));
-    setHeadcount(String(position.headcount || 1));
-    setHiringManagerUid(position.hiringManagerUid || "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, position?.id]);
 
@@ -107,10 +85,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setRequiredSkillsText("");
     setMinYearsExperience("0");
     setNiceToHaveText("");
-    setShortlistThreshold("0");
     setCloseDate("");
-    setHeadcount("1");
-    setHiringManagerUid("");
     setSelected(DEFAULT_MIDDLE);
   };
   const close = () => {
@@ -121,26 +96,28 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   // Only required skills gates this; requiredQualification stays optional
   // (5.2/5.3 — a role can genuinely have no degree-level minimum). Applies to
   // both create and edit — store.js enforces it again server-side either way.
-  const canSubmit = title.trim() && department.trim() && closeDate && Number(headcount) >= 1
-    && hiringManagerUid && parseList(requiredSkillsText).length > 0;
+  const canSubmit = title.trim() && department.trim() && closeDate && parseList(requiredSkillsText).length > 0;
   const submit = async () => {
     if (!canSubmit) return;
-    const manager = managers.find((m) => m.uid === hiringManagerUid);
     const requirements = {
       requiredQualification: qualLevel ? { level: Number(qualLevel), field: qualField.trim() || null } : null,
       requiredSkills: parseList(requiredSkillsText),
       minYearsExperience: Math.max(0, Number(minYearsExperience) || 0),
       niceToHave: parseList(niceToHaveText),
     };
+    // headcount, hiringManagerUid/Name and shortlistThreshold no longer have a
+    // UI control in this modal (section 2/4) but updatePosition() overwrites
+    // whatever it's given — passing the position's own current value through
+    // unchanged is what stops an unrelated edit from silently wiping them.
     if (isEdit) {
       await updatePosition(position.id, {
         title, department, description, minQualification, level,
         closesAt: endOfDayMs(closeDate),
-        headcount: Number(headcount),
-        hiringManagerUid,
-        hiringManagerName: manager?.name || "",
+        headcount: position.headcount || 1,
+        hiringManagerUid: position.hiringManagerUid || "",
+        hiringManagerName: position.hiringManagerName || "",
         requirements,
-        shortlistThreshold: Number(shortlistThreshold) || 0,
+        shortlistThreshold: position.shortlistThreshold ?? 0,
       });
       close();
       return;
@@ -148,15 +125,13 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     const pos = await addPosition({
       title, department, description, minQualification, level,
       closesAt: endOfDayMs(closeDate),
-      headcount: Number(headcount),
-      hiringManagerUid,
-      hiringManagerName: manager?.name || "",
+      headcount: 1,
       stages: buildPipeline(selected),
       createdByRole: user?.role,
       createdByUid: user?.uid || "",
       createdByName: user?.name || "",
       requirements,
-      shortlistThreshold: Number(shortlistThreshold) || 0,
+      shortlistThreshold: 0,
     });
     close();
     nav(`/positions/${pos.id}`);
@@ -191,21 +166,6 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
         <Field label="Description">
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="Short summary of the role and responsibilities…" />
         </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Headcount">
-            <Input type="number" min={1} value={headcount} onChange={(e) => setHeadcount(e.target.value)} />
-          </Field>
-          <Field label="Hiring manager">
-            <Select value={hiringManagerUid} onChange={(e) => setHiringManagerUid(e.target.value)} disabled={managersLoading}>
-              <option value="">{managersLoading ? "Loading…" : "Select a hiring manager…"}</option>
-              {managers.map((m) => <option key={m.uid} value={m.uid}>{m.name}</option>)}
-            </Select>
-            {!managersLoading && managers.length === 0 && (
-              <p className="mt-1 text-xs text-muted-foreground">No Management accounts found yet.</p>
-            )}
-          </Field>
-        </div>
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Minimum qualification (optional)">
@@ -281,13 +241,6 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
             </p>
           )}
         </div>
-
-        <Field label="Default shortlist threshold (optional)">
-          <Input type="number" min={0} max={100} value={shortlistThreshold} onChange={(e) => setShortlistThreshold(e.target.value)} />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Starting point for the Applied column's shortlist slider — HR can still move it per-session. It only hides low scorers from view; nothing is rejected or moved.
-          </p>
-        </Field>
 
         <Field label="Auto-close date">
           <Input type="date" value={closeDate} min={todayStr()} onChange={(e) => setCloseDate(e.target.value)} />

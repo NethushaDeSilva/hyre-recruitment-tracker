@@ -6,27 +6,40 @@
 import { HelpCircle, Check, Send } from "lucide-react";
 import { timeAgo } from "@/lib/format";
 
-export default function InterviewCalendarLegend({ interviewers, availability, visible, onToggle, onRequest, requested }) {
+export default function InterviewCalendarLegend({ interviewers, availability, visible, maxVisible, onToggle, onRequest, requested }) {
+  const atCap = maxVisible != null && visible.length >= maxVisible;
+  const hiddenCount = interviewers.length - visible.length;
   return (
     <div className="w-full shrink-0 space-y-1.5 lg:w-64">
-      <div className="px-1 text-[11px] font-bold tracking-[0.1em] text-muted-foreground">INTERVIEWERS</div>
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[11px] font-bold tracking-[0.1em] text-muted-foreground">INTERVIEWERS</span>
+        {/* §7b — never silently shrink the grid's lanes past 3; say what's hidden instead. */}
+        {atCap && hiddenCount > 0 && (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-bold text-muted-foreground">
+            +{hiddenCount} more
+          </span>
+        )}
+      </div>
       {interviewers.length === 0 && (
-        <p className="px-1 text-sm text-muted-foreground">No DevOps interviewers match this filter.</p>
+        <p className="px-1 text-sm text-muted-foreground">No interviewers found.</p>
       )}
       {interviewers.map((person) => {
         const av = availability[person.uid];
         const unknown = !av || av.state === "unknown";
         const on = visible.includes(person.uid);
+        const disabled = !on && atCap;
         const ageing = av?.declaredAt > 0 && Date.now() - av.declaredAt > 7 * 24 * 60 * 60 * 1000;
         return (
           <div
             key={person.uid}
-            className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-xs"
+            className={`flex flex-wrap items-center gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-xs ${disabled ? "opacity-50" : ""}`}
           >
             <button
               type="button"
               onClick={() => onToggle(person.uid)}
-              className="flex shrink-0 items-center gap-2"
+              disabled={disabled}
+              title={disabled ? `Deselect someone to add ${person.name} (max ${maxVisible} at once)` : undefined}
+              className="flex shrink-0 items-center gap-2 disabled:cursor-not-allowed"
               aria-pressed={on}
             >
               <span

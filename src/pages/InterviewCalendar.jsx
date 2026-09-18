@@ -13,7 +13,12 @@ import { Button } from "@/components/ui/Button";
 import InterviewCalendarLegend from "@/pages/InterviewCalendarLegend";
 import InterviewCalendarGrid from "@/pages/InterviewCalendarGrid";
 
-const MAX_VISIBLE = 4; // "readable for four people" — WS8 §7
+// WS8 §7b — side-by-side sub-columns per person sharing a day; above three
+// the lanes just keep shrinking, so three is the cap. A person beyond the
+// cap doesn't disappear from the legend, they're just not toggle-able onto
+// the grid until one of the three visible is deselected — the legend shows
+// a "+N more" count instead of silently letting a 4th lane squeeze in.
+const MAX_VISIBLE = 3;
 
 function weekLabel(startMs) {
   const end = startMs + 6 * 86400000;
@@ -55,7 +60,11 @@ export default function InterviewCalendar() {
   }, [visible, weekStartMs]);
 
   const toggleVisible = (uid) =>
-    setVisible((prev) => (prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]));
+    setVisible((prev) => {
+      if (prev.includes(uid)) return prev.filter((id) => id !== uid);
+      if (prev.length >= MAX_VISIBLE) return prev; // §7b — cap at 3, never shrink lanes further
+      return [...prev, uid];
+    });
 
   const requestAvailability = async (person) => {
     await notifyUser({
@@ -109,6 +118,7 @@ export default function InterviewCalendar() {
           interviewers={interviewers}
           availability={availability}
           visible={visible}
+          maxVisible={MAX_VISIBLE}
           onToggle={toggleVisible}
           onRequest={requestAvailability}
           requested={requested}

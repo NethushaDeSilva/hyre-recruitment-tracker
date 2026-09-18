@@ -26,6 +26,19 @@ function formatHour(h) {
   return `${hr}${period}`;
 }
 
+// §7a — a free block used to render as a bare coloured rectangle with no
+// text at all. "Tue 2–4pm" here is the viewer's own local time, same
+// convention as the rest of this file.
+function formatTimeRange(startMs, endMs) {
+  const fmt = (ms) => {
+    const d = new Date(ms);
+    const period = d.getHours() < 12 ? "AM" : "PM";
+    const hr = d.getHours() % 12 === 0 ? 12 : d.getHours() % 12;
+    return d.getMinutes() === 0 ? `${hr}${period}` : `${hr}:${String(d.getMinutes()).padStart(2, "0")}${period}`;
+  };
+  return `${fmt(startMs)}–${fmt(endMs)}`;
+}
+
 export default function InterviewCalendarGrid({ weekStartMs, startHour, endHour, people, availability }) {
   const days = useMemo(() => weekDays(weekStartMs), [weekStartMs]);
   const hours = useMemo(() => Array.from({ length: endHour - startHour }, (_, i) => startHour + i), [startHour, endHour]);
@@ -77,7 +90,7 @@ export default function InterviewCalendarGrid({ weekStartMs, startHour, endHour,
                 <div key={h} className="pointer-events-none absolute inset-x-0 z-10 border-t border-border/60" style={{ top: i * HOUR_PX }} />
               ))}
               {people.map((person) => (
-                <PersonLane key={person.uid} person={person} day={day} startHour={startHour} endHour={endHour} availability={availability[person.uid]} />
+                <PersonLane key={person.uid} person={person} day={day} startHour={startHour} endHour={endHour} bodyHeight={bodyHeight} availability={availability[person.uid]} />
               ))}
             </div>
           ))}
@@ -87,11 +100,23 @@ export default function InterviewCalendarGrid({ weekStartMs, startHour, endHour,
   );
 }
 
-function PersonLane({ person, day, startHour, endHour, availability: av }) {
+// Minimum pixel heights for a free block to carry text at all, and to carry
+// the time range on top of the name — below the first threshold the block is
+// left blank rather than clipping a word into illegibility; the tooltip is
+// still there as a fallback either way.
+const MIN_PX_FOR_NAME = 20;
+const MIN_PX_FOR_TIME = 34;
+
+function PersonLane({ person, day, startHour, endHour, bodyHeight, availability: av }) {
   const dayStart = day.dateMs;
   const tz = av?.timeZone;
 
-  const freeSegs = (av?.freeSlots || []).map((s) => eventPosition(s, dayStart, startHour, endHour)).filter(Boolean);
+  const freeSegs = (av?.freeSlots || [])
+    .map((s) => {
+      const pos = eventPosition(s, dayStart, startHour, endHour);
+      return pos ? { pos, startMs: s.startMs, endMs: s.endMs } : null;
+    })
+    .filter(Boolean);
 
   const busyItems = [
     ...(av?.commitments || []).map((c) => ({ ...c, label: c.source === "interview" ? "Interview" : "Busy" })),
@@ -101,9 +126,26 @@ function PersonLane({ person, day, startHour, endHour, availability: av }) {
 
   return (
     <div className="relative h-full flex-1 border-l border-border/40 first:border-l-0" style={HATCH_BG}>
-      {freeSegs.map((pos, i) => (
-        <div key={`free-${i}`} className="absolute inset-x-0 bg-card" style={{ top: `${pos.topPct}%`, height: `${pos.heightPct}%` }} />
-      ))}
+      {freeSegs.map(({ pos, startMs, endMs }, i) => {
+        const heightPx = (pos.heightPct / 100) * bodyHeight;
+        return (
+          <Tooltip
+            key={`free-${i}`}
+            label={`${person.name} — free ${formatTimeRange(startMs, endMs)}`}
+            className="absolute inset-x-0.5 flex flex-col items-start overflow-hidden rounded-sm border bg-card px-1 py-0.5 text-left leading-tight"
+            style={{ top: `${pos.topPct}%`, height: `${pos.heightPct}%`, borderColor: person.avatarColor }}
+          >
+            {heightPx >= MIN_PX_FOR_NAME && (
+              <span className="block truncate text-[10px] font-semibold" style={{ color: person.avatarColor }}>
+                {person.name}
+              </span>
+            )}
+            {heightPx >= MIN_PX_FOR_TIME && (
+              <span className="block truncate text-[9px] text-muted-foreground">{formatTimeRange(startMs, endMs)}</span>
+            )}
+          </Tooltip>
+        );
+      })}
       {busySegs.map(({ pos, label }, i) => (
         <Tooltip
           key={`busy-${i}`}

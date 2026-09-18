@@ -14,7 +14,7 @@ import AssessmentStatus from "@/components/AssessmentStatus";
 import { useMemo, useState, useEffect } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, SlidersHorizontal, RefreshCw, AlertCircle } from "lucide-react";
-import { useHyreData, advanceStage, rejectCandidate, bulkReject, rescoreVacancy } from "@/data/store";
+import { useHyreData, advanceStage, rejectCandidate, bulkReject, rescoreVacancy, updatePositionThreshold } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
 import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage, isSchedulableStage } from "@/lib/stages";
@@ -51,11 +51,14 @@ export default function PositionDetail() {
   const [picked, setPicked] = useState(() => new Set());
   // board search (HR only) — live, filters by name/skills/role/company/field.
   const [q, setQ] = useState("");
-  // WS5 5.8 shortlist threshold — pure client-side view filter (HR only).
-  // Never written to Firestore by moving the slider; initialises from the
-  // position's stored default and resets only when navigating to a
-  // DIFFERENT position, so it never fights a live Firestore update mid-session.
+  // WS5 5.8 / WS8 §4 — shortlist threshold. Now a persisted position field,
+  // not a per-session view filter: dragging it writes position.shortlistThreshold
+  // via updatePositionThreshold() on release, so it survives a reload. Local
+  // state still drives the slider live (immediate feedback while dragging)
+  // and resets from the position's stored value only when navigating to a
+  // DIFFERENT position, so it never fights a live Firestore update mid-drag.
   const [threshold, setThreshold] = useState(0);
+  const [savingThreshold, setSavingThreshold] = useState(false);
   const [rescoring, setRescoring] = useState(false);
   const [rescoreMsg, setRescoreMsg] = useState("");
   // UI chrome: the header shrinks as you scroll the board (reclaims space).
@@ -167,7 +170,7 @@ export default function PositionDetail() {
     // trigger (isSchedulableStage) needs to check.
     const landingStage = nextStage(position.stages, c.stage);
     const res = await advanceStage(c.id, actor);
-    if (res && res.ok === false && res.reason === "review-required") {
+    if (res && res.ok === false && (res.reason === "review-required" || res.reason === "comment-required")) {
       setReviewFor(c.id);
       setMustReview(true);
       setDetail(c);
@@ -214,6 +217,16 @@ export default function PositionDetail() {
     const res = await rescoreVacancy(position.id);
     setRescoring(false);
     setRescoreMsg(res.ok ? `Re-scored ${res.scored} application${res.scored === 1 ? "" : "s"}${res.failed ? `, ${res.failed} failed` : ""}.` : res.error);
+  };
+
+  // Persist on release (mouseup/touchend/blur), not on every `input` tick of
+  // the drag — the slider still updates `threshold` live via onChange for
+  // immediate visual feedback, this just decides when that value gets saved.
+  const persistThreshold = async (value) => {
+    if (value === (position?.shortlistThreshold ?? 0)) return;
+    setSavingThreshold(true);
+    await updatePositionThreshold(position.id, value);
+    setSavingThreshold(false);
   };
 
   // --- Applied-stage bulk move (HR only) ---
@@ -289,10 +302,7 @@ export default function PositionDetail() {
         )}
       </div>
 
-      {/* search + Applied-column shortlist threshold — HR only. The threshold
-          slider is a pure client-side view filter: it only ever calls
-          setThreshold (local state), never a store mutator — nothing here
-          writes to Firestore or touches a stage/record. */}
+      {/* search — HR only. Client-side, filters the visible board only. */}
       {isHR && (
         <div className={`relative z-30 flex flex-wrap items-center gap-2.5 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-5"}`}>
           <div className="flex min-w-[160px] flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
@@ -304,36 +314,51 @@ export default function PositionDetail() {
               className="w-full bg-transparent text-foreground placeholder:text-[#94A3B8] focus:outline-none"
             />
           </div>
+        </div>
+      )}
+
+      {/* WS5 5.8 / WS8 §4 — shortlist threshold. A primary control now, not a
+          side slider: this is what turns 100 Applied CVs into a workable
+          shortlist. Persists to position.shortlistThreshold on release
+          (persistThreshold above) so it survives a reload, and drives the
+          Applied-column green/red colour and the review-comment gate
+          everywhere else via the same >= comparison (meetsShortlistThreshold). */}
+      {isHR && (
+        <div className={`relative z-20 flex flex-wrap items-center gap-3 rounded-lg border border-primary/25 bg-primary/[0.05] px-4 py-3.5 transition-[margin] duration-200 ease-natural ${collapsed ? "mt-2" : "mt-3"}`}>
+          <SlidersHorizontal size={18} className="shrink-0 text-primary" />
           {/* min-w-0 (not shrink-0) is the actual fix: shrink-0 was blocking this
               box from ever being squeezed into a narrower line, so its own
               flex-wrap never had a reason to engage — the box just ran off the
               viewport at full width instead of reflowing its children. */}
-          <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-xs">
-            <SlidersHorizontal size={13} className="text-muted-foreground" />
-            <label className="font-semibold text-foreground">Shortlist</label>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <label htmlFor="shortlist-threshold" className="text-sm font-bold text-foreground">Shortlist threshold</label>
             <input
+              id="shortlist-threshold"
               type="range" min={0} max={100} step={5} value={threshold}
               onChange={(e) => setThreshold(Number(e.target.value))}
-              className="w-24 accent-primary"
+              onMouseUp={(e) => persistThreshold(Number(e.target.value))}
+              onTouchEnd={(e) => persistThreshold(Number(e.target.value))}
+              onKeyUp={(e) => persistThreshold(Number(e.target.value))}
+              className="h-2 w-40 accent-primary"
             />
-            <span className="w-9 font-bold tabular-nums text-foreground">{threshold}+</span>
-            <span className="text-muted-foreground">
-              {appliedVisibleEntries.length} shown · {appliedHiddenByThreshold} below threshold
-              {appliedUnscoredCount > 0 && <> · {appliedUnscoredCount} unscored</>}
+            <span className="text-lg font-extrabold tabular-nums text-primary">{threshold}+</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              {savingThreshold ? "Saving…" : `${appliedVisibleEntries.length} shown · ${appliedHiddenByThreshold} below threshold`}
+              {!savingThreshold && appliedUnscoredCount > 0 && <> · {appliedUnscoredCount} unscored</>}
             </span>
             {appliedStaleCount > 0 && (
-              <span className="rounded bg-[#FBF1DC] px-1.5 py-0.5 font-bold text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]">
+              <span className="rounded bg-[#FBF1DC] px-1.5 py-0.5 text-xs font-bold text-[#A9781A] dark:bg-[#A9781A]/20 dark:text-[#F5D77E]">
                 {appliedStaleCount} stale
               </span>
             )}
-            <button
-              onClick={runRescore}
-              disabled={rescoring}
-              className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/[0.06] px-2 py-1 font-bold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
-            >
-              <RefreshCw size={11} className={rescoring ? "animate-spin" : ""} /> {rescoring ? "Re-scoring…" : "Re-score all"}
-            </button>
           </div>
+          <button
+            onClick={runRescore}
+            disabled={rescoring}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-card px-2.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={rescoring ? "animate-spin" : ""} /> {rescoring ? "Re-scoring…" : "Re-score all"}
+          </button>
         </div>
       )}
       {isHR && rescoreMsg && <p className="mt-1.5 text-xs text-muted-foreground">{rescoreMsg}</p>}
@@ -462,7 +487,7 @@ export default function PositionDetail() {
                       {isHR && stageId === "applied" && (
                         scores.get(c.id)?.status === "scored" ? (
                           <div className="flex items-center gap-1.5">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${scorePillClass(scores.get(c.id).overallScore)}`}>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-extrabold ${scorePillClass(scores.get(c.id).overallScore, position)}`}>
                               {scores.get(c.id).overallScore}
                             </span>
                             {isScoreStale(scores.get(c.id)) && (

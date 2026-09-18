@@ -45,9 +45,20 @@ export function assessmentEligibility(score, position, candidate) {
   return review("Legacy score retained; mandatory eligibility needs review (no matching requirements snapshot).");
 }
 
-export function canBulkSelect(score, position, candidate) {
+// The single source of truth for "does this candidate meet the position's
+// shortlist threshold" — the Applied-column green/red colour (scorePillClass
+// below), the bulk-select gate, and the review-comment gate (advanceStage()
+// in data/store.js) all read this same comparison, so a green candidate can
+// never be one that also demands a comment. An unscored, failed or stale
+// score never counts as meeting it — never let "we can't compare" resolve to
+// "looks fine".
+export function meetsShortlistThreshold(score, position) {
   return score?.status === "scored" && !isScoreStale(score) &&
-    score.overallScore >= (position?.shortlistThreshold ?? 0) &&
+    score.overallScore >= (position?.shortlistThreshold ?? 0);
+}
+
+export function canBulkSelect(score, position, candidate) {
+  return meetsShortlistThreshold(score, position) &&
     assessmentEligibility(score, position, candidate).status === "meets";
 }
 
@@ -97,9 +108,13 @@ export function notScoredReason(scoreDoc, position) {
 }
 
 /** Colour band for a Match pill — shared so the Shortlist and the Candidates
- * Match column render the same score the same colour. */
-export function scorePillClass(score) {
-  return score >= 75 ? "bg-[#16A34A]/12 text-[#16A34A] dark:text-[#4ADE80]"
-    : score >= 50 ? "bg-[#E0A422]/15 text-[#B4801A] dark:text-[#F5D77E]"
+ * Match column render the same score the same colour. Threshold-relative
+ * (WS5 5.8): at or above the position's shortlist threshold is green, below
+ * is red — the same comparison meetsShortlistThreshold() uses, so this can
+ * never show green for a candidate the review-comment gate still treats as
+ * below threshold. Callers only ever pass an already-`scored` number. */
+export function scorePillClass(score, position) {
+  return score >= (position?.shortlistThreshold ?? 0)
+    ? "bg-[#16A34A]/12 text-[#16A34A] dark:text-[#4ADE80]"
     : "bg-[#DC2626]/10 text-[#DC2626] dark:text-[#F87171]";
 }

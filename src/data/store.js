@@ -1,4 +1,4 @@
-import { canBulkSelect } from "@/lib/scoreStaleness";
+import { canBulkSelect, meetsShortlistThreshold } from "@/lib/scoreStaleness";
 // THE single data seam for Hyre — the one module the whole UI talks to for data.
 // When Firebase is configured, positions & candidates live in Firestore and are
 // kept in sync with real-time onSnapshot listeners; mutations write to Firestore.
@@ -773,6 +773,24 @@ export async function updatePosition(id, {
   return { id, ...current, ...data };
 }
 
+// WS5 5.8 / WS8 §4 — the shortlist threshold lives on the position board now,
+// not a create/edit modal field (OpenPositionModal no longer collects it). A
+// narrow, dedicated mutator rather than routing through updatePosition():
+// threshold changes are frequent (dragged, not typed) and, per 5.2, staleness
+// is keyed on requirements ONLY — shortlistThreshold never enters that
+// comparison — so this never needs assertPublishableRequirements or the
+// requirements-changed diff updatePosition() carries.
+export async function updatePositionThreshold(id, shortlistThreshold) {
+  const value = Math.max(0, Math.min(100, Number(shortlistThreshold) || 0));
+  if (firebaseReady) {
+    await updateDoc(doc(db, "positions", id), { shortlistThreshold: value });
+  } else {
+    positions = positions.map((p) => (p.id === id ? { ...p, shortlistThreshold: value } : p));
+    commit();
+  }
+  return value;
+}
+
 /**
  * WS5 5.2 — explicitly re-score every application for one vacancy: after
  * requirements were edited (existing scores already marked stale above),
@@ -1439,11 +1457,13 @@ const commentId = (cm) => cm.byUid || cm.by || "";
  * Move a candidate to the next stage of its position's pipeline (no skipping).
  * `actor` = { name, role, uid } of the user making the move.
  *
- * For every stage AFTER Applied, the acting user must first have left a review
- * (a comment WITH a score) on this candidate at the current stage — otherwise the
- * move is refused and we return { ok:false, reason:"review-required" }. Applied
- * is exempt (it's just an application). The review is copied onto the history
- * entry so it shows in the candidate's timeline.
+ * For every stage AFTER Applied, the acting user must first have left a
+ * SCORE at the current stage — otherwise { ok:false, reason:"review-required" }.
+ * Comment TEXT is only mandatory on top of that when the score is below the
+ * position's shortlist threshold (WS8 §4) — otherwise { ok:false,
+ * reason:"comment-required" }. Applied is exempt (it's just an application).
+ * The review is copied onto the history entry so it shows in the candidate's
+ * timeline.
  */
 export async function advanceStage(candidateId, actor, opts = {}) {
   const cand = candidates.find((c) => c.id === candidateId);
@@ -1457,10 +1477,20 @@ export async function advanceStage(candidateId, actor, opts = {}) {
 
   const uidActor = idOf(actor);
   const review = (cand.comments || []).find(
-    (cm) => commentId(cm) === uidActor && cm.stage === cand.stage && cm.score != null
+    (cm) => commentId(cm) === uidActor && cm.stage === cand.stage
   );
-  if (cand.stage !== "applied" && !review) {
-    return { ok: false, reason: "review-required" };
+  if (cand.stage !== "applied") {
+    // A score is mandatory for every move past Applied, unconditionally.
+    if (!review || review.score == null) {
+      return { ok: false, reason: "review-required" };
+    }
+    // WS8 §4 — comment TEXT is only mandatory when this score is below the
+    // position's shortlist threshold; the SAME >= comparison the
+    // Applied-column colour uses (meetsShortlistThreshold in scoreStaleness.js),
+    // so a green candidate can never be the one this blocks.
+    if (!meetsShortlistThreshold(scores.get(candidateId), pos) && !(review.text && review.text.trim())) {
+      return { ok: false, reason: "comment-required" };
+    }
   }
   // Ties the loop closed: nobody reaches "hired" without a candidate-accepted offer.
   if (nx === "hired" && cand.offer?.status !== "accepted") {
@@ -1650,19 +1680,21 @@ const RECOMMENDATIONS = ["advance", "reject", "hold"];
 
 export async function addComment(candidateId, { text, score = null, recommendation = null, actor }) {
   const cand = candidates.find((c) => c.id === candidateId);
-  if (!cand || !text || !text.trim()) return;
+  const hasText = !!(text && text.trim());
+  // Validate the score here too (not just below) so a text-less "score only"
+  // review (WS8 §4 — comment text is optional at/above the position's
+  // shortlist threshold) can still be told apart from truly empty input.
+  const scoreNum = score !== null && score !== undefined && score !== "" ? Number(score) : NaN;
+  const hasScore = Number.isFinite(scoreNum);
+  if (!cand || (!hasText && !hasScore)) return;
   // One comment per user per stage — enforced HERE, not only in the UI, so a
   // second tab or a stray caller can't post a duplicate review.
   const mine = idOf(actor);
   if ((cand.comments || []).some((cm) => commentId(cm) === mine && cm.stage === cand.stage)) return;
-  const entry = { text: text.trim(), stage: cand.stage, at: Date.now(), ...actorFields(actor) };
-  // Validate the score: must be a real, finite number; clamp to 0–100. A blank
-  // or garbage score (which would become NaN) is dropped, so it can never
-  // masquerade as a valid review and slip past the mandatory-review gate.
-  if (score !== null && score !== undefined && score !== "") {
-    const n = Number(score);
-    if (Number.isFinite(n)) entry.score = Math.min(100, Math.max(0, Math.round(n)));
-  }
+  const entry = { stage: cand.stage, at: Date.now(), ...actorFields(actor) };
+  if (hasText) entry.text = text.trim();
+  // Clamp to 0–100 — already validated finite above.
+  if (hasScore) entry.score = Math.min(100, Math.max(0, Math.round(scoreNum)));
   // Structured recommendation (advance / reject / hold) — this is what turns a
   // scorecard into a decision, not just free-text feedback. Anything else is dropped.
   if (RECOMMENDATIONS.includes(recommendation)) entry.recommendation = recommendation;

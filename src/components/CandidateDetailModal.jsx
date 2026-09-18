@@ -16,6 +16,7 @@ import { stageLabelOf, canActOnStageFor, nextStage, resolveStage, isSchedulableS
 import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl, openDataUrl, humanSize } from "@/lib/file";
 import { reconsiderCandidate, addComment, deleteComment, advanceStage, sendOffer, respondToOffer } from "@/data/store";
+import { meetsShortlistThreshold } from "@/lib/scoreStaleness";
 import InterviewStatusPanel from "@/components/InterviewStatusPanel";
 
 const OFFER_STATUS_TONE = { sent: "#2563EB", accepted: "#16A34A", declined: "#DC2626", negotiating: "#A9781A" };
@@ -82,14 +83,22 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const comments = c.comments || [];
 
   // Review rules: a score is required for every stage AFTER Applied (and not for
-  // terminal stages). Each user gets ONE comment per stage — they may delete it
-  // (before the move is confirmed) and re-add.
+  // terminal stages) — unconditionally, regardless of threshold. Each user gets
+  // ONE comment per stage — they may delete it (before the move is confirmed)
+  // and re-add.
   const isTerminal = c.stage === "hired" || c.stage === "rejected";
   const scoreRequired = !isTerminal && c.stage !== "applied";
   const myComment = comments.find((cm) => (cm.byUid || cm.by) === myId && cm.stage === c.stage);
+  // WS8 §4 — comment TEXT is only mandatory when this score is below the
+  // position's shortlist threshold; same >= comparison the Applied-column
+  // colour uses (meetsShortlistThreshold), so a green score can never demand
+  // one. The score itself stays mandatory either way (scoreRequired, above).
+  const commentRequired = scoreRequired && !meetsShortlistThreshold(scoreDoc, position);
   const scoreOk = !scoreRequired || (score !== "" && Number(score) >= 0 && Number(score) <= 100);
   const recommendationOk = !scoreRequired || !!recommendation;
   const canPost = canComment && !isTerminal && !myComment;
+  const hasScoredReview = !!(myComment && myComment.score != null);
+  const commentSatisfied = !commentRequired || !!(myComment?.text && myComment.text.trim());
 
   // Move to next stage — right here in the pop-out, so reviewing and advancing a
   // candidate (e.g. one clicked from an AI-filtered shortlist) never needs closing
@@ -100,7 +109,11 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const nextId = position ? nextStage(position.stages, c.stage) : null;
   const nextLabel = nextId ? resolveStage(position, nextId)?.label : null;
   const offerRequired = nextId === "hired" && c.offer?.status !== "accepted"; // ties the loop closed
-  const moveBlocked = (scoreRequired && !myComment) || offerRequired;
+  // Mirrors advanceStage()'s own gate exactly (same score-mandatory +
+  // threshold-relative-comment shape) rather than trusting "a review exists"
+  // alone — a threshold change between leaving the review and clicking Move
+  // must re-gate against the CURRENT threshold, same as the server does.
+  const moveBlocked = (scoreRequired && (!hasScoredReview || !commentSatisfied)) || offerRequired;
 
   const reconsider = async () => {
     await reconsiderCandidate(c.id, actor);
@@ -123,7 +136,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   };
 
   const postComment = async () => {
-    if (!draft.trim() || !scoreOk || !recommendationOk) return;
+    if ((commentRequired && !draft.trim()) || !scoreOk || !recommendationOk) return;
     setPosting(true);
     await addComment(c.id, {
       text: draft,
@@ -258,10 +271,12 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           </div>
 
           {/* shown when someone tried to move this candidate without reviewing first */}
-          {mustReview && scoreRequired && !myComment && (
+          {mustReview && scoreRequired && moveBlocked && (
             <div className="mb-3 flex items-start gap-2 rounded-lg bg-[#FBE9E9] px-3 py-2.5 text-[13px] font-semibold text-[#B91C1C]">
               <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-              Add your comment and a score below before you can move this candidate to the next stage.
+              {!hasScoredReview
+                ? "Add your comment and a score below before you can move this candidate to the next stage."
+                : "This score is below the shortlist threshold — add a comment below before you can move this candidate to the next stage."}
             </div>
           )}
 
@@ -298,7 +313,11 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                         </button>
                       )}
                     </div>
-                    <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground">{cm.text}</p>
+                    {cm.text ? (
+                      <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground">{cm.text}</p>
+                    ) : cm.score != null ? (
+                      <p className="mt-1.5 text-sm italic text-muted-foreground">No comment left — score met the shortlist threshold.</p>
+                    ) : null}
                   </li>
                 );
               })}
@@ -313,8 +332,15 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 maxLength={1000}
-                placeholder="Add your comment on this candidate…"
+                placeholder={commentRequired ? "Add your comment on this candidate…" : "Add an optional comment on this candidate…"}
               />
+              {scoreRequired && (
+                <p className="text-xs text-muted-foreground">
+                  {commentRequired
+                    ? "Comment required — this score is below the shortlist threshold."
+                    : "Comment optional — this score meets the shortlist threshold."}
+                </p>
+              )}
               {scoreRequired && (
                 <div className="flex items-center gap-2">
                   <label className="text-[13px] font-semibold text-foreground">Score</label>
@@ -352,7 +378,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                 </div>
               )}
               <div className="flex justify-end">
-                <Button onClick={postComment} disabled={!draft.trim() || !scoreOk || !recommendationOk || posting}>
+                <Button onClick={postComment} disabled={(commentRequired && !draft.trim()) || !scoreOk || !recommendationOk || posting}>
                   <Send size={14} /> {posting ? "Posting…" : "Post review"}
                 </Button>
               </div>
@@ -428,7 +454,11 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
               {offerRequired ? (
                 <span className="font-semibold text-[#B91C1C]">{displayName(c)} needs an accepted offer before they can be hired.</span>
               ) : moveBlocked ? (
-                <span className="font-semibold text-[#B91C1C]">Add your comment and a score above before moving {displayName(c)} on.</span>
+                <span className="font-semibold text-[#B91C1C]">
+                  {!hasScoredReview
+                    ? <>Add your comment and a score above before moving {displayName(c)} on.</>
+                    : <>This score is below the shortlist threshold — add a comment above before moving {displayName(c)} on.</>}
+                </span>
               ) : (
                 <span className="text-foreground">
                   Ready to move <span className="font-semibold">{displayName(c)}</span> to <span className="font-semibold">{nextLabel || "the next stage"}</span>?

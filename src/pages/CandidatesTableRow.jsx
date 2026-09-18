@@ -38,7 +38,7 @@ function MatchPill({ position, scoreDoc, isOpen, onToggle }) {
       onClick={(e) => { e.stopPropagation(); onToggle(); }}
       className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-extrabold transition-opacity hover:opacity-80"
     >
-      <span className={cn("rounded-full px-1.5 py-0.5", scorePillClass(scoreDoc.overallScore))}>
+      <span className={cn("rounded-full px-1.5 py-0.5", scorePillClass(scoreDoc.overallScore, position))}>
         {scoreDoc.overallScore}
       </span>
       {stale && (

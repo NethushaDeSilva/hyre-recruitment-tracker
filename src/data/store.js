@@ -206,6 +206,9 @@ const mapPosition = (d) => {
   return {
     id: d.id, title: x.title, department: x.department, description: x.description || "",
     status: x.status || "Open", stages: x.stages || DEFAULT_PIPELINE, minQualification: x.minQualification || "",
+    // Free text, HR-entered only — never computed, estimated or fetched.
+    // Omitted from the candidate-facing job detail page entirely when blank.
+    salaryRange: x.salaryRange || "",
     // WS5 5.2 — structured scoring requirements, separate from minQualification
     // above (a legacy free-text hint across the full O/L-to-PhD ladder; this
     // one is the engine's strict input and only exists once a position has
@@ -661,7 +664,7 @@ export async function addPosition({
   title, department, description, stages, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
   createdByRole = "", createdByUid = "", createdByName = "",
-  requirements = null, shortlistThreshold = 0,
+  requirements = null, shortlistThreshold = 0, salaryRange = "",
 }) {
   // HR is the recruitment authority now, so a newly opened vacancy goes live
   // immediately — there's no separate Management approval step anymore. That
@@ -678,6 +681,9 @@ export async function addPosition({
     minQualification,
     requirements,
     shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
+    // Free text, HR-entered only (candidate-facing job detail page) — never
+    // computed/estimated/fetched. Trimmed, no other validation.
+    salaryRange: (salaryRange || "").trim(),
     // mandatory auto-close date: the position closes itself once this passes
     closesAt: closesAt ? new Date(closesAt) : null,
     headcount: Math.max(1, Number(headcount) || 1),
@@ -716,7 +722,7 @@ export async function addPosition({
 export async function updatePosition(id, {
   title, department, description, minQualification = "", closesAt = 0,
   headcount = 1, hiringManagerUid = "", hiringManagerName = "",
-  requirements = null, shortlistThreshold = 0,
+  requirements = null, shortlistThreshold = 0, salaryRange = "",
 }) {
   const current = positions.find((p) => p.id === id);
   if (!current) throw new Error(`updatePosition: no position ${id}`);
@@ -738,6 +744,7 @@ export async function updatePosition(id, {
     minQualification,
     requirements,
     shortlistThreshold: Math.max(0, Math.min(100, Number(shortlistThreshold) || 0)),
+    salaryRange: (salaryRange || "").trim(),
     closesAt: closesAt ? new Date(closesAt) : null,
     headcount: Math.max(1, Number(headcount) || 1),
     hiringManagerUid,

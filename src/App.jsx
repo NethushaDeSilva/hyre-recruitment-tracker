@@ -28,6 +28,7 @@ const CandidatesTable = lazy(() => import("@/pages/CandidatesTable"));
 const Employees = lazy(() => import("@/pages/Employees"));
 const Rejected = lazy(() => import("@/pages/Rejected"));
 const Jobs = lazy(() => import("@/pages/Jobs"));
+const JobDetail = lazy(() => import("@/pages/JobDetail"));
 const MyApplications = lazy(() => import("@/pages/MyApplications"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -80,6 +81,7 @@ export default function App() {
 
             {/* candidate — the applicant portal */}
             <Route path="/jobs" element={<RequireRole roles={[ROLES.CANDIDATE]}><Jobs /></RequireRole>} />
+            <Route path="/jobs/:positionId" element={<RequireRole roles={[ROLES.CANDIDATE]}><JobDetail /></RequireRole>} />
             <Route path="/applications" element={<RequireRole roles={[ROLES.CANDIDATE]}><MyApplications /></RequireRole>} />
 
             {/* company — internal, staff only */}

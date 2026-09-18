@@ -9,7 +9,7 @@
 //                              a neutral GRAY "Applications closed" — being hired
 //                              is terminal, globally, regardless of role.
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Briefcase, MapPin, CheckCircle2, ArrowRight, Ban, Lock, BadgeCheck, Clock } from "lucide-react";
 import { useHyreData } from "@/data/store";
 import { isOpenNow } from "@/lib/positions";
@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 
 export default function Jobs() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { positions, candidates, loading } = useHyreData();
   const [applyTo, setApplyTo] = useState(null);
   const [justApplied, setJustApplied] = useState(null);
@@ -144,8 +145,20 @@ export default function Jobs() {
               ? "border-border opacity-55"
               : "";
 
+            // Any card, any status, opens the job detail page — the apply
+            // form lives there now, not in a modal launched straight from
+            // this list (see JobDetail.jsx). The visible "Apply now" button
+            // has no onClick of its own; it's the same click target as the
+            // rest of the card via bubbling, so there's one destination, not two.
             return (
-              <Card key={pos.id} className={cn("flex h-full flex-col gap-4 p-5 transition-all", tint)}>
+              <Card
+                key={pos.id}
+                onClick={() => navigate(`/jobs/${pos.id}`)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(`/jobs/${pos.id}`); } }}
+                role="button"
+                tabIndex={0}
+                className={cn("flex h-full cursor-pointer flex-col gap-4 p-5 transition-all", tint)}
+              >
                 <div className={cn(
                   "flex h-11 w-11 items-center justify-center rounded-xl",
                   hiredHere ? "bg-[#16A34A]/12 text-[#16A34A] dark:text-[#4ADE80]"
@@ -181,7 +194,7 @@ export default function Jobs() {
                       <Lock size={15} /> Applications closed
                     </div>
                   ) : (
-                    <Button className="w-full" onClick={() => setApplyTo(pos)}>
+                    <Button className="w-full">
                       Apply now <ArrowRight size={16} />
                     </Button>
                   )}

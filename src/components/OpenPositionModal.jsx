@@ -47,6 +47,9 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   const [requiredSkillsText, setRequiredSkillsText] = useState("");
   const [minYearsExperience, setMinYearsExperience] = useState("0");
   const [niceToHaveText, setNiceToHaveText] = useState("");
+  // Candidate-facing job detail page — free text, HR-entered only, optional.
+  // Never computed, estimated or fetched (see JobDetail.jsx).
+  const [salaryRange, setSalaryRange] = useState("");
   const [closeDate, setCloseDate] = useState("");
   const [selected, setSelected] = useState(DEFAULT_MIDDLE);
   // WS5 5.3 — derived, not chosen: Bachelor's/Master's/PhD map onto the
@@ -68,6 +71,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setRequiredSkillsText((position.requirements?.requiredSkills || []).join(", "));
     setMinYearsExperience(String(position.requirements?.minYearsExperience ?? 0));
     setNiceToHaveText((position.requirements?.niceToHave || []).join(", "));
+    setSalaryRange(position.salaryRange || "");
     setCloseDate(msToDateStr(position.closesAt));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, position?.id]);
@@ -81,6 +85,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setRequiredSkillsText("");
     setMinYearsExperience("0");
     setNiceToHaveText("");
+    setSalaryRange("");
     setCloseDate("");
     setSelected(DEFAULT_MIDDLE);
   };
@@ -114,6 +119,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
         hiringManagerName: position.hiringManagerName || "",
         requirements,
         shortlistThreshold: position.shortlistThreshold ?? 0,
+        salaryRange,
       });
       close();
       return;
@@ -128,6 +134,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
       createdByName: user?.name || "",
       requirements,
       shortlistThreshold: 0,
+      salaryRange,
     });
     close();
     nav(`/positions/${pos.id}`);
@@ -216,6 +223,18 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
             </p>
           </Field>
         </div>
+
+        <Field label="Salary range (optional)">
+          <Input
+            value={salaryRange}
+            onChange={(e) => setSalaryRange(e.target.value)}
+            maxLength={120}
+            placeholder="e.g. LKR 150,000 – 200,000 per month"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Shown on the candidate's job detail page exactly as typed. Leave blank to omit the salary section entirely — never guessed or estimated.
+          </p>
+        </Field>
 
         <Field label="Auto-close date">
           <Input type="date" value={closeDate} min={todayStr()} onChange={(e) => setCloseDate(e.target.value)} />

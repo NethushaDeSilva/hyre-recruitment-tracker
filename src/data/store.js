@@ -1232,6 +1232,21 @@ export async function saveWeeklyAvailability(uid, days) {
   });
 }
 
+/**
+ * RAW weekly-availability docs (or null) for a set of staff, keyed by uid —
+ * the existence check the directory list's "Availability declared" / "No
+ * availability" chip needs (Part B), distinct from getWeeklyAvailability()
+ * above which always normalizes to a full week and so can't tell "declared
+ * an empty week" apart from "never declared at all".
+ */
+export async function getWeeklyAvailabilityDocs(uids) {
+  if (!firebaseReady || !uids.length) return {};
+  const snaps = await Promise.all(uids.map((id) => getDoc(doc(db, "weeklyAvailability", id))));
+  const out = {};
+  uids.forEach((id, i) => { out[id] = snaps[i].exists() ? snaps[i].data() : null; });
+  return out;
+}
+
 // --- WS8 Part C — automated interview assignment ----------------------------
 // CLAUDE.md WS8 §8.6: "fewest current assignments" is REAL BOOKING LOAD — how
 // many interviews someone currently holds — never the pipeline-team-membership

@@ -41,6 +41,7 @@ const MATRIX = {
   exportReports: [ROLES.HR, ROLES.MANAGEMENT], // Sprint 2
   manageOwnAvailability: [ROLES.HR, ROLES.INTERVIEWER, ROLES.MANAGEMENT], // WS8 §8.2 — declare your own schedule
   viewInterviewCalendar: [ROLES.HR, ROLES.MANAGEMENT], // WS8 §8.2a — HR schedules; Interviewer sees their own via /availability
+  viewAvailabilityDirectory: [ROLES.HR, ROLES.MANAGEMENT], // Part B — browse interviewers' declared weekly template, read-only
 
   // candidate side
   apply: [ROLES.CANDIDATE],

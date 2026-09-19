@@ -35,6 +35,7 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const Company = lazy(() => import("@/pages/Company"));
 const Team = lazy(() => import("@/pages/Team"));
 const Availability = lazy(() => import("@/pages/Availability"));
+const AvailabilityDirectory = lazy(() => import("@/pages/AvailabilityDirectory"));
 const InterviewCalendar = lazy(() => import("@/pages/InterviewCalendar"));
 const Help = lazy(() => import("@/pages/Help"));
 
@@ -88,6 +89,7 @@ export default function App() {
             <Route path="/company" element={<RequireRole roles={STAFF}><Company /></RequireRole>} />
             <Route path="/team" element={<RequireRole roles={STAFF}><Team /></RequireRole>} />
             <Route path="/availability" element={<RequireRole roles={STAFF}><Availability /></RequireRole>} />
+            <Route path="/availability/directory" element={<RequireRole roles={RECRUITERS}><AvailabilityDirectory /></RequireRole>} />
             <Route path="/schedule" element={<RequireRole roles={RECRUITERS}><InterviewCalendar /></RequireRole>} />
 
             {/* everyone */}

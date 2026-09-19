@@ -1,6 +1,6 @@
 // Persistent left sidebar on desktop; a slide-in drawer on phones/tablets.
 import { NavLink, Link } from "react-router-dom";
-import { Briefcase, Users, Search, FileText, BadgeCheck, UserX, CalendarClock, CalendarRange, X } from "lucide-react";
+import { Briefcase, Users, Search, FileText, BadgeCheck, UserX, CalendarClock, CalendarRange, CalendarSearch, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useHyreData } from "@/data/store";
 import { can } from "@/lib/permissions";
@@ -17,6 +17,7 @@ function navFor(role) {
   if (can(role, "viewEmployees")) items.push({ to: "/employees", label: "Employees", icon: BadgeCheck });
   if (can(role, "viewEmployees")) items.push({ to: "/rejected", label: "Rejected", icon: UserX });
   if (can(role, "viewInterviewCalendar")) items.push({ to: "/schedule", label: "Schedule", icon: CalendarRange });
+  if (can(role, "viewAvailabilityDirectory")) items.push({ to: "/availability/directory", label: "Interviewer Availability", icon: CalendarSearch });
   if (can(role, "manageOwnAvailability")) items.push({ to: "/availability", label: "Availability", icon: CalendarClock });
   if (can(role, "apply")) {
     items.push({ to: "/jobs", label: "Open Roles", icon: Search });

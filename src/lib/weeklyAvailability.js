@@ -94,3 +94,75 @@ export function normalizeWeek(raw) {
   }
   return out;
 }
+
+// --- FIX 1: legacy-shape derivation (src/data/store.js dual-write) --------
+// The new weekly template is the source of truth; `availability/{uid}` (the
+// old declared-slots-with-expiry model — src/lib/availability.js,
+// src/lib/interviewAssignment.js's WS8 Part C ranking, InterviewCalendar.jsx/
+// InterviewCalendarGrid.jsx's /schedule booking calendar, and
+// StageAssignmentStep.jsx's chip) is now DERIVED from it on every save, so
+// those four readers keep working without being migrated. Pure functions
+// only — src/data/store.js is what actually writes it.
+
+const toHHMM = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+/**
+ * `range` minus every overlapping interval in `blockedRanges` — standard
+ * interval difference. Returns 0+ non-overlapping net intervals, sorted.
+ */
+export function subtractBlockedFromRange(range, blockedRanges) {
+  let intervals = [{ start: toMinutes(range.start), end: toMinutes(range.end) }];
+  for (const b of blockedRanges || []) {
+    const bStart = toMinutes(b.start);
+    const bEnd = toMinutes(b.end);
+    const next = [];
+    for (const iv of intervals) {
+      if (bEnd <= iv.start || bStart >= iv.end) { next.push(iv); continue; } // no overlap
+      if (bStart <= iv.start && bEnd >= iv.end) continue; // fully covers — drop
+      if (bStart > iv.start && bEnd < iv.end) { // fully inside — splits into two
+        next.push({ start: iv.start, end: bStart }, { start: bEnd, end: iv.end });
+        continue;
+      }
+      if (bStart <= iv.start) { next.push({ start: bEnd, end: iv.end }); continue; } // overlaps the start
+      next.push({ start: iv.start, end: bStart }); // overlaps the end
+    }
+    intervals = next;
+  }
+  return intervals.filter((iv) => iv.end > iv.start).map((iv) => ({ start: toHHMM(iv.start), end: toHHMM(iv.end) }));
+}
+
+// The old model's dayOfWeek is numeric, Sunday-first (src/pages/Availability.jsx's
+// former DAYS array / src/lib/availability.js's materializeSlots) — distinct
+// from this file's own mon..sun DAY_KEYS, which is Part A's tab order.
+const LEGACY_DAY_OF_WEEK = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+/** The weekly template's net free time, as the old model's flat `slots` array. */
+export function toLegacyAvailabilitySlots(days) {
+  const slots = [];
+  for (const key of DAY_KEYS) {
+    const day = days?.[key];
+    if (!day || day.enabled === false) continue; // contributes nothing
+    for (const range of day.available || []) {
+      for (const net of subtractBlockedFromRange(range, day.blocked)) {
+        slots.push({ dayOfWeek: LEGACY_DAY_OF_WEEK[key], startTime: net.start, endTime: net.end });
+      }
+    }
+  }
+  return slots;
+}
+
+/**
+ * The full `availability/{uid}` payload derived from a weekly template —
+ * everything except `declaredAt`, which the caller (store.js) sets with a
+ * real `serverTimestamp()`, not something this pure module can produce.
+ * @param {object} days - a normalized week (see normalizeWeek)
+ * @param {{exceptions?: Array, now?: number, timeZone?: string, validityMs: number}} opts
+ */
+export function buildLegacyAvailabilityDoc(days, { exceptions = [], now = Date.now(), timeZone = "Asia/Colombo", validityMs } = {}) {
+  return {
+    timeZone,
+    slots: toLegacyAvailabilitySlots(days),
+    exceptions,
+    validUntil: new Date(now + validityMs),
+  };
+}

@@ -17,7 +17,7 @@ import { canBulkSelect, evaluateReviewGate } from "@/lib/scoreStaleness";
 // is never re-uploaded or re-typed on a second application, while every other
 // screen that already reads `candidates` keeps working unmodified.
 import { useSyncExternalStore } from "react";
-import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
 import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta, stageOwnerRole } from "@/lib/stages";
 import { departmentCode } from "@/lib/departments";
@@ -27,7 +27,7 @@ import { scoringHeaders } from "@/lib/scoringAuth";
 import { createDeclaredAvailabilityProvider, availabilityState, AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
 import { browserTimeZone } from "@/lib/wallClock";
 import { rankEligibleInterviewers } from "@/lib/interviewAssignment";
-import { normalizeWeek } from "@/lib/weeklyAvailability";
+import { normalizeWeek, buildLegacyAvailabilityDoc } from "@/lib/weeklyAvailability";
 import { ROLES } from "@/lib/permissions";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
@@ -1222,14 +1222,43 @@ export async function getWeeklyAvailability(uid) {
   return normalizeWeek(snap.exists() ? snap.data() : null);
 }
 
-/** Whole-week single write — never seven per-day writes. */
+/**
+ * Whole-week single write for weeklyAvailability/{uid} — never seven
+ * per-day writes — PLUS a derived write to availability/{uid} in the same
+ * batch, so the two can never diverge.
+ *
+ * FIX 1: weeklyAvailability/{uid} is now the only editor, but
+ * availability/{uid} still has four live readers — src/lib/availability.js,
+ * src/lib/interviewAssignment.js (WS8 Part C's ranking), InterviewCalendar.jsx
+ * (/schedule's booking calendar), and StageAssignmentStep.jsx's declared-
+ * availability chip. Migrating all four is out of scope this close to a
+ * demo, so every save here also derives and writes their expected shape
+ * (buildLegacyAvailabilityDoc, src/lib/weeklyAvailability.js) instead of
+ * letting those declarations silently expire on their old 14-day fuse.
+ * TODO(post-demo): once all four consumers read weeklyAvailability directly,
+ * delete this second write and the availability/{uid} collection.
+ */
 export async function saveWeeklyAvailability(uid, days) {
   if (!firebaseReady || !uid) return;
-  await setDoc(doc(db, "weeklyAvailability", uid), {
+  // Preserve whatever exceptions already exist on the legacy doc — this
+  // dual-write derives `slots` from the template, but exceptions are a
+  // one-off-date concept the template has no equivalent of, so they're
+  // carried over untouched rather than cleared or invented.
+  const existing = await getDoc(doc(db, "availability", uid));
+  const exceptions = existing.exists() ? existing.data().exceptions || [] : [];
+  const legacyDoc = buildLegacyAvailabilityDoc(days, { exceptions, validityMs: AVAILABILITY_VALIDITY_MS });
+
+  const batch = writeBatch(db);
+  batch.set(doc(db, "weeklyAvailability", uid), {
     days,
     updatedAt: serverTimestamp(),
     updatedByUid: uid,
   });
+  batch.set(doc(db, "availability", uid), {
+    ...legacyDoc,
+    declaredAt: serverTimestamp(),
+  });
+  await batch.commit();
 }
 
 /**

@@ -17,7 +17,7 @@ import { canBulkSelect, evaluateReviewGate } from "@/lib/scoreStaleness";
 // is never re-uploaded or re-typed on a second application, while every other
 // screen that already reads `candidates` keeps working unmodified.
 import { useSyncExternalStore } from "react";
-import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction, serverTimestamp } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
 import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta, stageOwnerRole } from "@/lib/stages";
 import { departmentCode } from "@/lib/departments";
@@ -27,6 +27,7 @@ import { scoringHeaders } from "@/lib/scoringAuth";
 import { createDeclaredAvailabilityProvider, availabilityState, AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
 import { browserTimeZone } from "@/lib/wallClock";
 import { rankEligibleInterviewers } from "@/lib/interviewAssignment";
+import { normalizeWeek } from "@/lib/weeklyAvailability";
 import { ROLES } from "@/lib/permissions";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
@@ -1203,6 +1204,32 @@ export async function getAvailabilityRecords(uids) {
   const out = {};
   uids.forEach((id, i) => { out[id] = snaps[i].exists() ? mapAvailabilityDoc(snaps[i].data()) : null; });
   return out;
+}
+
+// --- Weekly availability TEMPLATE (a person's own recurring week) ----------
+// Deliberately a SEPARATE collection from `availability/{uid}` above (the
+// declared-slots-with-14-day-expiry model WS8 Part C's ranking, the /schedule
+// booking calendar and StageAssignmentStep's chip all still read). This is a
+// permanent weekly template — enabled/disabled per weekday, any number of
+// recurring available AND blocked ranges per day, no expiry concept — which
+// the old numeric-dayOfWeek/one-off-exceptions shape has no room for.
+// Reusing `availability/{uid}` for this would silently break every one of
+// those existing readers the moment someone saved the new form.
+/** The signed-in user's own weekly availability template, normalized (never null shape). */
+export async function getWeeklyAvailability(uid) {
+  if (!firebaseReady || !uid) return normalizeWeek(null);
+  const snap = await getDoc(doc(db, "weeklyAvailability", uid));
+  return normalizeWeek(snap.exists() ? snap.data() : null);
+}
+
+/** Whole-week single write — never seven per-day writes. */
+export async function saveWeeklyAvailability(uid, days) {
+  if (!firebaseReady || !uid) return;
+  await setDoc(doc(db, "weeklyAvailability", uid), {
+    days,
+    updatedAt: serverTimestamp(),
+    updatedByUid: uid,
+  });
 }
 
 // --- WS8 Part C — automated interview assignment ----------------------------

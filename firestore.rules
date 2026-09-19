@@ -155,6 +155,20 @@ service cloud.firestore {
       allow delete: if false; // re-declaring supersedes; deleting would just create a false `unknown` gap
     }
 
+    // --- Weekly availability TEMPLATE (a person's own recurring week) -----
+    // Deliberately a SEPARATE collection from /availability above — same
+    // ownership shape (read: any staff; write: only your own uid), but a
+    // different document shape (a permanent weekly template, not a dated
+    // declaration with an expiry), so it gets its own match block rather
+    // than overloading the one above with two incompatible schemas.
+    match /weeklyAvailability/{staffUid} {
+      allow read: if isStaff();
+      allow create, update: if isStaff() && request.auth.uid == staffUid
+                    && request.resource.data.updatedByUid == staffUid
+                    && request.resource.data.days is map;
+      allow delete: if false; // same reasoning as /availability — re-saving supersedes
+    }
+
     // --- WS8 Part C interviews (automated requests + booked interviews) ---
     // create: staff only (the assignment trigger or HR's manual override, §15
     // — both run under a staff session; an Interviewer can trigger one too,

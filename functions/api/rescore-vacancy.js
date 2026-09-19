@@ -17,13 +17,7 @@
 
 import { scoreVacancyApplications } from "../_lib/filtration-ai.js";
 import { requireStaff } from "../_lib/staff-auth.js";
-
-const ALLOWED_ORIGINS = new Set([
-  "https://hyre-hiring.pages.dev",
-  "https://screening-correctness.hyre-hiring.pages.dev",
-  "http://localhost:5173",
-  "http://localhost:4173",
-]);
+import { isAllowedOrigin } from "../_lib/cors.js";
 
 // 100+ CVs per vacancy is the MVP's stated realistic volume (CLAUDE.md
 // section 3) — this cap gives headroom above that while bounding one
@@ -48,13 +42,13 @@ function corsHeaders(origin) {
 
 export async function onRequestOptions({ request }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   return new Response(null, { status: 204, headers: origin ? corsHeaders(origin) : {} });
 }
 
 export async function onRequestPost({ request, env }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   const cors = origin ? corsHeaders(origin) : {};
   const denied = await requireStaff(request, env, cors);
   if (denied) return denied;

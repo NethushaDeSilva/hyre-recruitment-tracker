@@ -15,19 +15,14 @@
 //          missingSections: string[], fallback?: true }
 
 import { classifyCv, MODEL, truncateForModel } from "../_lib/cv-ai.js";
+import { isAllowedOrigin } from "../_lib/cors.js";
 
-// Only these origins may call this endpoint. This is the REAL gate — checked
-// before any model call runs, not just a response header. CORS headers below
-// are the browser-facing half of the same policy (they stop another site's JS
-// from reading a response its own browser was ever allowed to receive) — they
-// do not by themselves stop a non-browser caller from reaching this code, the
-// origin check does that.
-const ALLOWED_ORIGINS = new Set([
-  "https://hyre-hiring.pages.dev",
-  "http://localhost:5173",
-  "http://localhost:4173",
-]);
-
+// Only allowed origins (functions/_lib/cors.js) may call this endpoint. This
+// is the REAL gate — checked before any model call runs, not just a response
+// header. CORS headers below are the browser-facing half of the same policy
+// (they stop another site's JS from reading a response its own browser was
+// ever allowed to receive) — they do not by themselves stop a non-browser
+// caller from reaching this code, the origin check does that.
 function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
@@ -39,7 +34,7 @@ function corsHeaders(origin) {
 
 export async function onRequestOptions({ request }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   return new Response(null, { status: 204, headers: origin ? corsHeaders(origin) : {} });
 }
 
@@ -48,7 +43,7 @@ export async function onRequestOptions({ request }) {
 // actually submits a CV. No AI call, just confirms the binding exists.
 export async function onRequestGet({ request, env }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   const cors = origin ? corsHeaders(origin) : {};
   const bound = typeof env?.AI?.run === "function";
   return json({ ok: bound, model: MODEL }, bound ? 200 : 503, cors);
@@ -58,7 +53,7 @@ export async function onRequestPost({ request, env }) {
   const origin = request.headers.get("Origin");
   // A present Origin that isn't ours is refused outright — no model call runs.
   // A missing Origin (same-origin requests don't always send one) is allowed.
-  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+  if (!isAllowedOrigin(origin)) {
     return new Response(null, { status: 403 });
   }
   const cors = origin ? corsHeaders(origin) : {};

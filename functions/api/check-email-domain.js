@@ -10,12 +10,7 @@
 //   ->   { deliverable: bool, reason: string, domain: string }
 
 import { checkDomainDeliverable } from "../_lib/email-domain.js";
-
-const ALLOWED_ORIGINS = new Set([
-  "https://hyre-hiring.pages.dev",
-  "http://localhost:5173",
-  "http://localhost:4173",
-]);
+import { isAllowedOrigin } from "../_lib/cors.js";
 
 function corsHeaders(origin) {
   return {
@@ -28,13 +23,13 @@ function corsHeaders(origin) {
 
 export async function onRequestOptions({ request }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   return new Response(null, { status: 204, headers: origin ? corsHeaders(origin) : {} });
 }
 
 export async function onRequestPost({ request }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+  if (!isAllowedOrigin(origin)) {
     return new Response(null, { status: 403 });
   }
   const cors = origin ? corsHeaders(origin) : {};

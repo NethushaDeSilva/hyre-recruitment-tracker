@@ -29,12 +29,7 @@
 
 import { parseCvProfile, MODEL, truncateForModel } from "../_lib/cv-ai.js";
 import { computeTotalYearsExperience } from "../_lib/filtration/computeExperience.js";
-
-const ALLOWED_ORIGINS = new Set([
-  "https://hyre-hiring.pages.dev",
-  "http://localhost:5173",
-  "http://localhost:4173",
-]);
+import { isAllowedOrigin } from "../_lib/cors.js";
 
 function corsHeaders(origin) {
   return {
@@ -47,13 +42,13 @@ function corsHeaders(origin) {
 
 export async function onRequestOptions({ request }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   return new Response(null, { status: 204, headers: origin ? corsHeaders(origin) : {} });
 }
 
 export async function onRequestGet({ request, env }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   const cors = origin ? corsHeaders(origin) : {};
   const bound = typeof env?.AI?.run === "function";
   return json({ ok: bound, model: MODEL }, bound ? 200 : 503, cors);
@@ -61,7 +56,7 @@ export async function onRequestGet({ request, env }) {
 
 export async function onRequestPost({ request, env }) {
   const origin = request.headers.get("Origin");
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return new Response(null, { status: 403 });
+  if (!isAllowedOrigin(origin)) return new Response(null, { status: 403 });
   const cors = origin ? corsHeaders(origin) : {};
 
   let body;

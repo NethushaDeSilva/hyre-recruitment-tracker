@@ -1,6 +1,5 @@
-// The company's FIXED set of departments. When HR opens a position they pick ONE
-// from this list — it is NOT free-text. A position (job role) belongs to exactly
-// one department, and a candidate applies into that role.
+// Common department suggestions. HR can also enter a custom department.
+// A position belongs to one department.
 //
 // `code` is the department's SHORT FORM, used as the prefix of a hired employee's
 // ID (e.g. a hire in Software Engineering → "SE-0007"). Keep codes stable — they
@@ -16,11 +15,24 @@ export const DEPARTMENTS = [
   { name: "Customer Support", code: "CS" },
 ];
 
-export const DEPARTMENT_NAMES = DEPARTMENTS.map((d) => d.name);
+export const DEPARTMENT_NAMES = [
+  ...DEPARTMENTS.map((d) => d.name),
+  "Human Resources",
+  "Finance & Accounting",
+  "Operations",
+  "Administration",
+  "Information Technology",
+  "Legal & Compliance",
+  "Procurement",
+  "Logistics & Supply Chain",
+  "Research & Development",
+  "Product Management",
+  "Design",
+  "Manufacturing",
+];
 
 // The short code for a department name. Falls back to the initials of the words
-// for any legacy/unknown department string left on older positions, so nothing
-// ever breaks if the department isn't one of the fixed eight.
+// for custom departments, keeping their employee IDs supported too.
 export function departmentCode(name) {
   const key = String(name || "").trim().toLowerCase();
   const found = DEPARTMENTS.find((d) => d.name.toLowerCase() === key);

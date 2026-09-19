@@ -1,3 +1,4 @@
+import { isActiveCandidate } from "@/lib/candidateCounts";
 import { canBulkSelect, isScoreStale, staleReason, notScoredReason, scorePillClass } from "@/lib/scoreStaleness";
 import AssessmentStatus from "@/components/AssessmentStatus";
 // Position detail — the pipeline board. Columns = the position's configured
@@ -278,9 +279,8 @@ export default function PositionDetail() {
             <StatusPill status={effectiveStatus(position)} />
           </div>
           <div className={`overflow-hidden text-sm font-medium text-muted-foreground transition-[max-height,opacity] duration-200 ease-natural ${collapsed ? "max-h-0 opacity-0" : "max-h-8 opacity-100"}`}>
-            {position.department} · {anyFilter ? `${filtered.length} of ${cands.length}` : cands.length} candidates · Opened {formatDate(position.createdAt)}
+            {position.department} · {anyFilter ? `${filtered.filter(isActiveCandidate).length} of ${cands.filter(isActiveCandidate).length}` : cands.filter(isActiveCandidate).length} candidates · Opened {formatDate(position.createdAt)}
             {position.hiringManagerName && <> · Hiring manager: {position.hiringManagerName}</>}
-            {" · "}{position.hiredCount || 0}/{position.headcount || 1} hired
           </div>
         </div>
         {canConfigure && (

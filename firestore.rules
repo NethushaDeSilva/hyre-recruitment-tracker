@@ -43,6 +43,52 @@ service cloud.firestore {
       return myRole() in ['HR', 'Management'];
     }
 
+    // A deletion lock closes the vacancy before any dependent rows are removed.
+    function positionAvailable(id) {
+      return exists(/databases/$(database)/documents/positions/$(id))
+        && !get(/databases/$(database)/documents/positions/$(id)).data.get('deleting', false);
+    }
+    function deletingPosition(id) {
+      return isRecruiter()
+        && exists(/databases/$(database)/documents/positions/$(id))
+        && get(/databases/$(database)/documents/positions/$(id)).data.get('deleting', false);
+    }
+    function optionalPositionAvailable(data) {
+      return data.get('positionId', '') == '' || positionAvailable(data.positionId);
+    }
+
+    function newPositionClaim(id) {
+      let data = request.resource.data;
+      let code = data.identityCode;
+      let number = data.identitySequence;
+      return code is string && code.matches('^[A-Z0-9]{1,5}$')
+        && number is int && number > 0
+        && id == code + '-' + (number < 10 ? '0' : '') + string(number)
+        && getAfter(/databases/$(database)/documents/positionSequences/$(code)).data.next == number
+        && number == (exists(/databases/$(database)/documents/positionSequences/$(code))
+          ? get(/databases/$(database)/documents/positionSequences/$(code)).data.next : 0) + 1;
+    }
+
+    match /positionSequences/{code} {
+      allow read: if isStaff();
+      allow create: if isRecruiter() && code.matches('^[A-Z0-9]{1,5}$')
+        && request.resource.data.keys().hasOnly(['next']) && request.resource.data.next == 1;
+      allow update: if isRecruiter() && request.resource.data.keys().hasOnly(['next'])
+        && request.resource.data.next is int && request.resource.data.next == resource.data.next + 1;
+      allow delete: if false;
+    }
+
+    // Permanent identity registry. The full final vacancy survives deletion here.
+    match /positionArchive/{id} {
+      allow read: if isStaff();
+      allow create: if isRecruiter() && (
+        (newPositionClaim(id) && request.resource.data.recordState == 'Active'
+          && getAfter(/databases/$(database)/documents/positions/$(id)).data.identitySequence == request.resource.data.identitySequence)
+        || (deletingPosition(id) && request.resource.data.recordState == 'Deleted'));
+      allow update: if deletingPosition(id) && request.resource.data.recordState == 'Deleted';
+      allow delete: if false;
+    }
+
     // Which role owns (may advance/reject a candidate sitting in) a stage.
     // Mirrors STAGES[...].owner in src/lib/stages.js.
     function stageOwner(stage) {
@@ -158,8 +204,10 @@ service cloud.firestore {
     match /interviews/{interviewId} {
       allow read: if isRecruiter()
         || (signedIn() && resource.data.interviewerId == request.auth.uid);
-      allow create: if isStaff();
-      allow update: if isRecruiter()
+      allow create: if isStaff() && positionAvailable(request.resource.data.positionId);
+      allow update: if positionAvailable(resource.data.positionId)
+        && request.resource.data.positionId == resource.data.positionId
+        && (isRecruiter()
         || (signedIn() && resource.data.interviewerId == request.auth.uid
             && resource.data.status == 'pending_confirmation'
             && (
@@ -178,8 +226,8 @@ service cloud.firestore {
                         && request.resource.data.status == 'needs_attention')
                      )
                  )
-               ));
-      allow delete: if false; // a declined/exhausted request is history, not erased — mirrors applications/employees
+               )));
+      allow delete: if deletingPosition(resource.data.positionId);
     }
 
     // --- positions ---
@@ -195,8 +243,13 @@ service cloud.firestore {
       // client-side query filter alone doesn't enforce that, this does; CLAUDE.md
       // 6.7 R6).
       allow read: if isStaff() || (signedIn() && resource.data.status == 'Open');
-      allow create: if isRecruiter();
-      allow update: if isRecruiter()
+      allow create: if isRecruiter() && newPositionClaim(id)
+        && !exists(/databases/$(database)/documents/positionArchive/$(id))
+        && getAfter(/databases/$(database)/documents/positionArchive/$(id)).data.recordState == 'Active';
+      allow update: if !resource.data.get('deleting', false)
+        && request.resource.data.get('identityCode', '') == resource.data.get('identityCode', '')
+        && request.resource.data.get('identitySequence', 0) == resource.data.get('identitySequence', 0)
+        && (isRecruiter()
         // Any staff member may close out a requisition as part of hiring a
         // candidate into it (hireCandidate() in src/data/store.js) — the stage
         // whose owner triggers the "hired" transition isn't always HR/Management
@@ -207,8 +260,9 @@ service cloud.firestore {
         || (isStaff()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hiredCount', 'status'])
             && request.resource.data.hiredCount == resource.data.get('hiredCount', 0) + 1
-            && (request.resource.data.status == resource.data.status || request.resource.data.status == 'Closed'));
-      allow delete: if isRecruiter();
+            && (request.resource.data.status == resource.data.status || request.resource.data.status == 'Closed')));
+      allow delete: if isRecruiter() && resource.data.get('deleting', false)
+        && getAfter(/databases/$(database)/documents/positionArchive/$(id)).data.recordState == 'Deleted';
     }
 
     // --- sequence counters (e.g. counters/candidates.next) ---
@@ -218,11 +272,11 @@ service cloud.firestore {
     // downward. Uniqueness is guaranteed by the client using a transaction.
     match /counters/{id} {
       allow read: if signedIn();
-      allow create: if signedIn()
+      allow create: if signedIn() && (id != 'positionsV2' || (isRecruiter() && request.resource.data.next == 1))
         && request.resource.data.keys().hasOnly(['next'])
         && request.resource.data.next is int
         && request.resource.data.next >= 1;
-      allow update: if signedIn()
+      allow update: if signedIn() && (id != 'positionsV2' || (isRecruiter() && request.resource.data.next == resource.data.next + 1))
         && request.resource.data.keys().hasOnly(['next'])
         && request.resource.data.next is int
         && request.resource.data.next > resource.data.next;
@@ -292,21 +346,23 @@ service cloud.firestore {
       // client just hands us — otherwise a candidate could simply write
       // emailVerified:true regardless of truth, same anti-forgery reasoning
       // as applicationScores being staff-write-only (5.8/R3).
-      allow create: if isStaff()
+      allow create: if positionAvailable(request.resource.data.positionId) && (isStaff()
         || (signedIn()
             && request.resource.data.submittedByUid == request.auth.uid
             && request.resource.data.stage == 'applied'
             && request.resource.data.source == 'Self-applied'
             && request.resource.data.emailVerified == request.auth.token.email_verified
             && (!('comments' in request.resource.data)
-                || request.resource.data.comments.size() == 0));
+                || request.resource.data.comments.size() == 0)));
 
       // update: staff only, history append-only, and either
       //   (a) no stage change  → a comment / profile edit (any staff), or
       //   (b) a stage change   → the caller must own the current stage, or
       //   (c) HR reinstating a rejected candidate from the talent pool
       //       (rejected → applied). ONLY HR may reconsider — not Management.
-      allow update: if isStaff()
+      allow update: if positionAvailable(resource.data.positionId)
+        && request.resource.data.positionId == resource.data.positionId
+        && isStaff()
         && historyAppendOnly()
         && (
              request.resource.data.stage == resource.data.stage
@@ -316,12 +372,12 @@ service cloud.firestore {
                  && myRole() == 'HR')
            );
 
-      // delete: only as part of a HIRE transfer — a stage owner (or Management)
-      // removes the application the instant it's written into `employees`. A
-      // REJECTED application can NEVER be deleted (the talent pool is permanent).
-      allow delete: if isStaff()
+      // delete: explicit position cleanup, or as part of a HIRE transfer — a stage owner (or Management)
+      // removes the application the instant it's written into `employees`.
+      // Rejected applications otherwise remain in the talent pool.
+      allow delete: if deletingPosition(resource.data.positionId) || (isStaff()
         && resource.data.stage != 'rejected'
-        && ownsStage(resource.data.stage);
+        && ownsStage(resource.data.stage));
     }
 
     // --- employees (HIRED people) ---
@@ -339,7 +395,7 @@ service cloud.firestore {
 
       // create: staff only, and only a well-formed HIRED record (this is the
       // destination of a hire — never a self-serve write).
-      allow create: if isStaff()
+      allow create: if isStaff() && positionAvailable(request.resource.data.positionId)
         && request.resource.data.stage == 'hired'
         && request.resource.data.employeeId is string
         && request.resource.data.employeeId.size() > 0;
@@ -362,8 +418,10 @@ service cloud.firestore {
     // internal to HR"). No read path exists here for anyone but staff.
     match /applicationScores/{applicationId} {
       allow read: if isStaff();
-      allow create, update: if isStaff();
-      allow delete: if false; // score history persists — never silently erased
+      allow create: if isStaff() && positionAvailable(request.resource.data.positionId);
+      allow update: if isStaff() && positionAvailable(resource.data.positionId)
+        && request.resource.data.positionId == resource.data.positionId;
+      allow delete: if deletingPosition(resource.data.positionId);
     }
 
     // --- CV validation rejections (WS3) — demo evidence, immutable ---
@@ -372,20 +430,23 @@ service cloud.firestore {
     // Never updated or deleted — it's a record of what happened, not state.
     match /validation_logs/{id} {
       allow read: if isStaff();
-      allow create: if signedIn() && request.resource.data.submittedByUid == request.auth.uid;
-      allow update, delete: if false;
+      allow create: if optionalPositionAvailable(request.resource.data) && signedIn() && request.resource.data.submittedByUid == request.auth.uid;
+      allow update: if false;
+      allow delete: if deletingPosition(resource.data.positionId);
     }
 
     // --- in-app notifications (WS1 rejection notice, WS6 stage/offer/mention pings) ---
     // Addressed to one recipient (toUid); only staff ever create one (a candidate
     // has no one else in this app to notify); only the recipient may read/mark
-    // their own read, and only the `read` field may ever change.
+    // their own read, and only the `read` field may ever change. Recruiters can
+    // read/delete position-linked notices while that position is being deleted.
     match /notifications/{id} {
-      allow read: if signedIn() && resource.data.toUid == request.auth.uid;
-      allow create: if isStaff();
+      allow read: if (signedIn() && resource.data.toUid == request.auth.uid)
+        || deletingPosition(resource.data.get('positionId', ''));
+      allow create: if isStaff() && optionalPositionAvailable(request.resource.data);
       allow update: if signedIn() && resource.data.toUid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-      allow delete: if false;
+      allow delete: if deletingPosition(resource.data.positionId);
     }
 
     // Anything not matched above is denied by default.

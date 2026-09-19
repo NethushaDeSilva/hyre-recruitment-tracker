@@ -1,8 +1,10 @@
+import { useToast } from "@/components/ui/ToastProvider";
+import { isActiveCandidate } from "@/lib/candidateCounts";
 // Positions page — grid of position cards with live candidate counts + progress.
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, ChevronRight, Clock } from "lucide-react";
-import { useHyreData, deletePosition } from "@/data/store";
+import { useHyreData, deletePosition, positionDeletionSummary } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { useStaggerReveal } from "@/hooks/useStaggerReveal";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
@@ -38,6 +40,8 @@ export default function Positions() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const toast = useToast();
+  const [deletingId, setDeletingId] = useState(null);
   const { positions: allPositions, candidates, loading } = useHyreData();
   const [filter, setFilter] = useState("All");
   const [openModal, setOpenModal] = useState(false);
@@ -55,13 +59,20 @@ export default function Positions() {
   const confirmDelete = async (e, pos) => {
     e.preventDefault();
     e.stopPropagation();
-    const ok = await confirm({
-      title: `Delete “${pos.title}”?`,
-      message: "This removes the vacancy. Candidates already in it are not deleted.",
-      confirmLabel: "Delete",
-      tone: "danger",
-    });
-    if (ok) deletePosition(pos.id);
+    if (deletingId) return;
+    setDeletingId(pos.id);
+    try {
+      const summary = await positionDeletionSummary(pos.id);
+      const ok = await confirm({
+        title: `Delete “${pos.title}”?`,
+        message: `This removes ${summary.applications} applications and their scores, plus related interview records, notifications and validation logs. Employees already hired are not affected.`,
+        confirmLabel: "Delete",
+        tone: "danger",
+      });
+      if (ok) await deletePosition(pos.id);
+    } catch (error) {
+      toast.error(`Deletion failed. Retry to finish cleanup. ${error.message}`);
+    } finally { setDeletingId(null); }
   };
 
   const shown = useMemo(
@@ -70,7 +81,7 @@ export default function Positions() {
   );
   const gridRef = useStaggerReveal(!loading && shown.length > 0);
   const visibleIds = new Set(positions.map((p) => p.id));
-  const totalCandidates = candidates.filter((c) => visibleIds.has(c.positionId)).length;
+  const totalCandidates = candidates.filter((c) => visibleIds.has(c.positionId) && isActiveCandidate(c)).length;
 
   return (
     <div className="p-4 sm:p-7">
@@ -125,7 +136,7 @@ export default function Positions() {
            jump at a fixed breakpoint, and it never overflows on narrow screens. */
         <div ref={gridRef} className="mt-6 grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-5">
         {shown.map((pos) => {
-          const cands = candidates.filter((c) => c.positionId === pos.id);
+          const cands = candidates.filter((c) => c.positionId === pos.id && isActiveCandidate(c));
           const appliedCount = cands.filter((c) => c.stage === "applied").length;
           const pct = Math.round(progressOf(pos, cands) * 100);
           const stack = cands.slice(0, 3);
@@ -202,6 +213,7 @@ export default function Positions() {
                 {canDeletePos && (
                   <div className="flex items-center justify-end border-t border-border pt-3">
                     <button
+                      disabled={!!deletingId}
                       onClick={(e) => confirmDelete(e, pos)}
                       className="rounded-md px-2.5 py-1.5 text-xs font-semibold text-[#DC2626] transition-colors hover:bg-[#FBE9E9] dark:text-red-400 dark:hover:bg-red-500/10"
                     >

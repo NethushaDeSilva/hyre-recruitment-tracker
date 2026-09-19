@@ -1,3 +1,5 @@
+import { allocatePosition, removePersistedPosition, getPositionDeletionSummary } from "@/lib/positionPersistence";
+import { positionIdFor, positionCode, hiredPositionSnapshot } from "@/lib/positionLifecycle";
 import { canBulkSelect, evaluateReviewGate } from "@/lib/scoreStaleness";
 // THE single data seam for Hyre — the one module the whole UI talks to for data.
 // When Firebase is configured, positions & candidates live in Firestore and are
@@ -85,13 +87,10 @@ const roleCode = (title) => {
 const makeEmployeeId = (deptName, title, n) =>
   `${departmentCode(deptName)}-${roleCode(title)}-${fmtEmployeeNum(n)}`;
 
-// --- readable POSITION ids -----------------------------------------------------
-// A vacancy's document id is a short code from its title + a per-code sequence,
-// e.g. "Network Engineer" → NE-01, a second one → NE-02, "Regional manager" → RM-01.
-// Only staff create positions and they can read every position, so the next number
-// is derived from what's already there — no counter needed.
-const positionCode = (title) => roleCode(title);
-const makePositionId = (title, seq) => `${positionCode(title)}-${String(seq).padStart(2, "0")}`;
+// Permanent per-title-code sequences; production persists these in Firestore.
+const mockPositionSequences = new Map();
+const mockPositionArchive = new Map();
+
 
 const at = (iso) => new Date(iso).getTime();
 // Firestore Timestamp | number -> milliseconds
@@ -298,6 +297,7 @@ const mapApplication = (d) => {
     employeeId: x.employeeId || "",
     employeeDept: x.employeeDept || "",
     employeeRole: x.employeeRole || "",
+    hiredPosition: x.hiredPosition || null,
     hiredAt: x.hiredAt ? ms(x.hiredAt) : 0,
     history: Array.isArray(x.history) ? x.history : [],
     rejection: x.rejection || null,
@@ -316,6 +316,7 @@ const mapEmployee = (d) => {
     employeeId: x.employeeId || "",
     employeeDept: x.employeeDept || "",
     employeeRole: x.employeeRole || "",
+    hiredPosition: x.hiredPosition || null,
     hiredAt: x.hiredAt ? ms(x.hiredAt) : 0,
     name: x.name || "",
     email: x.email || "",
@@ -369,6 +370,7 @@ function joinFlat(identity, app) {
     employeeId: app.employeeId,
     employeeDept: app.employeeDept,
     employeeRole: app.employeeRole,
+    hiredPosition: app.hiredPosition || null,
     hiredAt: app.hiredAt,
     name: idn.name || "",
     email: idn.email || app.email || "",
@@ -695,21 +697,13 @@ export async function addPosition({
     createdAt: new Date(),
   };
   if (firebaseReady) {
-    // Readable document id derived from the title (e.g. NE-01) — the next per-code
-    // number comes from the positions already loaded, so no counter is involved.
-    const prefix = positionCode(data.title) + "-";
-    let maxSeq = 0;
-    for (const p of positions) {
-      if ((p.id || "").startsWith(prefix)) {
-        const n = Number(p.id.slice(prefix.length));
-        if (Number.isFinite(n)) maxSeq = Math.max(maxSeq, n);
-      }
-    }
-    const posId = makePositionId(data.title, maxSeq + 1);
-    await setDoc(doc(db, "positions", posId), data);
-    return { id: posId, ...data, createdAt: Date.now() };
+    return allocatePosition(db, data);
   }
-  const pos = { id: uid("pos"), ...data, createdAt: Date.now() };
+  const code = positionCode(data.title);
+  const sequence = (mockPositionSequences.get(code) || 0) + 1;
+  mockPositionSequences.set(code, sequence);
+  const pos = { id: positionIdFor(sequence, code), ...data, identityCode: code, identitySequence: sequence, createdAt: Date.now() };
+  mockPositionArchive.set(pos.id, { ...pos, recordState: "Active" });
   positions = [pos, ...positions];
   commit();
   return pos;
@@ -1535,6 +1529,7 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
       const counterSnap = await tx.get(counterRef);
       const next = counterSnap.exists() ? Number(counterSnap.data().next) || EMPLOYEE_SEQ_START : EMPLOYEE_SEQ_START;
       const posSnap = posRef ? await tx.get(posRef) : null;
+      if (!posSnap?.exists() || posSnap.data().deleting) throw new Error("Position is unavailable or being deleted.");
       employeeId = makeEmployeeId(deptName, title, next);
       const history = Array.isArray(app.history) ? [...app.history, entry] : [entry];
       tx.set(doc(db, "employees", employeeId), {
@@ -1577,6 +1572,7 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
         employeeId,
         employeeDept: deptName,
         employeeRole: title,
+        hiredPosition: hiredPositionSnapshot(posSnap.data()),
         hiredAt: new Date(),
         appliedAt: app.appliedAt || new Date(),
         history,
@@ -1603,6 +1599,7 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
   mockEmployeesList.push(joinFlat(identity, {
     ...(app || { id: applicationId, positionId, appliedRole: title, appliedAt: Date.now(), coverNote: "", source: "Added by HR", needsReview: false, cvValidation: null, offer: null, rejection: null, comments: [] }),
     id: applicationId, stage: "hired", employeeId, employeeDept: deptName, employeeRole: title,
+    hiredPosition: hiredPositionSnapshot(positions.find(p => p.id === positionId)),
     hiredAt: Date.now(), history: [...((app && app.history) || []), entry],
   }));
   positions = positions.map((p) => {
@@ -1807,12 +1804,27 @@ export async function logCvRejection({ reason, stage, confidence, missingSection
   // demo evidence for a real Firestore-backed deployment.
 }
 
-/** Delete a vacancy entirely (Management-only). Candidates are never deleted. */
+// Read current persisted counts, not the flattened stream (which includes employees).
+export async function positionDeletionSummary(positionId) {
+  if (!firebaseReady) return { applications: mockApplications.filter(a => a.positionId === positionId).length };
+  return getPositionDeletionSummary(db, positionId);
+}
+
+/** Explicit vacancy deletion removes its pipeline, while retaining people. */
 export async function deletePosition(positionId) {
   if (firebaseReady) {
-    await deleteDoc(doc(db, "positions", positionId));
+    await removePersistedPosition(db, positionId);
     return;
   }
-  positions = positions.filter((p) => p.id !== positionId);
+  const position = positions.find(p => p.id === positionId);
+  if (!position) return;
+  mockEmployeesList = mockEmployeesList.map(e => e.positionId === positionId ? { ...e, hiredPosition: e.hiredPosition || hiredPositionSnapshot(position) } : e);
+  for (let i = mockApplications.length - 1; i >= 0; i--) {
+    if (mockApplications[i].positionId === positionId) mockApplications.splice(i, 1);
+  }
+  for (const [id, score] of mockScores) if (score.positionId === positionId) mockScores.delete(id);
+  mockPositionArchive.set(positionId, { ...position, recordState: "Deleted", deletedAt: Date.now() });
+  positions = positions.filter(p => p.id !== positionId);
+  recomputeMock();
   commit();
 }

@@ -1,0 +1,758 @@
+{
+  "auditedAt": "2026-09-18T13:52:00.568Z",
+  "collections": [
+    "applicationScores",
+    "applications",
+    "availability",
+    "candidates",
+    "counters",
+    "employees",
+    "interviews",
+    "notifications",
+    "positions",
+    "users",
+    "validation_logs"
+  ],
+  "missingPositionReferences": {
+    "applications": [
+      {
+        "id": "9SdZNgZR0SXq5hAVCkuZ",
+        "field": "positionId",
+        "positionId": "HE-01",
+        "stage": "rejected",
+        "employeeRole": null
+      },
+      {
+        "id": "Po2HK2bC2gCJTw1uMa8c",
+        "field": "positionId",
+        "positionId": "SFD-01",
+        "stage": "applied",
+        "employeeRole": null
+      }
+    ],
+    "employees": [
+      {
+        "id": "SAL-RM-0037",
+        "field": "fromPositionId",
+        "positionId": "NE-01",
+        "stage": "hired",
+        "employeeRole": "Regional manager"
+      },
+      {
+        "id": "SE-SNE-0001",
+        "field": "positionId",
+        "positionId": "SNE-01",
+        "stage": "hired",
+        "employeeRole": "Senior network engineer"
+      }
+    ],
+    "interviews": [
+      {
+        "id": "1y42RPO2emW2TEKdR4mi",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "2ixEG7jwlix6xTV7Srwz",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "3kPqsqrYzTJdshtb3Ajj",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "5IGiJefXRBk2lRt3RTuN",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "5PVNnLtjghW8r0ag6sid",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "5TfuaiOUqKVrl1vmMozb",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "5frOqSeT3kzBJVDNOVKj",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "5sJzk6zVTHqsgU2DRUGr",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "6GlYvyhyCAmqVe7Qiwn1",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "7WXx6oJAUcx5W0Ees1EQ",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "7t2sxZV4g8vpqKUDybUB",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "82rbjJnTsQO31BB9uF7N",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "8vC9ylkVXDJI7g8ZkwIM",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "8yDNZQF6NR7KLosijpCr",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "9ppVbd0GyBqIJAW4wVba",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "Ap6MV1GAqiFKBEv4fsbL",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "Az2sxfoxA1hRJqpeQikY",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "BIvsd9yPoZLBP5ReLh1B",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "BVMMQaQ6EPNhI8cxQ7Cs",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "CEMsTXD59WXrwDm9so8J",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "CHZkwRVxDhxScEO5qTlV",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "CVUovGEqiwDRmPpLQNmc",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "CeQ5nlSIuIo3AiI1GGH7",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "DumucKwdRzo6xkl9Cj4O",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "ECyZQDUoHh3raow2CeAa",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "EDDNh2BI0MpUYVzuwkCS",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "EGefHIn5xqqq6rf889Z5",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "Etp6iWdwW1skgPcnKeKz",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "GVgnkALJuJO17f2Px97d",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "I0aNSZqzLM2mIG4yequU",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "Ih0qzOhVX3a6bxgcbDGP",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "IsdpiB3aHAK79qJcakDg",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "JbJ49HaaQoSzmTcA07cm",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "JuJCJzrfuyd72A030aKe",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "JwotylRRnsIksOFeT5qV",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "KeoBeViX7YZdFVw6ZQmN",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "Kmg6mRG9DCYk3dfwOM1B",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "LZgNcPXRQzzAE4HhdVai",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "NSQQFO7ORy1XwNpyVVN7",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "O62NnlGgZu5x9BuIPWxh",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "PcLle2gG8bEaxJq6Mo5d",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "PnyzccFKjJpIKqfZGH4O",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "Q1h13aH86A2ZyAq4TYJ3",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "QY13SZMnUKF6GRNduoVR",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "RIKNF1XiEzNv2Ipcp1Lb",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "SPASC8MkWpo0KkYBuOtc",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "U2kt06bHwspBPxQ7Q9fu",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "UA94AKLm9GcGYYrWBPl5",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "UeOOnpUbNMEDUgKl3SNZ",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "Ui098utsgWpSkjCFQyuu",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "WUwfjNgufSVJDNK2JIMS",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "X7JmypLOYPtbBLmciBCR",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "ZH4YixTQwdw5HKADxodU",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "ZKj6BgTJzJIx3N3JUOb9",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "agJOq0PXhKiWy0I2CsQW",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "b1yzX6yynqDpAQmPGFKH",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "bpUFj1b3TxS2Mq5yF90q",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "d1c2H2nigiyCpoCmJyam",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "dWWq8MUfTN37mJPzoP1v",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "dffVgPDArq8dZxdk93tO",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "drNq2s5ea4whXiBuVwyJ",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "eKEHIsQlKBImM9Ad1efr",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "esKVOBLyuMs0JuEtFlov",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "gAZmIAnVtJmaTIsYLrJu",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "iQhgHJTiwtQ7VqTTmENM",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "irO317DHMsTVyXDjLTUf",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "jU56wBPQLeICl46U7KC6",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "kTgRDqBxuMfaNDQUMeDd",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "kjmwyfuL5crP7iG8D9Wm",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "klIfNs1HtO1Fp4HUp3J9",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "krN3T1iYYiD4zox6aCiu",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "lQ1Xx0wpbvOR0zHyCXV5",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "lfhqRvHBlbzzlluuKB0J",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "mMuOqZfaK1eywkDE01m2",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "mX2uWhifvvFD6baHdLv6",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "nfO3VqGMayXxN6443Luy",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "oN8PmvdH0vTCMmUey5QK",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "ofWm5PA5dv6X0i81k4W1",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "pacLv3AOTcsgUf2ldRXv",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "pjMUwB3pTF6mAYuALT6g",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "qaCgivbwf3EmjqTri2XJ",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "qsW0xdIpstgMVbOuiFDW",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "r2gGc1Cl5TZNJUfaE8Si",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "rKmQBOvSFCPyqpzJ8qTr",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "rqUeFCiVdgLX4xrKtSgk",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "rxGNqeobkQpyHobM9QFU",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "sGIFMOuw6TzugLd4P8uO",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "sMSG2ubYRRI1DctW3gJE",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "sbTCQngci6sYRgKt9OKf",
+        "field": "positionId",
+        "positionId": "X",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "t7JeHLa8tnhj7DjaPORz",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "t7Xw8wcym95LsGwsJZO4",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "tq9xWm4dTVODQiU656jR",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "uUf5q34Iph67vDLU8T4I",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "ukZINRpJmDCxSM7dE7Jx",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "uvPOUGqtnPtmDTYBZ8fd",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "v1cgunuHqdMGFyWbbmBA",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "vSTsb9ajE8ZSHP9DPcRb",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "vstF0ILXKXFXGUAqmiKv",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "w8KDFrpX8tBo4hkfrSBW",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      },
+      {
+        "id": "yxMIHBDrhehPUQxNJ4wH",
+        "field": "positionId",
+        "positionId": "TEST-POS",
+        "stage": null,
+        "employeeRole": null
+      }
+    ]
+  },
+  "scoresWithoutApplication": [
+    {
+      "id": "EXuNpN6ZtokEglUxeQ48",
+      "positionId": "BD-01"
+    }
+  ]
+}

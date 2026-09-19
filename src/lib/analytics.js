@@ -1,15 +1,15 @@
 // Pure aggregation helpers for the Management dashboard. No React, no side
 // effects — just turn the raw positions/candidates arrays into chart-ready data.
-const TERMINAL = ["hired", "rejected"];
+import { isActiveCandidate } from "./candidateCounts";
 
 export function computeKpis(positions, candidates) {
   const openPositions = positions.filter((p) => p.status === "Open").length;
   const hired = candidates.filter((c) => c.stage === "hired").length;
   const rejected = candidates.filter((c) => c.stage === "rejected").length;
-  const inPipeline = candidates.filter((c) => !TERMINAL.includes(c.stage)).length;
+  const inPipeline = candidates.filter((c) => isActiveCandidate(c)).length;
   const decided = hired + rejected;
   const hireRate = decided ? Math.round((hired / decided) * 100) : 0;
-  return { openPositions, totalCandidates: candidates.length, inPipeline, hired, rejected, hireRate };
+  return { openPositions, totalCandidates: inPipeline, inPipeline, hired, rejected, hireRate };
 }
 
 /** Count candidates in each stage, in the order given. */
@@ -36,7 +36,7 @@ export function byDepartment(positions, candidates) {
   const map = new Map();
   for (const p of positions) map.set(p.id, p.department || "Other");
   const counts = new Map();
-  for (const c of candidates) {
+  for (const c of candidates.filter(isActiveCandidate)) {
     const dept = map.get(c.positionId) || "Other";
     counts.set(dept, (counts.get(dept) || 0) + 1);
   }

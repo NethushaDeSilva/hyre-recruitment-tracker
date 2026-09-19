@@ -3,7 +3,7 @@
 // just a one-shot create). Editing never touches stages/assignees; that's
 // StageConfigModal's job, already a separate, working flow this doesn't
 // duplicate — so the stage picker only renders in create mode.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useNavigate } from "react-router-dom";
 import { Modal } from "@/components/ui/Modal";
 import { Field, Input, Textarea, Select } from "@/components/ui/Field";
@@ -33,6 +33,7 @@ const parseList = (s) => s.split(",").map((v) => v.trim()).filter(Boolean);
 
 export default function OpenPositionModal({ open, onClose, position = null }) {
   const isEdit = !!position;
+  const departmentListId = useId();
   const nav = useNavigate();
   const { user } = useAuth();
   const [title, setTitle] = useState("");
@@ -67,7 +68,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
     setDepartment(position.department || "");
     setDescription(position.description || "");
     setMinQualification(position.minQualification || "");
-    setQualField(position.requirements?.requiredQualification?.field || "");
+    setQualField(position.requirements?.requiredQualification?.field || position.requirements?.fieldOfStudy || "");
     setRequiredSkillsText((position.requirements?.requiredSkills || []).join(", "));
     setMinYearsExperience(String(position.requirements?.minYearsExperience ?? 0));
     setNiceToHaveText((position.requirements?.niceToHave || []).join(", "));
@@ -101,6 +102,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
   const submit = async () => {
     if (!canSubmit) return;
     const requirements = {
+      fieldOfStudy: qualField.trim() || null,
       requiredQualification: degreeLevel ? { level: degreeLevel, field: qualField.trim() || null } : null,
       requiredSkills: parseList(requiredSkillsText),
       minYearsExperience: Math.max(0, Number(minYearsExperience) || 0),
@@ -160,10 +162,20 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Backend Developer" autoFocus />
           </Field>
           <Field label="Department">
-            <Select value={department} onChange={(e) => setDepartment(e.target.value)}>
-              <option value="">Select a department…</option>
-              {DEPARTMENT_NAMES.map((d) => <option key={d} value={d}>{d}</option>)}
-            </Select>
+            <Input
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              list={departmentListId}
+              autoComplete="off"
+              placeholder="Select or type a department"
+              aria-describedby={`${departmentListId}-hint`}
+            />
+            <datalist id={departmentListId}>
+              {DEPARTMENT_NAMES.map((d) => <option key={d} value={d} />)}
+            </datalist>
+            <p id={`${departmentListId}-hint`} className="text-xs text-muted-foreground">
+              Choose a suggestion or type your own department.
+            </p>
           </Field>
         </div>
         <Field label="Description">
@@ -214,12 +226,10 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
               value={qualField}
               onChange={(e) => setQualField(e.target.value)}
               placeholder="e.g. Computer Science"
-              disabled={!degreeLevel}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              {degreeLevel
-                ? "Optional — leave blank to accept any field at this degree level."
-                : "Only applies when \"Minimum qualification\" above is Bachelor's, Master's or PhD."}
+              Optional. Saved with this position; used for qualification matching when
+              a Bachelor's, Master's or PhD minimum is selected.
             </p>
           </Field>
         </div>

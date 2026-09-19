@@ -1,3 +1,4 @@
+import { isActiveCandidate } from "@/lib/candidateCounts";
 // Candidates table (HR / Management) — every ACTIVE applicant across all
 // positions in a sortable table. Hired candidates live on Employees; rejected
 // candidates live on Rejected — this table only ever holds people still in
@@ -40,7 +41,7 @@ export default function CandidatesTable() {
   // people still active in the pipeline.
   const candidates = useMemo(() => {
     const ids = new Set(positions.map((p) => p.id));
-    return allCandidates.filter((c) => ids.has(c.positionId) && c.stage !== "hired" && c.stage !== "rejected");
+    return allCandidates.filter((c) => ids.has(c.positionId) && isActiveCandidate(c));
   }, [allCandidates, positions]);
   const [q, setQ] = useState("");
   const [position, setPosition] = useState("");

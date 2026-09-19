@@ -4,7 +4,7 @@
 import { useMemo, useState } from "react";
 import { Search, ChevronUp, ChevronDown, Download, BadgeCheck } from "lucide-react";
 import { useHyreData } from "@/data/store";
-import { visiblePositions } from "@/lib/stages";
+import { visiblePositions, positionVisibleTo } from "@/lib/stages";
 import { useAuth } from "@/context/AuthContext";
 import { useStaggerReveal } from "@/hooks/useStaggerReveal";
 import { departmentCode } from "@/lib/departments";
@@ -36,7 +36,8 @@ export default function Employees() {
     const ids = new Set(positions.map((p) => p.id));
     const byPerson = new Map();
     for (const c of allCandidates) {
-      if (c.stage !== "hired" || !ids.has(c.positionId)) continue;
+      if (c.stage !== "hired") continue;
+      if (user?.role !== "HR" && !positionVisibleTo(c.hiredPosition, user) && !ids.has(c.positionId)) continue;
       const key = c.submittedByUid || (c.email || "").toLowerCase() || c.id;
       const prev = byPerson.get(key);
       if (!prev || (c.hiredAt || 0) > (prev.hiredAt || 0)) byPerson.set(key, c);
@@ -45,11 +46,11 @@ export default function Employees() {
       const pos = posById.get(c.positionId);
       return {
         ...c,
-        role: c.employeeRole || pos?.title || c.appliedRole || "—",
-        dept: c.employeeDept || pos?.department || "—",
+        role: c.employeeRole || c.hiredPosition?.title || pos?.title || c.appliedRole || "—",
+        dept: c.employeeDept || c.hiredPosition?.department || pos?.department || "—",
       };
     });
-  }, [allCandidates, positions, posById]);
+  }, [allCandidates, positions, posById, user]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -190,7 +191,7 @@ export default function Employees() {
         onClose={() => setSelected(null)}
         candidate={selected}
         position={selected ? posById.get(selected.positionId) || null : null}
-        positionTitle={selected ? posById.get(selected.positionId)?.title || "" : ""}
+        positionTitle={selected ? selected.employeeRole || selected.hiredPosition?.title || posById.get(selected.positionId)?.title || "" : ""}
       />
     </div>
   );

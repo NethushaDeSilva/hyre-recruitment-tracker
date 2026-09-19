@@ -1,14 +1,15 @@
+import { isActiveCandidate } from "@/lib/candidateCounts";
 // Management dashboard — live hiring analytics built from Firestore data.
 // Pure CSS + SVG (no chart library, per our guardrails). Management-only route.
 import { useEffect, useMemo, useState } from "react";
 import { Briefcase, Users, UserCheck, TrendingUp, Activity } from "lucide-react";
 import { useHyreData } from "@/data/store";
-import { STAGES } from "@/lib/stages";
+import { STAGES, stageInfo } from "@/lib/stages";
 import { Card } from "@/components/ui/Card";
 import { computeKpis, stageCounts, weeklyApplications, byDepartment } from "@/lib/analytics";
 
 const FUNNEL_STAGES = ["applied", "screening", "interview", "final", "hired"];
-const DONUT_STAGES = ["applied", "screening", "interview", "final", "hired", "rejected"];
+
 
 export default function Dashboard() {
   const { positions, candidates, loading } = useHyreData();
@@ -20,7 +21,7 @@ export default function Dashboard() {
 
   const kpis = useMemo(() => computeKpis(positions, candidates), [positions, candidates]);
   const funnel = useMemo(() => stageCounts(candidates, FUNNEL_STAGES), [candidates]);
-  const donut = useMemo(() => stageCounts(candidates, DONUT_STAGES).filter((s) => s.count > 0), [candidates]);
+  const donut = useMemo(() => stageCounts(candidates, [...new Set(candidates.filter(isActiveCandidate).map(c => c.stage))]).filter((s) => s.count > 0), [candidates]);
   const weekly = useMemo(() => weeklyApplications(candidates, 8, Date.now()), [candidates]);
   const depts = useMemo(() => byDepartment(positions, candidates), [positions, candidates]);
 
@@ -60,7 +61,7 @@ export default function Dashboard() {
         <Card className="p-6 lg:col-span-2">
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-base font-bold text-foreground">Hiring funnel</h2>
-            <span className="text-xs font-medium text-muted-foreground">Candidates by stage</span>
+            <span className="text-xs font-medium text-muted-foreground">Applications by outcome</span>
           </div>
           <Funnel data={funnel} mounted={mounted} />
         </Card>
@@ -164,7 +165,7 @@ function Donut({ data, total, mounted }) {
               cy="70"
               r={R}
               fill="none"
-              stroke={STAGES[s.id].dot}
+              stroke={stageInfo(s.id).dot}
               strokeWidth="16"
               strokeLinecap="butt"
               strokeDasharray={`${mounted ? s.dash : 0} ${C}`}
@@ -182,8 +183,8 @@ function Donut({ data, total, mounted }) {
         {segments.map((s) => (
           <div key={s.id} className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="h-2 w-2 rounded-full" style={{ background: STAGES[s.id].dot }} />
-              {STAGES[s.id].label}
+              <span className="h-2 w-2 rounded-full" style={{ background: stageInfo(s.id).dot }} />
+              {stageInfo(s.id).label}
             </span>
             <span className="text-xs font-bold text-foreground">{s.count}</span>
           </div>

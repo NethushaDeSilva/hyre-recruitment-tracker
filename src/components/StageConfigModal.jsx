@@ -273,22 +273,16 @@ export default function StageConfigModal({ open, position, onClose }) {
       width={880}
       title="Configure interview stages"
       subtitle={position ? position.title : ""}
+      stickyFooter
       footer={
         <div className="flex w-full items-center justify-between gap-2">
           <div>{step > 0 && <Button variant="ghost" onClick={() => goTo(step - 1)}><ArrowLeft size={15} /> Back</Button>}</div>
           <div className="flex items-center gap-2">
-            {step < lastStep && <Button variant="ghost" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save now"}</Button>}
-            {step < lastStep ? (
-              <Button onClick={() => goTo(step + 1)}>{step === 0 ? "Assign people" : "Proceed"} <ChevronRight size={15} /></Button>
-            ) : (
-              <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Save now"}</Button>
-            )}
+            {step < lastStep && <Button onClick={() => goTo(step + 1)}>{step === 0 ? "Assign people" : "Proceed"} <ChevronRight size={15} /></Button>}
           </div>
         </div>
       }
     >
-      {saveStatus && <p role="status" className="mb-3 text-sm text-[#15803D]">{saveStatus}</p>}
-      {saveError && <p role="alert" className="mb-3 text-sm text-[#DC2626]">{saveError}</p>}
       <fieldset disabled={busy} className="min-w-0" onChange={() => setSaveStatus("")}>
       {/* progress breadcrumb */}
       {canAssign && assignable.length > 0 && (
@@ -300,6 +294,16 @@ export default function StageConfigModal({ open, position, onClose }) {
               <StepChip active={step === i + 1} done={step > i + 1} onClick={() => goTo(i + 1)}>{r.label}</StepChip>
             </span>
           ))}
+        </div>
+      )}
+
+      {/* save — right here at the top, next to nothing you'd have to scroll
+          for, instead of only at the bottom of a long assignment list. */}
+      {canAssign && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
+          <Button onClick={save} disabled={busy} className="shrink-0">{busy ? "Saving…" : "Save now"}</Button>
+          {saveStatus && <p role="status" className="text-sm font-medium text-[#15803D]">{saveStatus}</p>}
+          {saveError && <p role="alert" className="text-sm font-medium text-[#DC2626]">{saveError}</p>}
         </div>
       )}
 

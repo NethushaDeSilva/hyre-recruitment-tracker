@@ -5,7 +5,11 @@ import { X } from "lucide-react";
 import { animate, utils, spring } from "animejs";
 import { prefersReduced, SPRING_POP } from "@/lib/motion";
 
-export function Modal({ open, onClose, title, subtitle, children, footer, width = 480 }) {
+// stickyFooter: opt-in only (StageConfigModal) — pins the footer to the
+// bottom of the modal frame and scrolls just the body underneath it, so the
+// footer's actions never require scrolling to reach. Every other modal keeps
+// the plain "everything scrolls together" layout unchanged.
+export function Modal({ open, onClose, title, subtitle, children, footer, width = 480, stickyFooter = false }) {
   const panelRef = useRef(null);
   const backdropRef = useRef(null);
 
@@ -32,6 +36,32 @@ export function Modal({ open, onClose, title, subtitle, children, footer, width 
   }, [open]);
 
   if (!open) return null;
+
+  if (stickyFooter) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div ref={backdropRef} className="absolute inset-0 bg-ink/50" onClick={onClose} />
+        <div ref={panelRef} className="relative z-10 flex max-h-[90vh] w-full flex-col rounded-2xl bg-card shadow-pop" style={{ maxWidth: width }}>
+          <div className="flex shrink-0 items-start justify-between gap-4 p-4 pb-0 sm:p-7 sm:pb-0">
+            <div>
+              <h3 className="text-xl font-extrabold text-foreground">{title}</h3>
+              {subtitle && <p className="mt-1 text-[13px] text-muted-foreground">{subtitle}</p>}
+            </div>
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground hover:bg-[#E5EBF3]"
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 sm:px-7">{children}</div>
+          {footer && <div className="shrink-0 border-t border-border bg-card p-4 sm:px-7 sm:py-4">{footer}</div>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div ref={backdropRef} className="absolute inset-0 bg-ink/50" onClick={onClose} />

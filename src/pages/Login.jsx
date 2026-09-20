@@ -72,15 +72,6 @@ export default function Login() {
       ? await register({ name, email, password, remember })
       : await login(email, password, remember);
     if (res.ok) {
-      // 10.1 — the account exists either way; a failed verification send is
-      // surfaced, never silently dropped. Not a blocker: the candidate still
-      // gets in, and can resend anytime from their Profile page.
-      if (isRegister && res.verificationEmailSent === false) {
-        toast.error(
-          "Your account was created, but we couldn't send the verification email right now. You can resend it anytime from your Profile page.",
-          { title: "Verification email not sent", duration: 8000 }
-        );
-      }
       setPending(true); // stay on "Signing in…" until the effect above redirects
     } else {
       setBusy(false);

@@ -18,7 +18,7 @@
 // staff password defaults to the demo password; override with HYRE_STAFF_PASSWORD.
 import { readFileSync } from "node:fs";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword, signOut, sendEmailVerification } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 
 // --- read .env.local (VITE_FIREBASE_* keys) ---
@@ -47,11 +47,6 @@ const STAFF = [
   { email: "management@hyre.app", role: "Management", displayName: "Dilani Perera", title: "Manager", avatarColor: "#E0A422" },
 ];
 
-// Same custom /verify-email landing page the app itself uses (AuthContext's
-// verifyEmailActionSettings) — kept in sync manually since this script runs
-// standalone, outside the app bundle.
-const APP_URL = process.env.HYRE_APP_URL || "https://hyre-hiring.pages.dev";
-
 let ok = 0;
 for (const s of STAFF) {
   try {
@@ -61,17 +56,6 @@ for (const s of STAFF) {
       { displayName: s.displayName, title: s.title, role: s.role, avatarColor: s.avatarColor, photoURL: "", email: s.email },
       { merge: true }
     );
-    // Layer 2 (signup email validation): send the verification link so new/
-    // re-provisioned staff aren't stuck relying solely on the in-app Resend
-    // button. Skip if already verified — idempotent re-runs shouldn't spam.
-    if (!cred.user.emailVerified) {
-      try {
-        await sendEmailVerification(cred.user, { url: `${APP_URL}/verify-email`, handleCodeInApp: true });
-        console.log(`  → verification email sent to ${s.email}`);
-      } catch (e) {
-        console.error(`  ✗ verification email to ${s.email} failed: ${e.code || e.message} (account still provisioned — resend from the app)`);
-      }
-    }
     console.log(`✓ provisioned ${s.email} → ${s.role}  (uid ${cred.user.uid})`);
     await signOut(auth);
     ok++;

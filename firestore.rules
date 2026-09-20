@@ -355,17 +355,11 @@ service cloud.firestore {
 
       // create: staff add anyone; an applicant creates only their own
       // application, only into "applied", with no forged review payload.
-      // emailVerified (signup email validation layer 2) must equal the
-      // SERVER-issued claim on the caller's own ID token, never a value the
-      // client just hands us — otherwise a candidate could simply write
-      // emailVerified:true regardless of truth, same anti-forgery reasoning
-      // as applicationScores being staff-write-only (5.8/R3).
       allow create: if positionAvailable(request.resource.data.positionId) && (isStaff()
         || (signedIn()
             && request.resource.data.submittedByUid == request.auth.uid
             && request.resource.data.stage == 'applied'
             && request.resource.data.source == 'Self-applied'
-            && request.resource.data.emailVerified == request.auth.token.email_verified
             && (!('comments' in request.resource.data)
                 || request.resource.data.comments.size() == 0)));
 

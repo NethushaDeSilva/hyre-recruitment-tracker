@@ -42,7 +42,7 @@ const prefillFrom = (app, user) => ({
 });
 
 export default function ApplyModal({ open, onClose, position, onApplied }) {
-  const { user, refreshEmailVerified } = useAuth();
+  const { user } = useAuth();
   const { candidates } = useHyreData();
   const [form, setForm] = useState({ ...EMPTY, email: user?.email || "" });
   const [cvFile, setCvFile] = useState(null); // a NEWLY chosen File (uploaded on submit)
@@ -307,13 +307,6 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
       const cvEmail = (parsedProfile?.email || "").trim().toLowerCase();
       const emailMismatch = !!(cvEmail && cvEmail !== typedEmail);
 
-      // Layer 2's status, stored on the APPLICATION so HR can see it — never
-      // blocking. refreshEmailVerified() forces a fresh read (the SDK's
-      // cached value doesn't update on its own after the link is clicked in
-      // another tab) and refreshes the ID token, so the Firestore rule below
-      // sees the current claim rather than a stale one.
-      const emailVerified = await refreshEmailVerified();
-
       // WS5 — NOT scored here. applicationScores is deliberately staff-write-only
       // (R3 — a candidate must never be able to forge their own match score,
       // and Firestore has no way to allow a write but not a read on the same
@@ -332,7 +325,6 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
         cvDataUrl: cvUrl, // Storage download URL (or a carried-over legacy data URL)
         cvSize,
         submittedByUid: user?.uid || "",
-        emailVerified,
         // Only set when a fresh file was actually scanned this session — a
         // carried-over CV isn't re-flagged one way or the other.
         ...(cvFile && scanResult

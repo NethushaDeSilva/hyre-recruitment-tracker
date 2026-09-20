@@ -21,7 +21,6 @@ import WorkerHealthBanner from "@/components/WorkerHealthBanner";
 const Home = lazy(() => import("@/pages/Home"));
 const Landing = lazy(() => import("@/pages/Landing"));
 const Login = lazy(() => import("@/pages/Login"));
-const VerifyEmail = lazy(() => import("@/pages/VerifyEmail"));
 const Positions = lazy(() => import("@/pages/Positions"));
 const PositionDetail = lazy(() => import("@/pages/PositionDetail"));
 const CandidatesTable = lazy(() => import("@/pages/CandidatesTable"));
@@ -57,7 +56,6 @@ export default function App() {
           {/* public */}
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* private */}
           <Route
@@ -69,10 +67,7 @@ export default function App() {
           >
             <Route path="/app" element={<Home />} />
 
-            {/* staff — the internal tracker. Not gated on emailVerified: staff are
-                provisioned by an administrator who assigns the role explicitly in
-                Firestore, which is a stronger guarantee than a mail round-trip —
-                there is nothing for a provisioned account to prove. */}
+            {/* staff — the internal tracker */}
             <Route path="/positions" element={<RequireRole roles={STAFF}><Positions /></RequireRole>} />
             <Route path="/positions/:id" element={<RequireRole roles={STAFF}><PositionDetail /></RequireRole>} />
             <Route path="/candidates" element={<RequireRole roles={RECRUITERS}><CandidatesTable /></RequireRole>} />

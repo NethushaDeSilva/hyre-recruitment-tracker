@@ -3,6 +3,7 @@ import {
   validateDay, validateWeek, weekHasErrors, daySummaryChip, normalizeWeek, emptyWeek, DAY_KEYS,
   toLegacyAvailabilitySlots, buildLegacyAvailabilityDoc,
   upcomingWeekDates, upcomingWeekByDayKey, formatShortDate, formatFullDate, weekRangeLabel, upcomingWeekBoundsMs,
+  currentWeekDates, currentWeekByDayKey,
 } from "./weeklyAvailability.js";
 import { availabilityState, materializeSlots } from "./availability.js";
 
@@ -138,4 +139,41 @@ it("upcomingWeekBoundsMs spans from the start of tomorrow to the end of the 7th 
   expect(new Date(fromMs).toISOString()).toBe("2026-09-20T00:00:00.000Z");
   expect(toMs).toBeGreaterThan(Date.UTC(2026, 8, 26, 23, 59, 0));
   expect(toMs).toBeLessThanOrEqual(Date.UTC(2026, 8, 27, 0, 0, 0));
+});
+
+// --- currentWeekDates / currentWeekByDayKey (Availability page, Sri Lanka week) ---
+// 2026-09-20 06:00 UTC = 2026-09-20 11:30 Asia/Colombo (UTC+05:30) — a Sunday.
+// Defaults to Asia/Colombo, matching the Availability page's own default.
+const SUNDAY_MORNING_COLOMBO = Date.UTC(2026, 8, 20, 6, 0, 0);
+
+it("currentWeekDates on a Sunday (Sri Lanka time) returns that same Sunday through Saturday", () => {
+  const dates = currentWeekDates(SUNDAY_MORNING_COLOMBO); // default timeZone = Asia/Colombo
+  expect(dates).toHaveLength(7);
+  expect(dates[0]).toMatchObject({ year: 2026, month: 9, day: 20, dayOfWeek: 0 }); // Sun 20 Sep — today itself
+  expect(dates[6]).toMatchObject({ year: 2026, month: 9, day: 26, dayOfWeek: 6 }); // Sat 26 Sep
+  expect(weekRangeLabel(dates)).toBe("Sun, 20 Sep 2026 – Sat, 26 Sep 2026");
+});
+
+it("currentWeekDates mid-week still returns THIS week's Sunday-Saturday, including already-past days", () => {
+  // Wednesday 23 Sep 2026, 11:30 Colombo — the week should still start on the
+  // Sunday that already happened (20th), not roll forward to next Sunday.
+  const wednesdayColombo = Date.UTC(2026, 8, 23, 6, 0, 0);
+  const dates = currentWeekDates(wednesdayColombo);
+  expect(dates[0]).toMatchObject({ day: 20, month: 9 });
+  expect(dates[6]).toMatchObject({ day: 26, month: 9 });
+});
+
+it("currentWeekDates shifts to the following week once the system date crosses into a new Sunday", () => {
+  // The very next Sunday, 27 Sep 2026 — the week must shift forward exactly one week.
+  const nextSundayColombo = Date.UTC(2026, 8, 27, 6, 0, 0);
+  const dates = currentWeekDates(nextSundayColombo);
+  expect(dates[0]).toMatchObject({ day: 27, month: 9 });
+  expect(dates[6]).toMatchObject({ day: 3, month: 10 });
+});
+
+it("currentWeekByDayKey maps DAY_KEYS (Sun-first) to this week's real dates", () => {
+  const byKey = currentWeekByDayKey(SUNDAY_MORNING_COLOMBO);
+  expect(DAY_KEYS).toEqual(["sun", "mon", "tue", "wed", "thu", "fri", "sat"]);
+  expect(byKey.sun).toMatchObject({ day: 20, month: 9 });
+  expect(byKey.sat).toMatchObject({ day: 26, month: 9 });
 });

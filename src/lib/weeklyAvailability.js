@@ -55,6 +55,33 @@ export function upcomingWeekByDayKey(now = Date.now(), timeZone = browserTimeZon
   return out;
 }
 
+/**
+ * THIS calendar week — Sunday through Saturday, in Sri Lanka time
+ * (Asia/Colombo, UTC+05:30) by default — for the Availability page's date
+ * banner and per-tab dates. Unlike upcomingWeekDates() above (which is a
+ * future-only "tomorrow onward" booking window, still used by the stage-
+ * assignment interview picker), this shows the ACTUAL current week: it can
+ * include days already past if today isn't Sunday. `now`/`timeZone` are
+ * injectable for testing; real callers get the real current week.
+ */
+export function currentWeekDates(now = Date.now(), timeZone = "Asia/Colombo") {
+  const today = utcToWallTime(now, timeZone);
+  const start = new Date(Date.UTC(today.year, today.month - 1, today.day - today.dayOfWeek));
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + i));
+    out.push({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), dayOfWeek: d.getUTCDay() });
+  }
+  return out;
+}
+
+/** DAY_KEYS ("sun".."sat") mapped to that weekday's actual date within THIS current week. */
+export function currentWeekByDayKey(now = Date.now(), timeZone = "Asia/Colombo") {
+  const out = {};
+  for (const d of currentWeekDates(now, timeZone)) out[WEEKDAY_TO_DAY_KEY[d.dayOfWeek]] = d;
+  return out;
+}
+
 export const formatShortDate = ({ day, month }) => `${day} ${MONTH_SHORT[month - 1]}`;
 export const formatFullDate = ({ day, month, year, dayOfWeek }) => `${WEEKDAY_SHORT[dayOfWeek]}, ${day} ${MONTH_SHORT[month - 1]} ${year}`;
 /** "Sun, 20 Sep 2026 – Sat, 26 Sep 2026" — the banner text for the whole window. */

@@ -22,16 +22,18 @@ import {
   DAY_KEYS, DAY_LABELS, WEEKEND_KEYS,
   emptyWeek, emptyDay, emptyAvailableRow,
   validateWeek, weekHasErrors, daySummaryChip,
-  upcomingWeekDates, upcomingWeekByDayKey, formatShortDate, weekRangeLabel,
+  currentWeekDates, currentWeekByDayKey, formatShortDate, weekRangeLabel,
 } from "@/lib/weeklyAvailability";
 import { Button } from "@/components/ui/Button";
 import DayPanel from "@/components/availability/DayPanel";
 
-/** Ms until 5s after the next local midnight — when the "tomorrow onward" window has to roll forward. */
-function msUntilNextLocalMidnight() {
+/** Ms until 5s after the next Sri-Lanka-time midnight — when "this week" rolls into the next one. */
+function msUntilNextColomboMidnight() {
   const now = new Date();
-  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
-  return next.getTime() - now.getTime();
+  // Asia/Colombo is a fixed UTC+05:30 offset (no DST) — safe to compute directly.
+  const colomboNow = new Date(now.getTime() + 5.5 * 3600 * 1000);
+  const nextMidnightColombo = Date.UTC(colomboNow.getUTCFullYear(), colomboNow.getUTCMonth(), colomboNow.getUTCDate() + 1, 0, 0, 5);
+  return nextMidnightColombo - 5.5 * 3600 * 1000 - now.getTime();
 }
 
 export default function Availability() {
@@ -44,16 +46,16 @@ export default function Availability() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  // Real-time window: the next 7 days, starting tomorrow — never today, never
-  // the past. Rolls forward automatically at local midnight so a tab left
-  // open overnight never shows a date that's already gone by.
+  // THIS calendar week — Sunday through Saturday, in Sri Lanka time
+  // (Asia/Colombo). Recomputed at Colombo midnight so a tab left open
+  // overnight rolls into the next week on its own.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setTimeout(() => setNow(Date.now()), msUntilNextLocalMidnight());
+    const t = setTimeout(() => setNow(Date.now()), msUntilNextColomboMidnight());
     return () => clearTimeout(t);
   }, [now]);
-  const weekDates = useMemo(() => upcomingWeekDates(now), [now]);
-  const datesByDayKey = useMemo(() => upcomingWeekByDayKey(now), [now]);
+  const weekDates = useMemo(() => currentWeekDates(now), [now]);
+  const datesByDayKey = useMemo(() => currentWeekByDayKey(now), [now]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -119,7 +121,8 @@ export default function Availability() {
       </p>
 
       {/* tab strip — Sunday..Saturday, fixed order, one panel visible at a time.
-          The date under each name is that weekday's real upcoming date. */}
+          The date under each name is that weekday's actual date THIS week,
+          Sri Lanka time. */}
       <div className="mt-6 flex flex-wrap gap-1.5 border-b border-border">
         {DAY_KEYS.map((key) => {
           const active = key === activeDay;

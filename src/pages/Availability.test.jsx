@@ -20,7 +20,7 @@ const button = (tree, label) => buttons(tree).find((b) => text(b).trim() === lab
 
 beforeEach(() => { mocks.save.mockReset().mockResolvedValue(); mocks.week = emptyWeek(); mocks.confirmResult = true; });
 
-it("shows a real-date range banner and a per-tab date, never today or the past", async () => {
+it("shows a real-date range banner (this calendar week, Sri Lanka time) and a per-tab date", async () => {
   let tree;
   await act(async () => { tree = create(<Availability />); });
   const rendered = JSON.stringify(tree.toJSON());

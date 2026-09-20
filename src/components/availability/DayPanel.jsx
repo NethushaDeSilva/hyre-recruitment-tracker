@@ -1,6 +1,9 @@
-// One day's editor: two sections (Available / Blocked) plus, on Saturday and
+// One day's editor: a single Available-times section, plus on Saturday and
 // Sunday ONLY, a "Remove this day" affordance (Part A spec — a weekday
-// expresses "not working" the ordinary way: zero available rows).
+// expresses "not working" the ordinary way: zero available rows). There is no
+// separate "blocked" section — anything not listed as available is already
+// treated as busy (src/lib/availability.js only ever reads declared `slots`
+// as free; everything else is implicitly unavailable).
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { WEEKEND_KEYS, DAY_LABELS } from "@/lib/weeklyAvailability";
@@ -46,7 +49,7 @@ export default function DayPanel({ dayKey, day, validation, onAddRow, onChangeRo
       <div className="space-y-3 rounded-lg border border-[#BBF0CE] bg-[#F0FBF4] p-5 dark:border-[#1c4a2e] dark:bg-[#0f2418]">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-[13px] font-bold text-[#16A34A]">Available times</h3>
-          <Button variant="ghost" onClick={() => onAddRow("available")} className="!px-3 !py-1.5 text-xs">
+          <Button variant="ghost" onClick={onAddRow} className="!px-3 !py-1.5 text-xs">
             <Plus size={14} /> Add available time
           </Button>
         </div>
@@ -63,32 +66,6 @@ export default function DayPanel({ dayKey, day, validation, onAddRow, onChangeRo
                 removeLabel={`Remove available time ${i + 1} on ${label}`}
                 onChange={(patch) => onChangeRow("available", i, patch)}
                 onRemove={() => onRemoveRow("available", i)}
-              />
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-3 rounded-lg border border-[#F5C6C6] bg-[#FDF1F1] p-5 dark:border-[#5a2a2a] dark:bg-[#241414]">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[13px] font-bold text-[#DC2626]">Restricted / blocked times</h3>
-          <Button variant="ghost" onClick={() => onAddRow("blocked")} className="!px-3 !py-1.5 text-xs">
-            <Plus size={14} /> Add blocked time
-          </Button>
-        </div>
-        {day.blocked.length === 0 && <p className="text-sm text-muted-foreground">No blocked times.</p>}
-        <div className="space-y-2">
-          {day.blocked.map((row, i) => {
-            const { error, warning } = issueFor(validation, "blocked", i);
-            return (
-              <TimeRangeRow
-                key={i}
-                row={row}
-                error={error}
-                warning={warning}
-                removeLabel={`Remove blocked time ${i + 1} on ${label}`}
-                onChange={(patch) => onChangeRow("blocked", i, patch)}
-                onRemove={() => onRemoveRow("blocked", i)}
               />
             );
           })}

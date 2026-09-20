@@ -119,10 +119,10 @@ function PersonLane({ person, day, startHour, endHour, bodyHeight, availability:
     .filter(Boolean);
 
   const busyItems = [
-    ...(av?.commitments || []).map((c) => ({ ...c, label: c.source === "interview" ? "Interview" : "Busy" })),
+    ...(av?.commitments || []).map((c) => ({ ...c, label: c.source === "interview" ? `${c.stageLabel || "Interview"} - ${c.positionTitle || "Position"}` : "Busy" })),
     ...(tz ? (av?.exceptions || []).map((e) => ({ ...exceptionRange(e, tz), label: e.type === "leave" ? "Leave" : "Blocked" })) : []),
   ];
-  const busySegs = busyItems.map((it) => ({ pos: eventPosition(it, dayStart, startHour, endHour), label: it.label })).filter((x) => x.pos);
+  const busySegs = busyItems.map((it) => ({ ...it, pos: eventPosition(it, dayStart, startHour, endHour) })).filter((x) => x.pos);
 
   return (
     <div className="relative h-full flex-1 border-l border-border/40 first:border-l-0" style={HATCH_BG}>
@@ -146,13 +146,19 @@ function PersonLane({ person, day, startHour, endHour, bodyHeight, availability:
           </Tooltip>
         );
       })}
-      {busySegs.map(({ pos, label }, i) => (
+      {busySegs.map(({ pos, label, startMs, endMs, status, stageLabel, positionTitle }, i) => (
         <Tooltip
           key={`busy-${i}`}
-          label={`${person.name} — ${label}`}
-          className="absolute inset-x-0.5 z-20 block overflow-hidden rounded-sm"
+          label={`${person.name} — ${label} — ${formatTimeRange(startMs, endMs)}${status ? ` — ${status === "pending_confirmation" ? "Awaiting confirmation" : "Booked"}` : ""}`}
+          className="absolute inset-x-0.5 z-20 flex-col items-start overflow-hidden rounded-sm px-1 py-0.5 text-[9px] leading-tight text-white"
           style={{ top: `${pos.topPct}%`, height: `${pos.heightPct}%`, minHeight: 3, background: person.avatarColor }}
-        />
+        >
+          <span className="block w-full truncate font-semibold">{person.name}</span>
+          <span className="block w-full truncate">{stageLabel || label}</span>
+          {positionTitle && <span className="block w-full truncate">{positionTitle}</span>}
+          <span className="block w-full truncate">{formatTimeRange(startMs, endMs)}</span>
+          {status && <span className="block w-full truncate">{status === "pending_confirmation" ? "Awaiting confirmation" : "Booked"}</span>}
+        </Tooltip>
       ))}
     </div>
   );

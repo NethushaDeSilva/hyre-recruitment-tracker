@@ -12,18 +12,20 @@
 // step 0. A candidate in a custom stage is actioned by Management (deployed rules
 // treat unknown stages as management-only) — per-role custom stages are Sprint 2.
 import { useState, useEffect, useMemo } from "react";
-import { Lock, Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, ArrowLeft, Search, Loader2, Users, CheckCheck, HelpCircle } from "lucide-react";
+import { Lock, Plus, Trash2, ChevronUp, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { collection, getDocs } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
-import { Avatar } from "@/components/ui/Avatar";
 import { STAGES, CONFIGURABLE_STAGES } from "@/lib/stages";
 import { ROLES, ROLE_LABELS, can } from "@/lib/permissions";
 import { ROLE_USERS, cleanTitle } from "@/context/auth-config";
-import { savePipeline, useHyreData, getAvailabilityStates } from "@/data/store";
+import { savePipeline, useHyreData, subscribeInterviewBookings, getAvailabilityRecords } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
+
+import AssignStep from "./StageAssignmentStep";
+import { BOOKED_STATUSES } from "@/lib/interviewSchedule";
 
 const ADDABLE_BUILTIN = [...CONFIGURABLE_STAGES, "hold"];
 const CUSTOM_PALETTE = [
@@ -33,13 +35,6 @@ const CUSTOM_PALETTE = [
   { dot: "#7C3AED", badgeBg: "#EDE9FE", badgeFg: "#6D28D9" },
   { dot: "#0EA5E9", badgeBg: "#E0F2FE", badgeFg: "#0369A1" },
 ];
-const AV_PALETTE = ["#1F3A5F", "#2563EB", "#4F46E5", "#0D9488", "#DB2777", "#D97706", "#7C3AED", "#0EA5E9", "#16A34A", "#E0A422"];
-const colorFor = (name = "") => {
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return AV_PALETTE[h % AV_PALETTE.length];
-};
-
 function toRows(position) {
   const meta = position?.stageMeta || {};
   return (position?.stages || [])
@@ -71,6 +66,14 @@ export default function StageConfigModal({ open, position, onClose }) {
   const [step, setStep] = useState(0); // 0 = pipeline; 1..N = assign rows[step-1]
   const [rows, setRows] = useState([]);
   const [assign, setAssign] = useState({}); // stageId -> [{uid,name,role,title}]
+  const [savedAssign, setSavedAssign] = useState({});
+  const [personSlots, setPersonSlots] = useState({}); // stageId -> { uid -> {scheduledAt, durationMs} }
+  const [availabilityByUid, setAvailabilityByUid] = useState({});
+  const [bookings, setBookings] = useState([]);
+  const [bookingError, setBookingError] = useState("");
+  const [bookingsLoading, setBookingsLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [staff, setStaff] = useState([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
@@ -94,6 +97,10 @@ export default function StageConfigModal({ open, position, onClose }) {
     const norm = {};
     for (const [k, v] of Object.entries(src)) norm[k] = Array.isArray(v) ? v : v ? [v] : [];
     setAssign(norm);
+    setSavedAssign(norm);
+    setPersonSlots({});
+    setSaveStatus("");
+    setSaveError("");
     setAdding(false);
     setNewLabel("");
     setQ("");
@@ -151,47 +158,23 @@ export default function StageConfigModal({ open, position, onClose }) {
     return () => { alive = false; };
   }, [open, canAssign]);
 
-  // Assignment counts across ALL positions — kept as two SEPARATE numbers so
-  // "already true" and "you just clicked this, unsaved" can never blend into
-  // one silently-changing badge. savedWorkload reads stageAssignees ONLY,
-  // for every position including the one open here — never the in-progress
-  // `assign` local state. pendingWorkload additionally substitutes `assign`
-  // for the position being edited (today's in-session picture, used for the
-  // least-busy-first sort — a person you just loaded up in this session
-  // SHOULD sort as busier, that ordering isn't the bug). The badge itself
-  // must render savedWorkload plus the delta, never pendingWorkload alone.
-  const savedWorkload = useMemo(() => {
-    const m = {};
-    for (const p of positions) {
-      for (const v of Object.values(p.stageAssignees || {})) {
-        const arr = Array.isArray(v) ? v : v ? [v] : [];
-        for (const a of arr) if (a?.uid) m[a.uid] = (m[a.uid] || 0) + 1;
-      }
-    }
-    return m;
-  }, [positions]);
-  const pendingWorkload = useMemo(() => {
-    const m = {};
-    for (const p of positions) {
-      const src = p.id === position?.id ? assign : p.stageAssignees || {};
-      for (const v of Object.values(src)) {
-        const arr = Array.isArray(v) ? v : v ? [v] : [];
-        for (const a of arr) if (a?.uid) m[a.uid] = (m[a.uid] || 0) + 1;
-      }
-    }
-    return m;
-  }, [positions, assign, position?.id]);
-
-  // WS8 §8.2 — declared/undeclared per person, same unknown-means-unknown
-  // treatment as the interview calendar. Fetched once the staff roster is
-  // known; re-fetched if the roster changes (e.g. after a slow load resolves).
-  const [availabilityStates, setAvailabilityStates] = useState({});
   useEffect(() => {
-    if (!open || staff.length === 0) return;
+    if (!open) return;
+    setBookingsLoading(true);
+    setBookingError("");
+    return subscribeInterviewBookings((list) => { setBookings(list); setBookingsLoading(false); }, (error) => {
+      setBookingError(`Couldn't check bookings: ${error.message}`);
+      setBookingsLoading(false);
+    });
+  }, [open]);
+
+  // Real declared availability for the whole staff directory, fetched once the
+  // roster is known — the assignment step's per-person "available times"
+  // dropdown reads from this rather than making its own Firestore call per row.
+  useEffect(() => {
+    if (!open || !staff.length) return;
     let alive = true;
-    getAvailabilityStates(staff.map((s) => s.uid))
-      .then((res) => { if (alive) setAvailabilityStates(res); })
-      .catch((e) => console.error("getAvailabilityStates:", e));
+    getAvailabilityRecords(staff.map((s) => s.uid)).then((records) => { if (alive) setAvailabilityByUid(records); });
     return () => { alive = false; };
   }, [open, staff]);
 
@@ -220,59 +203,73 @@ export default function StageConfigModal({ open, position, onClose }) {
   };
 
   // --- assignment (steps 1..N) ---
-  // A person may run only ONE stage of a given vacancy. `assignedElsewhere` maps a
-  // uid → the OTHER stage they're already on in this pipeline, so the current
-  // stage's list can lock (grey out) them and never double-book one person.
-  const assignedElsewhere = useMemo(() => {
-    const m = {};
-    if (step <= 0) return m;
-    const currentId = (canAssign ? rows : [])[step - 1]?.id;
-    if (!currentId) return m;
-    for (const r of rows) {
-      if (r.id === currentId) continue;
-      for (const a of assign[r.id] || []) if (a?.uid && !m[a.uid]) m[a.uid] = r.label;
-    }
-    return m;
-  }, [assign, rows, step, canAssign]);
-
   const toggle = (stageId, person) => setAssign((prev) => {
     const list = prev[stageId] ? [...prev[stageId]] : [];
     const i = list.findIndex((x) => x.uid === person.uid);
     if (i >= 0) list.splice(i, 1);
     else {
-      if (assignedElsewhere[person.uid]) return prev; // already on another stage — block
       list.push({ uid: person.uid, name: person.name, role: person.role, title: person.title || "", email: person.email || "" });
     }
     return { ...prev, [stageId]: list };
   });
   const setMany = (stageId, people) => setAssign((prev) => ({ ...prev, [stageId]: people.map((p) => ({ uid: p.uid, name: p.name, role: p.role, title: p.title || "", email: p.email || "" })) }));
 
+  // Booking a specific person's real available window as their interview
+  // slot for this stage — replaces the old manual "Book a time slot" typed
+  // date/time, which applied one slot to the whole team. Only one pending
+  // window per person per stage; picking a new one replaces the old pick.
+  const setPersonSlot = (stageId, person, window) =>
+    setPersonSlots((prev) => ({ ...prev, [stageId]: { ...prev[stageId], [person.uid]: window } }));
+  const clearPersonSlot = (stageId, uid) =>
+    setPersonSlots((prev) => {
+      const next = { ...(prev[stageId] || {}) };
+      delete next[uid];
+      return { ...prev, [stageId]: next };
+    });
+
   const save = async () => {
     setBusy(true);
-    const stages = ["applied", ...rows.map((r) => r.id), "hired"];
-    const stageMeta = {};
-    for (const r of rows) {
-      if (r.custom) stageMeta[r.id] = { label: r.label, owner: r.owner, dot: r.color?.dot, badgeBg: r.color?.badgeBg, badgeFg: r.color?.badgeFg };
-      else if (r.label && r.label !== STAGES[r.id]?.label) stageMeta[r.id] = { label: r.label };
-    }
-    const ids = new Set(rows.map((r) => r.id));
-    const stageAssignees = {};
-    for (const [id, list] of Object.entries(assign)) if (ids.has(id) && list?.length) stageAssignees[id] = list;
-    await savePipeline(position.id, { stages, stageMeta, stageAssignees });
-    setBusy(false);
-    onClose();
+    setSaveStatus("");
+    setSaveError("");
+    try {
+      const stages = ["applied", ...rows.map((r) => r.id), "hired"];
+      const stageMeta = {};
+      for (const r of rows) {
+        if (r.custom) stageMeta[r.id] = { label: r.label, owner: r.owner, dot: r.color?.dot, badgeBg: r.color?.badgeBg, badgeFg: r.color?.badgeFg };
+        else if (r.label && r.label !== STAGES[r.id]?.label) stageMeta[r.id] = { label: r.label };
+      }
+      const ids = new Set(rows.map((r) => r.id));
+      const stageAssignees = {};
+      for (const [id, list] of Object.entries(assign)) if (ids.has(id) && list?.length) stageAssignees[id] = list;
+
+      const pendingCount = rows.reduce((n, r) => n + Object.keys(personSlots[r.id] || {}).length, 0);
+      if (pendingCount && (bookingsLoading || bookingError)) throw new Error("Wait until bookings can be checked before saving an interview slot.");
+      const stageSlots = rows.flatMap((r) => Object.entries(personSlots[r.id] || {}).flatMap(([uid, window]) => {
+        // Already a real, persisted booking for this exact person/stage/time — nothing new to write.
+        const persisted = bookings.some((b) => b.positionId === position.id && b.stageId === r.id
+          && b.interviewerId === uid && b.scheduledAt === window.scheduledAt && BOOKED_STATUSES.includes(b.status));
+        if (persisted) return [];
+        const person = (assign[r.id] || []).find((p) => p.uid === uid) || staff.find((s) => s.uid === uid);
+        return [{ stageId: r.id, stageLabel: r.label, interviewerId: uid, interviewerName: person?.name || "", scheduledAt: window.scheduledAt, durationMs: window.durationMs }];
+      }));
+
+      await savePipeline(position.id, { stages, stageMeta, stageAssignees, stageSlots, actor: user });
+      setSavedAssign(stageAssignees);
+      setSaveStatus(stageSlots.length ? "Assignments and interview slots saved." : "Assignments saved.");
+    } catch (error) { setSaveError(error.message || "Couldn't save assignments. Please try again."); }
+    finally { setBusy(false); }
   };
 
   const assignable = canAssign ? rows : [];
   const lastStep = assignable.length; // step index of the final assignment screen (0 if none)
   const current = step > 0 ? assignable[step - 1] : null;
   const availableBuiltin = ADDABLE_BUILTIN.filter((id) => !rows.some((r) => r.id === id));
-  const goTo = (s) => { setQ(""); setStep(Math.max(0, Math.min(s, lastStep))); };
+  const goTo = (s) => { if (busy) return; setQ(""); setStep(Math.max(0, Math.min(s, lastStep))); };
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => !busy && onClose()}
       width={880}
       title="Configure interview stages"
       subtitle={position ? position.title : ""}
@@ -284,12 +281,15 @@ export default function StageConfigModal({ open, position, onClose }) {
             {step < lastStep ? (
               <Button onClick={() => goTo(step + 1)}>{step === 0 ? "Assign people" : "Proceed"} <ChevronRight size={15} /></Button>
             ) : (
-              <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Save stages"}</Button>
+              <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Save now"}</Button>
             )}
           </div>
         </div>
       }
     >
+      {saveStatus && <p role="status" className="mb-3 text-sm text-[#15803D]">{saveStatus}</p>}
+      {saveError && <p role="alert" className="mb-3 text-sm text-[#DC2626]">{saveError}</p>}
+      <fieldset disabled={busy} className="min-w-0" onChange={() => setSaveStatus("")}>
       {/* progress breadcrumb */}
       {canAssign && assignable.length > 0 && (
         <div className="mb-4 flex items-center gap-1 overflow-x-auto pb-1">
@@ -315,16 +315,20 @@ export default function StageConfigModal({ open, position, onClose }) {
           stage={current}
           staff={staff.filter((s) => s.role === current.owner)}
           selected={assign[current.id] || []}
-          lockedElsewhere={assignedElsewhere}
           q={q} setQ={setQ}
-          savedWorkload={savedWorkload} pendingWorkload={pendingWorkload}
-          availabilityStates={availabilityStates}
+          savedSelected={savedAssign[current.id] || []}
+          assignments={assign} positions={positions} positionId={position.id}
+          bookings={bookings} bookingsLoading={bookingsLoading} bookingError={bookingError}
+          availabilityByUid={availabilityByUid} pendingSlots={personSlots[current.id] || {}}
+          onSetPersonSlot={(person, window) => { setPersonSlot(current.id, person, window); setSaveStatus(""); }}
+          onClearPersonSlot={(uid) => { clearPersonSlot(current.id, uid); setSaveStatus(""); }}
           loading={staffLoading} error={staffError}
-          onToggle={(p) => toggle(current.id, p)}
-          onSetMany={(people) => setMany(current.id, people)}
+          onToggle={(p) => { toggle(current.id, p); setSaveStatus(""); }}
+          onSetMany={(people) => { setMany(current.id, people); setSaveStatus(""); }}
           stepInfo={`Step ${step} of ${lastStep}`}
         />
       )}
+      </fieldset>
     </Modal>
   );
 }
@@ -398,132 +402,6 @@ function PipelineStep({ rows, assign, move, rename, remove, adding, setAdding, n
   );
 }
 
-// ---------------------------------------------------------------- steps 1..N
-function AssignStep({ stage, staff, selected, lockedElsewhere = {}, q, setQ, savedWorkload, pendingWorkload, availabilityStates, loading, error, onToggle, onSetMany, stepInfo }) {
-  const roleLabel = ROLE_LABELS[stage.owner] || stage.owner;
-  const selIds = new Set(selected.map((s) => s.uid));
-  const needle = q.trim().toLowerCase();
-  // Always include people already assigned to THIS stage, even if the directory
-  // fetch wouldn't otherwise surface them (deleted account, filtered, etc.). This
-  // guarantees a saved assignee is never an unremovable "ghost" — there's always a
-  // row (with a ticked box) you can click to remove them.
-  const roster = (() => {
-    const byUid = new Map(staff.map((s) => [s.uid, s]));
-    for (const s of selected) if (s.uid && !byUid.has(s.uid)) byUid.set(s.uid, { uid: s.uid, name: s.name, role: s.role, title: s.title || "", email: s.email || "" });
-    return [...byUid.values()];
-  })();
-  // A person locked to another stage of this pipeline isn't selectable here.
-  const isLocked = (s) => !!lockedElsewhere[s.uid] && !selIds.has(s.uid);
-  const shown = (needle ? roster.filter((s) => s.name.toLowerCase().includes(needle) || (s.title || "").toLowerCase().includes(needle)) : roster.slice())
-    .sort((a, b) => {
-      // selectable first, then least-busy (this session's effective load —
-      // saved + whatever you've picked so far), then alphabetical
-      const lockDiff = (isLocked(a) ? 1 : 0) - (isLocked(b) ? 1 : 0);
-      if (lockDiff) return lockDiff;
-      const la = pendingWorkload[a.uid] || 0, lb = pendingWorkload[b.uid] || 0;
-      if (la !== lb) return la - lb;
-      return a.name.localeCompare(b.name);
-    });
-  const selectable = shown.filter((s) => !isLocked(s));
-  const allShownSelected = selectable.length > 0 && selectable.every((s) => selIds.has(s.uid));
-
-  const toggleAllShown = () => {
-    if (allShownSelected) {
-      const drop = new Set(selectable.map((s) => s.uid));
-      onSetMany(selected.filter((s) => !drop.has(s.uid)));
-    } else {
-      const merged = [...selected];
-      for (const s of selectable) if (!selIds.has(s.uid)) merged.push(s);
-      onSetMany(merged);
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: STAGES[stage.id]?.dot || stage.color?.dot || "#64748B" }} />
-            <h4 className="text-[15px] font-bold text-foreground">{stage.label}</h4>
-            <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{roleLabel}</span>
-          </div>
-          <p className="mt-1 text-[12px] text-muted-foreground">{stepInfo} · tick everyone who will run this stage. Only {roleLabel} staff are shown.</p>
-        </div>
-        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[12px] font-bold text-primary">{selected.length} selected</span>
-      </div>
-
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-        <Search size={15} className="shrink-0 text-muted-foreground" />
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${roleLabel} by name or title…`} className="w-full bg-transparent text-sm text-foreground placeholder:text-[#94A3B8] focus:outline-none" />
-        <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{loading ? "…" : shown.length}</span>
-      </div>
-
-      {selectable.length > 0 && (
-        <button onClick={toggleAllShown} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-primary hover:underline">
-          <CheckCheck size={14} /> {allShownSelected ? "Clear all shown" : `Select all ${selectable.length}`}
-        </button>
-      )}
-
-      <ul className="max-h-[52vh] min-h-[220px] divide-y divide-border overflow-y-auto rounded-xl border border-border">
-        {shown.map((s) => {
-          const on = selIds.has(s.uid);
-          const saved = savedWorkload[s.uid] || 0;
-          const pendingDelta = (pendingWorkload[s.uid] || 0) - saved;
-          const avState = availabilityStates[s.uid]; // undefined while loading
-          const lockedStage = isLocked(s) ? lockedElsewhere[s.uid] : null;
-          return (
-            <li key={s.uid}>
-              <button
-                type="button"
-                onClick={() => !lockedStage && onToggle(s)}
-                disabled={!!lockedStage}
-                title={lockedStage ? `Already assigned to “${lockedStage}” — one person runs one stage per vacancy` : undefined}
-                className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-left transition-colors ${lockedStage ? "cursor-not-allowed opacity-55" : on ? "bg-primary/5" : "hover:bg-secondary/60"}`}
-              >
-                <input type="checkbox" readOnly checked={on} disabled={!!lockedStage} className="h-4 w-4 shrink-0 accent-primary" />
-                <Avatar name={s.name} color={colorFor(s.name)} size={34} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-foreground">{s.name}</span>
-                  <span className="block truncate text-[12px] text-muted-foreground">{s.title || roleLabel}</span>
-                </span>
-                {lockedStage ? (
-                  <span className="shrink-0 whitespace-nowrap rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                    On “{lockedStage}”
-                  </span>
-                ) : (
-                  <span className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-                    <AvailabilityBadge state={avState} />
-                    {/* This measures stage-TEAM-membership count across positions — a
-                        pipeline-configuration figure, not real-time booking load. WS8
-                        Part C's "fewest current assignments" ranking is a different,
-                        separate number computed from the interviews collection — do
-                        not repurpose this one into that. */}
-                    <span className="flex items-center gap-1.5 whitespace-nowrap text-[11px]">
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: saved ? "#D97706" : "#16A34A" }} />
-                      <span className={saved ? "text-[#B45309]" : "text-[#16A34A]"}>
-                        {saved ? `${saved} assignment${saved === 1 ? "" : "s"}` : "No assignments"}
-                      </span>
-                      {pendingDelta !== 0 && (
-                        <span className="font-semibold text-primary">
-                          · {pendingDelta > 0 ? "+" : ""}{pendingDelta} pending
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                )}
-              </button>
-            </li>
-          );
-        })}
-        {loading && <li className="flex items-center justify-center gap-2 py-6 text-[13px] text-muted-foreground"><Loader2 size={15} className="animate-spin" /> Loading team…</li>}
-        {!loading && error && <li className="px-3 py-6 text-center text-[13px] font-medium text-[#DC2626]">{error}</li>}
-        {!loading && !error && roster.length === 0 && <li className="flex flex-col items-center gap-1 py-6 text-center text-[13px] text-muted-foreground"><Users size={18} /> No {roleLabel} staff yet.</li>}
-        {!loading && !error && roster.length > 0 && shown.length === 0 && <li className="px-3 py-6 text-center text-[13px] text-muted-foreground">No matches for “{q}”.</li>}
-      </ul>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------- bits
 function StepChip({ active, done, onClick, children }) {
   return (
@@ -536,33 +414,6 @@ function StepChip({ active, done, onClick, children }) {
     >
       {children}
     </button>
-  );
-}
-
-// WS8 §8.2 — same unknown-means-unknown vocabulary as the interview calendar
-// legend (InterviewCalendarLegend.jsx): a "?" icon, never a colour, for a
-// person who hasn't declared anything or whose declaration lapsed. Undeclared
-// must never look like "free" or blend in with a real declared state.
-function AvailabilityBadge({ state }) {
-  if (!state) return <span className="w-[64px] shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">…</span>;
-  if (state === "unknown") {
-    return (
-      <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-muted-foreground">
-        <HelpCircle size={12} strokeWidth={2.5} /> Undeclared
-      </span>
-    );
-  }
-  if (state === "unavailable") {
-    return (
-      <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-[#DC2626]">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#DC2626]" /> Unavailable
-      </span>
-    );
-  }
-  return (
-    <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[11px] font-medium text-[#16A34A]">
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#16A34A]" /> Declared
-    </span>
   );
 }
 

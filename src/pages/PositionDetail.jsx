@@ -227,15 +227,20 @@ export default function PositionDetail() {
   };
 
   // --- Applied-stage bulk move (HR only) ---
-  // Eligible = visible under the current threshold/search AND canBulkSelect
-  // (score fresh, meets eligibility). A candidate the threshold hides falls
-  // out of appliedVisibleEntries and therefore out of appliedShown, so
+  // Selection itself is unrestricted: every candidate visible under the
+  // current threshold/search can be ticked — individually or via Select
+  // All — no matter their score. A candidate the threshold hides falls out
+  // of appliedVisibleEntries and therefore out of appliedShown, so
   // appliedPicked (below) drops it automatically the next render — no
   // separate "clear selection on filter change" effect needed.
-  const appliedShown = isHR
-    ? appliedVisibleEntries.filter((e) => canBulkSelect(scores.get(e.candidateId), position, e.c)).map((e) => e.c)
-    : [];
+  //
+  // canBulkSelect only gates the MOVE, not the selection: mixing an eligible
+  // and an ineligible candidate into one selection must surface as an error
+  // telling HR why, never as a silent partial move that drops the ineligible
+  // ones without explanation.
+  const appliedShown = isHR ? appliedVisibleEntries.map((e) => e.c) : [];
   const appliedPicked = appliedShown.filter((c) => picked.has(c.id));
+  const appliedIneligiblePicked = appliedPicked.filter((c) => !canBulkSelect(scores.get(c.id), position, c));
   const allAppliedPicked = appliedShown.length > 0 && appliedPicked.length === appliedShown.length;
   const appliedNext = nextStage(position.stages, "applied");
   const appliedNextLabel = resolveStage(position, appliedNext)?.label || "next stage";
@@ -254,9 +259,18 @@ export default function PositionDetail() {
     });
   const clearPicked = () => setPicked(new Set());
   const movePickedToNext = async () => {
-    // Recheck at execution (point 7) — never trust the picked Set alone,
-    // even though appliedPicked is already filtered through appliedShown.
-    const ids = appliedPicked.filter((c) => canBulkSelect(scores.get(c.id), position, c)).map((c) => c.id);
+    // Recheck at execution (point 7) — never trust the picked Set alone.
+    // If ANY selected candidate hasn't met the threshold/eligibility, block
+    // the whole move rather than silently moving only the eligible subset —
+    // HR ticked all of them on purpose and needs to know why it didn't happen.
+    const ineligible = appliedPicked.filter((c) => !canBulkSelect(scores.get(c.id), position, c));
+    if (ineligible.length > 0) {
+      toast.error(
+        `Can't move — ${ineligible.length} of ${appliedPicked.length} selected ${ineligible.length === 1 ? "candidate hasn't" : "candidates haven't"} met the shortlist threshold. Deselect them, or move only candidates that qualify.`
+      );
+      return;
+    }
+    const ids = appliedPicked.map((c) => c.id);
     setPicked(new Set());
     await Promise.all(ids.map((id) => advanceStage(id, actor, { screeningBulk: true }))); // no note — it's just an application
   };
@@ -423,9 +437,16 @@ export default function PositionDetail() {
                   {appliedPicked.length > 0 && (
                     <div className="space-y-1.5 rounded-xl border border-primary/40 bg-primary/10 p-2">
                       <div className="px-0.5 text-[12px] font-bold text-foreground">{appliedPicked.length} selected</div>
+                      {appliedIneligiblePicked.length > 0 && (
+                        <div className="rounded-lg border border-[#F0C4C4] bg-[#FBE9E9] px-2 py-1.5 text-[11px] font-medium text-[#B42318] dark:border-[#5a2a2a] dark:bg-[#2a1717] dark:text-[#F87171]">
+                          {appliedIneligiblePicked.length} of {appliedPicked.length} selected {appliedIneligiblePicked.length === 1 ? "hasn't" : "haven't"} met the shortlist threshold — can't move to {appliedNextLabel} until they're deselected.
+                        </div>
+                      )}
                       <button
                         onClick={movePickedToNext}
-                        className="flex w-full items-center justify-center gap-1 rounded-lg bg-primary py-2 text-xs font-bold text-primary-foreground transition-opacity hover:opacity-90"
+                        disabled={appliedIneligiblePicked.length > 0}
+                        title={appliedIneligiblePicked.length > 0 ? `${appliedIneligiblePicked.length} selected candidate${appliedIneligiblePicked.length === 1 ? "" : "s"} below the shortlist threshold` : undefined}
+                        className="flex w-full items-center justify-center gap-1 rounded-lg bg-primary py-2 text-xs font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:opacity-40"
                       >
                         Move to {appliedNextLabel} <ChevronRight size={14} />
                       </button>
@@ -456,7 +477,6 @@ export default function PositionDetail() {
                           <input
                             type="checkbox"
                             checked={picked.has(c.id)}
-                            disabled={!canBulkSelect(scores.get(c.id), position, c)}
                             onChange={() => togglePick(c.id)}
                             aria-label={`Select ${displayName(c)}`}
                             className="mt-2.5 h-4 w-4 shrink-0 cursor-pointer accent-primary"

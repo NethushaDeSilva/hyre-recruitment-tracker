@@ -33,16 +33,18 @@ export default function InterviewRequestModal({ open, onClose }) {
 
   const respond = async (id, accept) => {
     setBusyId(id);
-    const res = await respondToInterviewRequest(id, { accept, actor: user });
-    setBusyId(null);
-    if (!accept && res.ok) {
-      setLastOutcome(res.status === "needs_attention" ? "No one else was left — HR has been surfaced this one." : "Passed to the next ranked interviewer.");
-    }
-    load();
+    try {
+      const res = await respondToInterviewRequest(id, { accept, actor: user });
+      if (!accept && res.ok) {
+        setLastOutcome(res.status === "needs_attention" ? "No one else was left — HR has been surfaced this one." : "Passed to the next ranked interviewer.");
+      }
+      load();
+    } catch (e) { setLastOutcome(e.message); }
+    finally { setBusyId(null); }
   };
 
   return (
-    <Modal open={open} onClose={onClose} width={520} title="Interview requests" subtitle="DevOps interviews waiting on your response">
+    <Modal open={open} onClose={onClose} width={520} title="Interview requests" subtitle="Interviews waiting on your response">
       <div className="space-y-3">
         {lastOutcome && <p className="rounded-md bg-secondary px-3 py-2 text-[12px] text-muted-foreground">{lastOutcome}</p>}
         {loading && <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>}

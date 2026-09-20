@@ -185,6 +185,16 @@ service cloud.firestore {
     // interviewerId, through the narrow, mechanically-constrained path — full
     // staff-grade access to this collection belongs to HR/Management only.
     //
+    // SECOND ENCOUNTER, 2026-09-19: the exact same isStaff() widening was
+    // proposed again, this time to satisfy commitInterviewChanges()'s
+    // unfiltered getDocs(collection(db,"interviews")) call in
+    // src/lib/interviewPersistence.js — its cross-position conflict check
+    // (bookingConflict) needs visibility into bookings that don't belong to
+    // the caller. Investigated whether the read could instead be scoped to
+    // where("interviewerId","==",request.auth.uid): it cannot, cleanly — see
+    // the dated note above the `interviews` match block below for why, and
+    // report this conversation for the two options put to the Product Owner.
+    // Do not re-propose isStaff() here a third time without reading this.
     // update, isRecruiter(): full access — HR's override, marking completed.
     // update, the currently-requested interviewer, responding to THEIR OWN
     // pending request — exactly two shapes, nothing else:
@@ -215,11 +225,29 @@ service cloud.firestore {
     //     (mapInterviewDoc in store.js) converts "" back to `null` for
     //     consumers — this sentinel is a rules-evaluation workaround, not a
     //     concept that should leak into the rest of the codebase.
+    function scheduleRevisionAdvanced() {
+      let path = /databases/$(database)/documents/counters/interviewSchedule;
+      let before = exists(path) ? get(path).data.next : 0;
+      return getAfter(path).data.next == before + 1;
+    }
+    // 2026-09-19 — READ STAYS isRecruiter()-OR-SELF, NOT isStaff(). Investigated
+    // scoping commitInterviewChanges()'s unfiltered read (src/lib/interviewPersistence.js)
+    // to where("interviewerId","==",request.auth.uid) instead of widening this
+    // rule. Firestore requires an unfiltered collection query to be provably
+    // satisfied by the rule for EVERY possible returned document, so a scoped
+    // query only works if every legitimate read genuinely only ever needs the
+    // caller's own docs — and it doesn't: respondToInterviewRequest()'s DECLINE
+    // path also conflict-checks the PROPOSED NEXT interviewer (a different
+    // uid, read from the current request's own rankedInfo) before handing off,
+    // so the query needs a second party's bookings, not just the caller's own.
+    // A self-scoped query cannot return that document at all under a
+    // self-scoped rule. Reported to the Product Owner rather than widened
+    // silently a second time; see the two options above this match block.
     match /interviews/{interviewId} {
       allow read: if isRecruiter()
         || (signedIn() && resource.data.interviewerId == request.auth.uid);
-      allow create: if isStaff() && positionAvailable(request.resource.data.positionId);
-      allow update: if positionAvailable(resource.data.positionId)
+      allow create: if isStaff() && scheduleRevisionAdvanced() && positionAvailable(request.resource.data.positionId);
+      allow update: if scheduleRevisionAdvanced() && positionAvailable(resource.data.positionId)
         && request.resource.data.positionId == resource.data.positionId
         && (isRecruiter()
         || (signedIn() && resource.data.interviewerId == request.auth.uid
@@ -235,8 +263,7 @@ service cloud.firestore {
                         && request.resource.data.interviewerId == resource.data.rankedInfo[resource.data.interviewerId].nextUid
                         && request.resource.data.status == 'pending_confirmation')
                        ||
-                       (resource.data.rankedInfo[resource.data.interviewerId].nextUid == ''
-                        && request.resource.data.interviewerId == ''
+                       (request.resource.data.interviewerId == ''
                         && request.resource.data.status == 'needs_attention')
                      )
                  )
@@ -286,11 +313,11 @@ service cloud.firestore {
     // downward. Uniqueness is guaranteed by the client using a transaction.
     match /counters/{id} {
       allow read: if signedIn();
-      allow create: if signedIn() && (id != 'positionsV2' || (isRecruiter() && request.resource.data.next == 1))
+      allow create: if signedIn() && (id != 'interviewSchedule' || (isStaff() && request.resource.data.next == 1)) && (id != 'positionsV2' || (isRecruiter() && request.resource.data.next == 1))
         && request.resource.data.keys().hasOnly(['next'])
         && request.resource.data.next is int
         && request.resource.data.next >= 1;
-      allow update: if signedIn() && (id != 'positionsV2' || (isRecruiter() && request.resource.data.next == resource.data.next + 1))
+      allow update: if signedIn() && (id != 'interviewSchedule' || (isStaff() && request.resource.data.next == resource.data.next + 1)) && (id != 'positionsV2' || (isRecruiter() && request.resource.data.next == resource.data.next + 1))
         && request.resource.data.keys().hasOnly(['next'])
         && request.resource.data.next is int
         && request.resource.data.next > resource.data.next;

@@ -1,5 +1,5 @@
-// One [start] [end] [remove] row, shared by the "Available times" and
-// "Restricted / blocked times" sections of a day panel (Part A). `step="900"`
+// One [start] [end] [remove] row used by a day panel's "Available times"
+// section (Part A). `step="900"`
 // snaps the native time picker to 15-minute increments at the UI layer;
 // validateDay() (src/lib/weeklyAvailability.js) is the real, authoritative
 // check that runs regardless of how the value got there (typed, pasted).

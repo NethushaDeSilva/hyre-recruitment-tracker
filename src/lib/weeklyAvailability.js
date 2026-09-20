@@ -1,24 +1,82 @@
 // A person's own recurring weekly availability TEMPLATE — "what does my week
 // normally look like" (enabled/disabled per weekday, any number of recurring
-// available AND blocked ranges per day). Deliberately separate in shape and
-// storage from src/lib/availability.js's declared-slots-with-14-day-expiry
-// model (WS8 Part C's booking/ranking feature — see the collection-split note
-// in src/data/store.js for why). Pure, stateless helpers only; no Firestore
-// here so this stays trivially unit-testable.
+// available ranges per day). There is no separate "blocked" list — anything
+// not listed as available is already busy by construction: nothing outside
+// `available` is ever written to the derived `slots`, and every reader of
+// `slots` treats absence as unavailable (src/lib/availability.js). Deliberately
+// separate in shape and storage from src/lib/availability.js's declared-slots-
+// with-14-day-expiry model (WS8 Part C's booking/ranking feature — see the
+// collection-split note in src/data/store.js for why). Pure, stateless
+// helpers only; no Firestore here so this stays trivially unit-testable.
+import { utcToWallTime, wallTimeToUTC, browserTimeZone } from "@/lib/wallClock";
 
-export const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+// Sunday-first — the calendar week starts on Sunday and ends on Saturday.
+export const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export const DAY_LABELS = {
-  mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday",
-  fri: "Friday", sat: "Saturday", sun: "Sunday",
+  sun: "Sunday", mon: "Monday", tue: "Tuesday", wed: "Wednesday",
+  thu: "Thursday", fri: "Friday", sat: "Saturday",
 };
 // Only Saturday and Sunday ever get the "Remove this day" affordance (Part A
 // spec) — a weekday expresses "not working" the ordinary way, zero rows.
 export const WEEKEND_KEYS = ["sat", "sun"];
 
-export const emptyDay = () => ({ enabled: true, available: [], blocked: [] });
+// --- Real-time upcoming week window (the date banner + per-tab dates on the
+// Availability page) --------------------------------------------------------
+// The weekly template's day tabs (Sunday..Saturday) are a timeless recurring
+// PATTERN — this section answers "what are the actual calendar dates for
+// that pattern, right now," so nobody has to work it out by hand. Always
+// starts TOMORROW (today's remaining hours are never schedulable — there is
+// no such thing as declaring availability in the past) and always spans
+// exactly 7 days, so it rolls forward by one day every day, never showing a
+// date that has already passed. Purely presentational: never stored, never
+// changes what gets saved. `now`/`timeZone` are injectable for testing;
+// real callers pass real values (the caller's own browser clock/zone — this
+// is "what does my week look like from here," not tied to any one IANA zone).
+const WEEKDAY_TO_DAY_KEY = { 0: "sun", 1: "mon", 2: "tue", 3: "wed", 4: "thu", 5: "fri", 6: "sat" };
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** The next 7 calendar dates starting TOMORROW in `timeZone` — never today, never the past. */
+export function upcomingWeekDates(now = Date.now(), timeZone = browserTimeZone()) {
+  const today = utcToWallTime(now, timeZone);
+  const start = new Date(Date.UTC(today.year, today.month - 1, today.day + 1));
+  const out = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + i));
+    out.push({ year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate(), dayOfWeek: d.getUTCDay() });
+  }
+  return out;
+}
+
+/** DAY_KEYS ("mon".."sun") mapped to that weekday's actual date within the upcoming 7-day window. */
+export function upcomingWeekByDayKey(now = Date.now(), timeZone = browserTimeZone()) {
+  const out = {};
+  for (const d of upcomingWeekDates(now, timeZone)) out[WEEKDAY_TO_DAY_KEY[d.dayOfWeek]] = d;
+  return out;
+}
+
+export const formatShortDate = ({ day, month }) => `${day} ${MONTH_SHORT[month - 1]}`;
+export const formatFullDate = ({ day, month, year, dayOfWeek }) => `${WEEKDAY_SHORT[dayOfWeek]}, ${day} ${MONTH_SHORT[month - 1]} ${year}`;
+/** "Sun, 20 Sep 2026 – Sat, 26 Sep 2026" — the banner text for the whole window. */
+export const weekRangeLabel = (dates) => `${formatFullDate(dates[0])} – ${formatFullDate(dates[dates.length - 1])}`;
+
+/**
+ * The same "tomorrow through +7 days" window as epoch-ms bounds, for feeding
+ * src/lib/availability.js's `materializeSlots(record, fromMs, toMs)` — used
+ * by the stage-assignment picker to show a real person's actual upcoming
+ * free windows, not just the weekday pattern.
+ */
+export function upcomingWeekBoundsMs(now = Date.now(), timeZone = browserTimeZone()) {
+  const dates = upcomingWeekDates(now, timeZone);
+  const first = dates[0], last = dates[dates.length - 1];
+  const fromMs = wallTimeToUTC({ timeZone, year: first.year, month: first.month, day: first.day, hour: 0, minute: 0 });
+  const toMs = wallTimeToUTC({ timeZone, year: last.year, month: last.month, day: last.day, hour: 23, minute: 59 }) + 60_000;
+  return { fromMs, toMs };
+}
+
+export const emptyDay = () => ({ enabled: true, available: [] });
 export const emptyWeek = () => Object.fromEntries(DAY_KEYS.map((k) => [k, emptyDay()]));
 export const emptyAvailableRow = () => ({ start: "09:00", end: "17:00" });
-export const emptyBlockedRow = () => ({ start: "12:00", end: "13:00" });
 
 const toMinutes = (hhmm) => {
   const [h, m] = String(hhmm || "0:0").split(":").map(Number);
@@ -29,40 +87,31 @@ const rangesOverlap = (a, b) => toMinutes(a.start) < toMinutes(b.end) && toMinut
 export const isQuarterHour = (hhmm) => Number.isFinite(toMinutes(hhmm)) && toMinutes(hhmm) % 15 === 0;
 
 /**
- * Validate one day's rows.
+ * Validate one day's available-time rows.
  * @returns {{ errors: Array<{list,index,message}>, warnings: Array<{list,index,message}> }}
- * Errors block save (bad time, end<=start, overlap within the same list).
- * Warnings never block save — a blocked range with zero overlap against
- * every available range on that day (spec: "entirely outside").
+ * Errors block save (bad time, end<=start, overlap with another available range).
+ * `warnings` stays for shape-compatibility with callers (DayPanel) — always empty now
+ * that there's nothing left to warn about.
  */
 export function validateDay(day) {
   const errors = [];
-  const warnings = [];
-  for (const list of ["available", "blocked"]) {
-    const rows = day?.[list] || [];
-    rows.forEach((row, i) => {
-      if (!isQuarterHour(row.start) || !isQuarterHour(row.end)) {
-        errors.push({ list, index: i, message: "Times must be on a 15-minute increment." });
-        return;
-      }
-      if (toMinutes(row.end) <= toMinutes(row.start)) {
-        errors.push({ list, index: i, message: "End time must be after start time." });
-        return;
-      }
-      const overlapsSibling = rows.some((other, j) => j !== i && rangesOverlap(row, other));
-      if (overlapsSibling) {
-        errors.push({ list, index: i, message: `Overlaps another ${list} range on this day.` });
-      }
-    });
-  }
-  (day?.blocked || []).forEach((b, i) => {
-    if (errors.some((e) => e.list === "blocked" && e.index === i)) return; // already invalid — skip the warning
-    const overlapsAnyAvailable = (day?.available || []).some((a) => rangesOverlap(a, b));
-    if (!overlapsAnyAvailable) {
-      warnings.push({ list: "blocked", index: i, message: "This blocked time is outside your available hours" });
+  const list = "available";
+  const rows = day?.available || [];
+  rows.forEach((row, i) => {
+    if (!isQuarterHour(row.start) || !isQuarterHour(row.end)) {
+      errors.push({ list, index: i, message: "Times must be on a 15-minute increment." });
+      return;
+    }
+    if (toMinutes(row.end) <= toMinutes(row.start)) {
+      errors.push({ list, index: i, message: "End time must be after start time." });
+      return;
+    }
+    const overlapsSibling = rows.some((other, j) => j !== i && rangesOverlap(row, other));
+    if (overlapsSibling) {
+      errors.push({ list, index: i, message: "Overlaps another available range on this day." });
     }
   });
-  return { errors, warnings };
+  return { errors, warnings: [] };
 }
 
 export function validateWeek(days) {
@@ -89,7 +138,6 @@ export function normalizeWeek(raw) {
     out[key] = {
       enabled: d?.enabled !== false,
       available: Array.isArray(d?.available) ? d.available.filter(isRow) : [],
-      blocked: Array.isArray(d?.blocked) ? d.blocked.filter(isRow) : [],
     };
   }
   return out;
@@ -104,48 +152,24 @@ export function normalizeWeek(raw) {
 // those four readers keep working without being migrated. Pure functions
 // only — src/data/store.js is what actually writes it.
 
-const toHHMM = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-
-/**
- * `range` minus every overlapping interval in `blockedRanges` — standard
- * interval difference. Returns 0+ non-overlapping net intervals, sorted.
- */
-export function subtractBlockedFromRange(range, blockedRanges) {
-  let intervals = [{ start: toMinutes(range.start), end: toMinutes(range.end) }];
-  for (const b of blockedRanges || []) {
-    const bStart = toMinutes(b.start);
-    const bEnd = toMinutes(b.end);
-    const next = [];
-    for (const iv of intervals) {
-      if (bEnd <= iv.start || bStart >= iv.end) { next.push(iv); continue; } // no overlap
-      if (bStart <= iv.start && bEnd >= iv.end) continue; // fully covers — drop
-      if (bStart > iv.start && bEnd < iv.end) { // fully inside — splits into two
-        next.push({ start: iv.start, end: bStart }, { start: bEnd, end: iv.end });
-        continue;
-      }
-      if (bStart <= iv.start) { next.push({ start: bEnd, end: iv.end }); continue; } // overlaps the start
-      next.push({ start: iv.start, end: bStart }); // overlaps the end
-    }
-    intervals = next;
-  }
-  return intervals.filter((iv) => iv.end > iv.start).map((iv) => ({ start: toHHMM(iv.start), end: toHHMM(iv.end) }));
-}
-
 // The old model's dayOfWeek is numeric, Sunday-first (src/pages/Availability.jsx's
 // former DAYS array / src/lib/availability.js's materializeSlots) — distinct
 // from this file's own mon..sun DAY_KEYS, which is Part A's tab order.
 const LEGACY_DAY_OF_WEEK = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
-/** The weekly template's net free time, as the old model's flat `slots` array. */
+/**
+ * The weekly template's available time, as the old model's flat `slots`
+ * array. There is no "blocked" list to subtract — anything not listed as
+ * available never appears here, and the old model already treats absence
+ * from `slots` as unavailable.
+ */
 export function toLegacyAvailabilitySlots(days) {
   const slots = [];
   for (const key of DAY_KEYS) {
     const day = days?.[key];
     if (!day || day.enabled === false) continue; // contributes nothing
     for (const range of day.available || []) {
-      for (const net of subtractBlockedFromRange(range, day.blocked)) {
-        slots.push({ dayOfWeek: LEGACY_DAY_OF_WEEK[key], startTime: net.start, endTime: net.end });
-      }
+      slots.push({ dayOfWeek: LEGACY_DAY_OF_WEEK[key], startTime: range.start, endTime: range.end });
     }
   }
   return slots;

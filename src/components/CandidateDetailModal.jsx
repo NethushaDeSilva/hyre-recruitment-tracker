@@ -97,7 +97,6 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   // never reaches those; it's display (colour) and Applied-move only there.
   const commentRequired = isApplied ? !meetsShortlistThreshold(scoreDoc, position) : scoreRequired;
   const scoreOk = !scoreRequired || (score !== "" && Number(score) >= 0 && Number(score) <= 100);
-  const recommendationOk = !scoreRequired || !!recommendation;
   const canPost = canComment && !isTerminal && !myComment;
   const hasScoredReview = !!(myComment && myComment.score != null); // copy only — which banner text to show
 
@@ -110,6 +109,12 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const nextId = position ? nextStage(position.stages, c.stage) : null;
   const nextLabel = nextId ? resolveStage(position, nextId)?.label : null;
   const offerRequired = nextId === "hired" && c.offer?.status !== "accepted"; // ties the loop closed
+  // Recommendation (Advance/Hold/Reject) and the Offer box are both scoped to
+  // the one transition that actually needs them: the final stage moving into
+  // Hired. Every earlier stage-to-stage move (HR screening → department
+  // review → initial interview → final interview) only ever needs a comment
+  // + score — no recommendation buttons, no offer box.
+  const recommendationOk = nextId !== "hired" || !!recommendation;
   // The SAME evaluateReviewGate() call advanceStage() makes server-side —
   // not a hand-rolled re-check — so this can never drift from what the
   // actual move will do. Re-evaluated on every render, so a threshold change
@@ -143,7 +148,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
     await addComment(c.id, {
       text: draft,
       score: scoreRequired ? Number(score) : null,
-      recommendation: scoreRequired ? recommendation : null,
+      recommendation: nextId === "hired" ? recommendation : null,
       actor,
     });
     setDraft("");
@@ -361,7 +366,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                   <span className="text-xs text-muted-foreground">out of 100 (required to move on)</span>
                 </div>
               )}
-              {scoreRequired && (
+              {nextId === "hired" && (
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="text-[13px] font-semibold text-foreground">Recommendation</label>
                   <div className="flex gap-1.5">
@@ -395,8 +400,11 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           )}
         </div>
 
-        {/* offer — required before this candidate can be hired */}
-        {!isTerminal && (canManage || c.offer) && (
+        {/* offer — required before this candidate can be hired. The "make an
+            offer" form only shows on the one transition that leads into Hired
+            (final interview → hired); an already-sent offer's status stays
+            visible regardless, same as before. */}
+        {!isTerminal && (c.offer || (canManage && nextId === "hired")) && (
           <div className="rounded-lg border border-border bg-background p-4">
             <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
               <Briefcase size={13} /> Offer

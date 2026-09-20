@@ -17,6 +17,7 @@ const DURATIONS = [
   { value: 2700000, label: "45 minutes" },
   { value: 3600000, label: "1 hour" },
   { value: 5400000, label: "1.5 hours" },
+  { value: 7200000, label: "2 hours" },
 ];
 const pad = (n) => String(n).padStart(2, "0");
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -27,10 +28,11 @@ export default function ProposeInterviewModal({ open, candidate, position, stage
   const [time, setTime] = useState("");
   const [durationMs, setDurationMs] = useState(3600000);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [result, setResult] = useState(null);
 
   const close = () => {
-    setDate(""); setTime(""); setDurationMs(3600000); setResult(null);
+    setError(""); setDate(""); setTime(""); setDurationMs(3600000); setResult(null);
     onClose();
   };
 
@@ -38,13 +40,16 @@ export default function ProposeInterviewModal({ open, candidate, position, stage
   const submit = async () => {
     if (!canSubmit || !candidate) return;
     setBusy(true);
-    const scheduledAt = new Date(`${date}T${time}`).getTime();
-    const res = await createInterviewRequest({
-      applicationId: candidate.id, positionId: position.id, stageId,
-      candidateName: displayName(candidate), scheduledAt, durationMs, actor: user,
-    });
-    setBusy(false);
-    setResult(res);
+    setError("");
+    try {
+      const scheduledAt = new Date(`${date}T${time}`).getTime();
+      const res = await createInterviewRequest({
+        applicationId: candidate.id, positionId: position.id, stageId,
+        candidateName: displayName(candidate), scheduledAt, durationMs, actor: user,
+      });
+      setResult(res);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
   };
 
   if (!open || !candidate) return null;
@@ -67,10 +72,11 @@ export default function ProposeInterviewModal({ open, candidate, position, stage
         )
       }
     >
+      {error && <p role="alert" className="mb-3 text-sm text-[#DC2626]">{error}</p>}
       {!result ? (
         <div className="space-y-4">
           <p className="text-[13px] text-muted-foreground">
-            Propose a slot. Hyre ranks eligible DevOps interviewers by declared availability at this time and current booking load, then requests the top pick.
+            Propose a slot. Hyre ranks eligible interviewers by declared availability at this time and current booking load, then requests the top pick.
           </p>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Date" required>

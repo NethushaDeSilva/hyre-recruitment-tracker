@@ -51,7 +51,7 @@ beforeEach(() => {
 it("writes weeklyAvailability and the derived availability doc in exactly ONE batch", async () => {
   const days = {
     ...emptyWeek(),
-    mon: { enabled: true, available: [{ start: "09:00", end: "17:00" }], blocked: [{ start: "12:00", end: "13:00" }] },
+    mon: { enabled: true, available: [{ start: "09:00", end: "17:00" }] },
   };
   await saveWeeklyAvailability("priya-uid", days);
 
@@ -68,8 +68,7 @@ it("writes weeklyAvailability and the derived availability doc in exactly ONE ba
   expect(legacy.data.declaredAt).toBe("SERVER_TIMESTAMP");
   expect(legacy.data.validUntil).toBeInstanceOf(Date);
   expect(legacy.data.slots).toEqual([
-    { dayOfWeek: 1, startTime: "09:00", endTime: "12:00" },
-    { dayOfWeek: 1, startTime: "13:00", endTime: "17:00" },
+    { dayOfWeek: 1, startTime: "09:00", endTime: "17:00" },
   ]);
   expect(legacy.data.exceptions).toEqual(state.existingExceptions); // preserved, not invented
 });

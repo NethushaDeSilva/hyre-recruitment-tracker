@@ -1,10 +1,11 @@
+import { bookingConflict, bookingDescription } from "@/lib/interviewSchedule";
 // WS8 Part C — HR's view of where a scheduled interview stands, and the
 // standalone override (§15): works whether or not the ranking ever produced
 // anyone, so it's the real fallback when it's exhausted, not a feature that
 // depends on automation having run first.
 import { useEffect, useState } from "react";
 import { AlertTriangle, Clock, CheckCircle2, Send, CalendarPlus } from "lucide-react";
-import { getInterviewsForApplication, overrideInterviewRequest, listInterviewers } from "@/data/store";
+import { getInterviewsForApplication, overrideInterviewRequest, listInterviewers, subscribeInterviewBookings } from "@/data/store";
 import { stageOwnerRole, resolveStage, isSchedulableStage } from "@/lib/stages";
 import { ROLES } from "@/lib/permissions";
 import { timeAgo } from "@/lib/format";
@@ -96,12 +97,17 @@ function InterviewRecord({ record, position, actor, onChanged }) {
   );
 }
 
-const nameOf = (record) => record.rankedCandidates?.find((r) => r.uid === record.interviewerId)?.name || "someone";
+const nameOf = (record) => record.interviewerName || record.rankedCandidates?.find((r) => r.uid === record.interviewerId)?.name || "someone";
 
 function NeedsAttention({ record, position, stage, when, actor, onChanged }) {
   const [pool, setPool] = useState([]);
   const [pickUid, setPickUid] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [bookings, setBookings] = useState([]);
+  const [bookingsReady, setBookingsReady] = useState(false);
+  useEffect(() => subscribeInterviewBookings((list) => { setBookings(list); setBookingsReady(true); }, (e) => { setError(e.message); setBookingsReady(false); }), []);
+  const conflictFor = (uid) => bookingConflict(bookings, { ...record, interviewerId: uid });
 
   useEffect(() => {
     const ownerRole = stageOwnerRole(position, record.stageId);
@@ -113,14 +119,17 @@ function NeedsAttention({ record, position, stage, when, actor, onChanged }) {
   const assign = async () => {
     if (!pickUid) return;
     setBusy(true);
-    await overrideInterviewRequest({
-      interviewId: record.id, applicationId: record.applicationId, positionId: record.positionId, stageId: record.stageId,
-      candidateName: record.candidateName, interviewerId: pickUid, scheduledAt: record.scheduledAt, durationMs: record.durationMs,
-      actor,
-    });
-    setBusy(false);
-    setPickUid("");
-    onChanged();
+    setError("");
+    try {
+      await overrideInterviewRequest({
+        interviewId: record.id, applicationId: record.applicationId, positionId: record.positionId, stageId: record.stageId,
+        candidateName: record.candidateName, interviewerId: pickUid, scheduledAt: record.scheduledAt, durationMs: record.durationMs,
+        actor,
+      });
+      setPickUid("");
+      onChanged();
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
   };
 
   return (
@@ -129,13 +138,14 @@ function NeedsAttention({ record, position, stage, when, actor, onChanged }) {
         <AlertTriangle size={16} className="mt-0.5 shrink-0" />
         <span><b>{stage.label} needs attention</b> — {record.poolReason || "no eligible interviewer was found."}</span>
       </div>
+      {error && <p role="alert" className="text-[#DC2626]">{error}</p>}
       <div className="text-muted-foreground">Proposed for {when}. Assign someone directly:</div>
       <div className="flex flex-wrap items-center gap-2">
         <Select value={pickUid} onChange={(e) => setPickUid(e.target.value)} className="!w-auto min-w-[180px] flex-1">
           <option value="">Choose an interviewer…</option>
-          {pool.map((p) => <option key={p.uid} value={p.uid}>{p.name}</option>)}
+          {pool.map((p) => { const conflict = conflictFor(p.uid); return <option key={p.uid} value={p.uid} disabled={!!conflict}>{p.name}{conflict ? ` - ${bookingDescription(conflict)}` : ""}</option>; })}
         </Select>
-        <Button onClick={assign} disabled={!pickUid || busy} className="shrink-0 !px-3 !py-1.5 text-xs">
+        <Button onClick={assign} disabled={!pickUid || busy || !bookingsReady || !!conflictFor(pickUid)} className="shrink-0 !px-3 !py-1.5 text-xs">
           <Send size={13} /> {busy ? "Sending…" : "Request"}
         </Button>
       </div>

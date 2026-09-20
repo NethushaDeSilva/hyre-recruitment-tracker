@@ -1,7 +1,10 @@
 // A staff member's own recurring weekly availability TEMPLATE — 7 day tabs
-// (Mon→Sun), each with an "Available times" and a "Restricted / blocked
-// times" section. Saturday and Sunday alone can be removed from the week
-// entirely ("Remove this day") — a weekday expresses "not working" the
+// (Sun→Sat — the calendar week starts on Sunday), each with a single
+// "Available times" section. Anything not
+// listed as available is already treated as busy (src/lib/availability.js
+// only ever reads declared slots as free) — there is no separate blocked-
+// times list to maintain. Saturday and Sunday alone can be removed from the
+// week entirely ("Remove this day") — a weekday expresses "not working" the
 // ordinary way, zero available rows.
 //
 // This is a DIFFERENT feature from WS8 Part C's declared-slots-with-14-day-
@@ -10,17 +13,26 @@
 // note beside getWeeklyAvailability()/saveWeeklyAvailability() in
 // src/data/store.js for why this couldn't reuse that shape.
 import { useEffect, useMemo, useState } from "react";
+import { CalendarDays } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getWeeklyAvailability, saveWeeklyAvailability } from "@/data/store";
 import {
   DAY_KEYS, DAY_LABELS, WEEKEND_KEYS,
-  emptyWeek, emptyDay, emptyAvailableRow, emptyBlockedRow,
+  emptyWeek, emptyDay, emptyAvailableRow,
   validateWeek, weekHasErrors, daySummaryChip,
+  upcomingWeekDates, upcomingWeekByDayKey, formatShortDate, weekRangeLabel,
 } from "@/lib/weeklyAvailability";
 import { Button } from "@/components/ui/Button";
 import DayPanel from "@/components/availability/DayPanel";
+
+/** Ms until 5s after the next local midnight — when the "tomorrow onward" window has to roll forward. */
+function msUntilNextLocalMidnight() {
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  return next.getTime() - now.getTime();
+}
 
 export default function Availability() {
   const { user } = useAuth();
@@ -28,9 +40,20 @@ export default function Availability() {
   const toast = useToast();
   const [saved, setSaved] = useState(emptyWeek());
   const [days, setDays] = useState(emptyWeek());
-  const [activeDay, setActiveDay] = useState("mon");
+  const [activeDay, setActiveDay] = useState("sun"); // Sunday is the first tab — the week starts there
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  // Real-time window: the next 7 days, starting tomorrow — never today, never
+  // the past. Rolls forward automatically at local midnight so a tab left
+  // open overnight never shows a date that's already gone by.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setTimeout(() => setNow(Date.now()), msUntilNextLocalMidnight());
+    return () => clearTimeout(t);
+  }, [now]);
+  const weekDates = useMemo(() => upcomingWeekDates(now), [now]);
+  const datesByDayKey = useMemo(() => upcomingWeekByDayKey(now), [now]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -48,10 +71,10 @@ export default function Availability() {
   const hasErrors = weekHasErrors(validation);
 
   const patchDay = (key, patch) => setDays((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
-  const addRow = (list) => patchDay(activeDay, { [list]: [...days[activeDay][list], list === "available" ? emptyAvailableRow() : emptyBlockedRow()] });
-  const changeRow = (list, index, patch) =>
-    patchDay(activeDay, { [list]: days[activeDay][list].map((r, i) => (i === index ? { ...r, ...patch } : r)) });
-  const removeRow = (list, index) => patchDay(activeDay, { [list]: days[activeDay][list].filter((_, i) => i !== index) });
+  const addRow = () => patchDay(activeDay, { available: [...days[activeDay].available, emptyAvailableRow()] });
+  const changeRow = (_list, index, patch) =>
+    patchDay(activeDay, { available: days[activeDay].available.map((r, i) => (i === index ? { ...r, ...patch } : r)) });
+  const removeRow = (_list, index) => patchDay(activeDay, { available: days[activeDay].available.filter((_, i) => i !== index) });
 
   const removeDay = async () => {
     const label = DAY_LABELS[activeDay];
@@ -62,7 +85,7 @@ export default function Availability() {
       tone: "danger",
     });
     if (!ok) return;
-    patchDay(activeDay, { enabled: false, available: [], blocked: [] });
+    patchDay(activeDay, { enabled: false, available: [] });
   };
   const restoreDay = () => patchDay(activeDay, emptyDay());
 
@@ -90,8 +113,13 @@ export default function Availability() {
       <p className="mt-1.5 text-sm text-muted-foreground">
         Your own recurring week. This is what HR sees when scheduling interviews.
       </p>
+      <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground">
+        <CalendarDays size={14} className="text-primary" />
+        {weekRangeLabel(weekDates)}
+      </p>
 
-      {/* tab strip — Monday..Sunday, fixed order, one panel visible at a time */}
+      {/* tab strip — Sunday..Saturday, fixed order, one panel visible at a time.
+          The date under each name is that weekday's real upcoming date. */}
       <div className="mt-6 flex flex-wrap gap-1.5 border-b border-border">
         {DAY_KEYS.map((key) => {
           const active = key === activeDay;
@@ -106,7 +134,7 @@ export default function Availability() {
             >
               {DAY_LABELS[key]}
               <span className={`text-[10px] font-medium ${active ? "text-primary/70" : "text-muted-foreground/70"}`}>
-                {daySummaryChip(days[key])}
+                {formatShortDate(datesByDayKey[key])} · {daySummaryChip(days[key])}
               </span>
             </button>
           );

@@ -21,20 +21,20 @@ it('renders "Remove this day" on Saturday and Sunday, and NEVER on a weekday —
   }
 });
 
-it("shows the empty-state copy for both sections and calls onRemoveDay on click (weekend only)", () => {
+it("shows the empty-state copy and calls onRemoveDay on click (weekend only)", () => {
   const onRemoveDay = vi.fn();
   const tree = create(<DayPanel dayKey="sat" day={emptyDay()} validation={noValidation} onAddRow={vi.fn()} onChangeRow={vi.fn()} onRemoveRow={vi.fn()} onRemoveDay={onRemoveDay} onRestoreDay={vi.fn()} />);
   const rendered = JSON.stringify(tree.toJSON());
   expect(rendered).toContain("No available times set for this day.");
-  expect(rendered).toContain("No blocked times.");
+  expect(rendered).not.toContain("blocked");
   buttons(tree).find((b) => text(b) === "Remove this day").props.onClick();
   expect(onRemoveDay).toHaveBeenCalled();
   tree.unmount();
 });
 
-it("a removed day (enabled:false) shows the muted message + Restore button instead of the two sections", () => {
+it("a removed day (enabled:false) shows the muted message + Restore button instead of the available-times section", () => {
   const onRestoreDay = vi.fn();
-  const tree = create(<DayPanel dayKey="sun" day={{ enabled: false, available: [], blocked: [] }} validation={noValidation} onAddRow={vi.fn()} onChangeRow={vi.fn()} onRemoveRow={vi.fn()} onRemoveDay={vi.fn()} onRestoreDay={onRestoreDay} />);
+  const tree = create(<DayPanel dayKey="sun" day={{ enabled: false, available: [] }} validation={noValidation} onAddRow={vi.fn()} onChangeRow={vi.fn()} onRemoveRow={vi.fn()} onRemoveDay={vi.fn()} onRestoreDay={onRestoreDay} />);
   expect(text(tree.root.findByType("p"))).toBe("You are not working on Sundays.");
   expect(JSON.stringify(tree.toJSON())).not.toContain("Available times");
   const restore = buttons(tree).find((b) => text(b).includes("Restore Sunday"));
@@ -44,10 +44,10 @@ it("a removed day (enabled:false) shows the muted message + Restore button inste
   tree.unmount();
 });
 
-it("surfaces a row error and a row warning at the right index", () => {
-  const day = { enabled: true, available: [{ start: "09:00", end: "12:00" }], blocked: [{ start: "14:00", end: "15:00" }] };
-  const validation = { errors: [], warnings: [{ list: "blocked", index: 0, message: "This blocked time is outside your available hours" }] };
+it("surfaces a row error at the right index", () => {
+  const day = { enabled: true, available: [{ start: "09:00", end: "12:00" }] };
+  const validation = { errors: [{ list: "available", index: 0, message: "Overlaps another available range on this day." }], warnings: [] };
   const tree = create(<DayPanel dayKey="mon" day={day} validation={validation} onAddRow={vi.fn()} onChangeRow={vi.fn()} onRemoveRow={vi.fn()} onRemoveDay={vi.fn()} onRestoreDay={vi.fn()} />);
-  expect(JSON.stringify(tree.toJSON())).toContain("This blocked time is outside your available hours");
+  expect(JSON.stringify(tree.toJSON())).toContain("Overlaps another available range on this day.");
   tree.unmount();
 });

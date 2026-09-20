@@ -20,16 +20,27 @@ const button = (tree, label) => buttons(tree).find((b) => text(b).trim() === lab
 
 beforeEach(() => { mocks.save.mockReset().mockResolvedValue(); mocks.week = emptyWeek(); mocks.confirmResult = true; });
 
-it("lands on Monday, has all 7 tabs in order, and Save starts disabled", async () => {
+it("shows a real-date range banner and a per-tab date, never today or the past", async () => {
   let tree;
   await act(async () => { tree = create(<Availability />); });
-  const labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const rendered = JSON.stringify(tree.toJSON());
+  expect(rendered).toMatch(/\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}/); // the banner range
+  expect(text(tab(tree, "Monday"))).toMatch(/\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/);
+  tree.unmount();
+});
+
+it("lands on Sunday (the first day of the week), tabs are in Sun→Sat order, and Save starts disabled", async () => {
+  let tree;
+  await act(async () => { tree = create(<Availability />); });
+  const labels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   expect(labels.every((l) => tab(tree, l))).toBe(true);
+  const order = buttons(tree).filter((b) => labels.includes(text(b).split(/\d/)[0].trim())).map((b) => text(b).split(/\d/)[0].trim());
+  expect(order).toEqual(labels); // Sunday first, Saturday last — not Monday first
   expect(button(tree, "Save availability").props.disabled).toBe(true);
   tree.unmount();
 });
 
-it("adding a row on Monday dirties the form and enables Save; saving writes the WHOLE week once", async () => {
+it("adding a row on Sunday dirties the form and enables Save; saving writes the WHOLE week once", async () => {
   let tree;
   await act(async () => { tree = create(<Availability />); });
   await act(async () => { button(tree, "Add available time").props.onClick(); });
@@ -38,7 +49,7 @@ it("adding a row on Monday dirties the form and enables Save; saving writes the 
   expect(mocks.save).toHaveBeenCalledTimes(1);
   const [uid, days] = mocks.save.mock.calls[0];
   expect(uid).toBe("priya-uid");
-  expect(days.mon.available).toHaveLength(1);
+  expect(days.sun.available).toHaveLength(1);
   expect(button(tree, "Save availability").props.disabled).toBe(true); // dirty clears after a successful save
   tree.unmount();
 });
@@ -70,7 +81,7 @@ it("removing Saturday (after confirm) flips its tab chip to Not working and clea
   await act(async () => { tab(tree, "Saturday").props.onClick(); });
   await act(async () => { button(tree, "Add available time").props.onClick(); });
   await act(async () => { button(tree, "Remove this day").props.onClick(); });
-  expect(text(tab(tree, "Saturday"))).toBe("SaturdayNot working");
+  expect(text(tab(tree, "Saturday"))).toContain("Not working"); // date prefix varies with real today's date
   const paragraphs = tree.root.findAllByType("p").map(text);
   expect(paragraphs).toContain("You are not working on Saturdays.");
   tree.unmount();

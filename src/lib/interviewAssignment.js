@@ -1,3 +1,4 @@
+import { bookingConflict, bookingDescription } from "./interviewSchedule.js";
 // WS8 Part C — deterministic interviewer ranking. No LLM, no randomness, no
 // hidden state: every output is reproducible from the inputs alone, and every
 // person's placement (or exclusion) carries a plain-language reason that gets
@@ -21,8 +22,10 @@ import { availabilityState, slotIsDeclaredFree } from "@/lib/availability";
  *   poolReason: string|null,
  * }}
  */
-export function rankEligibleInterviewers({ interviewers, targetMs, availabilityRecords, bookingCounts }) {
+export function rankEligibleInterviewers({ interviewers, targetMs, availabilityRecords, bookingCounts, bookings = [], durationMs = 3600000 }) {
   const evaluated = (interviewers || []).map((p) => {
+    const conflict = bookingConflict(bookings, { interviewerId: p.uid, scheduledAt: targetMs, durationMs });
+    if (conflict) return { uid: p.uid, name: p.name, eligible: false, reason: bookingDescription(conflict) };
     const record = availabilityRecords?.[p.uid] || null;
     const state = availabilityState(record);
     // §8.2's core rule, applied here rather than just at display time: unknown

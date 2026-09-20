@@ -107,7 +107,7 @@ it("the per-person availability dropdown shows real free windows and locks a slo
   // checkbox tick), and every OTHER window's Set Interview button disables —
   // only one active pick per person per stage until it's unselected.
   await act(async () => { tree.update(<StageAssignmentStep {...props} pendingSlots={{ amara: window }} />); });
-  expect(text(tree.toJSON())).toContain("Unselect");
+  expect(text(tree.toJSON())).toContain("Interview set · Unselect");
   const otherSetButtons = tree.root.findAllByType("button").filter((b) => text(b) === "Set Interview");
   expect(otherSetButtons.length).toBeGreaterThan(0);
   expect(otherSetButtons.every((b) => b.props.disabled)).toBe(true);
@@ -117,6 +117,29 @@ it("the per-person availability dropdown shows real free windows and locks a slo
   await act(async () => { tree.update(<StageAssignmentStep {...props} pendingSlots={{ amara: window }} bookings={bookings} />); });
   expect(text(tree.toJSON())).toContain("Interview set · Saved");
   expect(text(tree.toJSON())).not.toContain("Unselect");
+  tree.unmount();
+});
+
+it("Save now is Word-doc-style: disabled with nothing to save, enabled the moment something changes, disabled again once saved", async () => {
+  let tree;
+  await act(async () => { tree = create(<StageConfigModal open position={position} onClose={vi.fn()} />); });
+  await act(async () => { button(tree, "Assign people").props.onClick(); });
+  // Nothing changed yet — disabled.
+  expect(button(tree, "Save now").props.disabled).toBe(true);
+
+  const picker = () => tree.root.findByType(StageAssignmentStep);
+  const person = picker().props.staff[0];
+  await act(async () => { picker().props.onToggle(person); });
+  // A change was made — enabled.
+  expect(button(tree, "Save now").props.disabled).toBe(false);
+
+  await act(async () => { await button(tree, "Save now").props.onClick(); });
+  // Saved — nothing left to save, disabled again.
+  expect(button(tree, "Save now").props.disabled).toBe(true);
+
+  await act(async () => { picker().props.onToggle(person); });
+  // Deselecting is itself a new unsaved change — enabled again.
+  expect(button(tree, "Save now").props.disabled).toBe(false);
   tree.unmount();
 });
 

@@ -65,6 +65,7 @@ export default function StageConfigModal({ open, position, onClose }) {
   );
   const [step, setStep] = useState(0); // 0 = pipeline; 1..N = assign rows[step-1]
   const [rows, setRows] = useState([]);
+  const [savedRows, setSavedRows] = useState([]);
   const [assign, setAssign] = useState({}); // stageId -> [{uid,name,role,title}]
   const [savedAssign, setSavedAssign] = useState({});
   const [personSlots, setPersonSlots] = useState({}); // stageId -> { uid -> {scheduledAt, durationMs} }
@@ -91,7 +92,9 @@ export default function StageConfigModal({ open, position, onClose }) {
   useEffect(() => {
     if (!open) return;
     setStep(0);
-    setRows(toRows(position));
+    const initialRows = toRows(position);
+    setRows(initialRows);
+    setSavedRows(initialRows);
     // normalise assignees to arrays (older data stored a single object)
     const src = position?.stageAssignees || {};
     const norm = {};
@@ -254,11 +257,31 @@ export default function StageConfigModal({ open, position, onClose }) {
       }));
 
       await savePipeline(position.id, { stages, stageMeta, stageAssignees, stageSlots, actor: user });
+      setSavedRows(rows);
       setSavedAssign(stageAssignees);
+      // personSlots is NOT cleared here — a saved pick still needs to stay the
+      // "active" one for its row (AvailabilityDropdown then reads `bookings`,
+      // refreshed by the live subscription, to show it as persisted/locked).
       setSaveStatus(stageSlots.length ? "Assignments and interview slots saved." : "Assignments saved.");
     } catch (error) { setSaveError(error.message || "Couldn't save assignments. Please try again."); }
     finally { setBusy(false); }
   };
+
+  // A pending pick counts as "unsaved" only if it isn't ALREADY a real,
+  // persisted booking — same check save() itself uses to decide what to
+  // write. Otherwise the button would stay permanently enabled for anything
+  // ever picked, even after it's long been committed.
+  const hasUnsavedSlot = Object.entries(personSlots).some(([stageId, byUid]) =>
+    Object.entries(byUid).some(([uid, window]) => !bookings.some((b) =>
+      b.positionId === position?.id && b.stageId === stageId && b.interviewerId === uid
+      && b.scheduledAt === window.scheduledAt && BOOKED_STATUSES.includes(b.status))));
+
+  // Word-doc-style Save: disabled once everything is saved, re-enabled the
+  // moment ANY further change is made (stage structure, team, or a newly
+  // picked interview slot not yet committed).
+  const dirty = JSON.stringify(rows) !== JSON.stringify(savedRows)
+    || JSON.stringify(assign) !== JSON.stringify(savedAssign)
+    || hasUnsavedSlot;
 
   const assignable = canAssign ? rows : [];
   const lastStep = assignable.length; // step index of the final assignment screen (0 if none)
@@ -278,6 +301,7 @@ export default function StageConfigModal({ open, position, onClose }) {
         <div className="flex w-full items-center justify-between gap-2">
           <div>{step > 0 && <Button variant="ghost" onClick={() => goTo(step - 1)}><ArrowLeft size={15} /> Back</Button>}</div>
           <div className="flex items-center gap-2">
+            {canAssign && <Button variant="ghost" onClick={save} disabled={!dirty || busy}>{busy ? "Saving…" : "Save now"}</Button>}
             {step < lastStep && <Button onClick={() => goTo(step + 1)}>{step === 0 ? "Assign people" : "Proceed"} <ChevronRight size={15} /></Button>}
           </div>
         </div>
@@ -307,7 +331,7 @@ export default function StageConfigModal({ open, position, onClose }) {
           rows={rows} assign={assign} move={move} rename={rename} remove={remove}
           adding={adding} setAdding={setAdding} newLabel={newLabel} setNewLabel={setNewLabel}
           addCustom={addCustom} addBuiltin={addBuiltin} availableBuiltin={availableBuiltin} canAssign={canAssign}
-          locked={started} onSave={save} busy={busy}
+          locked={started}
         />
       ) : (
         <AssignStep
@@ -325,7 +349,6 @@ export default function StageConfigModal({ open, position, onClose }) {
           onToggle={(p) => { toggle(current.id, p); setSaveStatus(""); }}
           onSetMany={(people) => { setMany(current.id, people); setSaveStatus(""); }}
           stepInfo={`Step ${step} of ${lastStep}`}
-          onSave={save} busy={busy}
         />
       )}
       </fieldset>
@@ -334,27 +357,20 @@ export default function StageConfigModal({ open, position, onClose }) {
 }
 
 // ---------------------------------------------------------------- step 0
-function PipelineStep({ rows, assign, move, rename, remove, adding, setAdding, newLabel, setNewLabel, addCustom, addBuiltin, availableBuiltin, canAssign, locked, onSave, busy }) {
+function PipelineStep({ rows, assign, move, rename, remove, adding, setAdding, newLabel, setNewLabel, addCustom, addBuiltin, availableBuiltin, canAssign, locked }) {
   return (
     <div className="space-y-2.5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        {locked ? (
-          <div className="flex items-start gap-2 rounded-lg border border-[#F0C4C4] bg-[#FBE9E9] px-3 py-2.5 text-[12px] font-medium text-[#B91C1C]">
-            <Lock size={14} className="mt-0.5 shrink-0" />
-            <span>Recruitment has started — candidates have moved past Applied, so the stages are locked and can’t be added, removed, renamed or reordered. {canAssign ? "You can still change who’s assigned to each stage." : ""}</span>
-          </div>
-        ) : (
-          <p className="text-[13px] text-muted-foreground">
-            Every vacancy starts at <b className="text-foreground">Applied</b> and ends at <b className="text-foreground">Hired</b>. Rename,
-            reorder, remove or add the stages in between{canAssign ? ", then continue to assign a team to each one." : "."}
-          </p>
-        )}
-        {canAssign && (
-          <button type="button" onClick={onSave} disabled={busy} className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-            {busy ? "Saving…" : "Save now"}
-          </button>
-        )}
-      </div>
+      {locked ? (
+        <div className="flex items-start gap-2 rounded-lg border border-[#F0C4C4] bg-[#FBE9E9] px-3 py-2.5 text-[12px] font-medium text-[#B91C1C]">
+          <Lock size={14} className="mt-0.5 shrink-0" />
+          <span>Recruitment has started — candidates have moved past Applied, so the stages are locked and can’t be added, removed, renamed or reordered. {canAssign ? "You can still change who’s assigned to each stage." : ""}</span>
+        </div>
+      ) : (
+        <p className="text-[13px] text-muted-foreground">
+          Every vacancy starts at <b className="text-foreground">Applied</b> and ends at <b className="text-foreground">Hired</b>. Rename,
+          reorder, remove or add the stages in between{canAssign ? ", then continue to assign a team to each one." : "."}
+        </p>
+      )}
       <LockedRow label="Applied" />
       {rows.map((r, i) => {
         const n = (assign[r.id] || []).length;

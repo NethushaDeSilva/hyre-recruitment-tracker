@@ -16,7 +16,7 @@ const colorFor = (name = "") => {
 const fmtDate = (ms, tz) => new Date(ms).toLocaleDateString("en-GB", { timeZone: tz, weekday: "short", day: "numeric", month: "short" });
 const fmtTime = (ms, tz) => new Date(ms).toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" });
 
-export default function StageAssignmentStep({ stage, staff, selected, savedSelected, assignments, positions, positionId, bookings, bookingsLoading, bookingError, availabilityByUid, pendingSlots, onSetPersonSlot, onClearPersonSlot, q, setQ, loading, error, onToggle, onSetMany, stepInfo, onSave, busy }) {
+export default function StageAssignmentStep({ stage, staff, selected, savedSelected, assignments, positions, positionId, bookings, bookingsLoading, bookingError, availabilityByUid, pendingSlots, onSetPersonSlot, onClearPersonSlot, q, setQ, loading, error, onToggle, onSetMany, stepInfo }) {
   const listRef = useRef(null);
   const selectionKey = selected.map((p) => p.uid).sort().join(",");
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = 0; }, [selectionKey, stage.id]);
@@ -43,12 +43,7 @@ export default function StageAssignmentStep({ stage, staff, selected, savedSelec
         </div>
         <p className="mt-1 text-[12px] text-muted-foreground">{stepInfo} · Select the {roleLabel} staff who will run this stage. Expand a name to book them against their own declared availability.</p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[12px] font-bold text-primary">{selected.length} selected</span>
-        <button type="button" onClick={onSave} disabled={busy} className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
-          {busy ? "Saving…" : "Save now"}
-        </button>
-      </div>
+      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[12px] font-bold text-primary">{selected.length} selected</span>
     </div>
 
     {bookingError && <p role="alert" className="text-xs text-[#DC2626]">{bookingError}</p>}
@@ -87,7 +82,6 @@ export default function StageAssignmentStep({ stage, staff, selected, savedSelec
             pendingSlot={pendingSlots?.[p.uid] || null}
             onSet={(window) => onSetPersonSlot(p, window)}
             onClear={() => onClearPersonSlot(p.uid)}
-            onSave={onSave} busy={busy}
           />
         </li>;
       })}
@@ -104,7 +98,7 @@ export default function StageAssignmentStep({ stage, staff, selected, savedSelec
 // gets a "Set Interview" button; once set, that specific window locks so
 // nothing can be pressed again. No checkboxes here — a slot is either open,
 // booked, or busy, never a multi-select.
-function AvailabilityDropdown({ person, positionId, stage, bookings, record, pendingSlot, onSet, onClear, onSave, busy }) {
+function AvailabilityDropdown({ person, positionId, stage, bookings, record, pendingSlot, onSet, onClear }) {
   const [open, setOpen] = useState(false);
   const tz = record?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { fromMs, toMs } = upcomingWeekBoundsMs();
@@ -136,16 +130,9 @@ function AvailabilityDropdown({ person, positionId, stage, bookings, record, pen
                 }`}>
                   <span className={isThisSlot ? "font-semibold text-[#166534]" : conflict ? "text-[#B91C1C]" : "text-[#166534]"}>{label}</span>
                   {isThisSlot ? (
-                    persisted ? (
-                      <span className="text-[11px] font-semibold text-[#166534]">Interview set · Saved</span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <button type="button" onClick={onClear} className="text-[11px] font-semibold text-[#166534] underline decoration-dotted hover:text-[#14532D]">Unselect</button>
-                        <button type="button" onClick={onSave} disabled={busy} className="rounded-md bg-[#16A34A] px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#15803D] disabled:opacity-50">
-                          {busy ? "Saving…" : "Save now"}
-                        </button>
-                      </span>
-                    )
+                    persisted
+                      ? <span className="text-[11px] font-semibold text-[#166534]">Interview set · Saved</span>
+                      : <button type="button" onClick={onClear} className="text-[11px] font-semibold text-[#166534] underline decoration-dotted hover:text-[#14532D]">Interview set · Unselect</button>
                   ) : conflict ? (
                     <span className="text-[11px] text-[#B91C1C]">{bookingDescription(conflict)}</span>
                   ) : (

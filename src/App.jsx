@@ -21,6 +21,7 @@ import WorkerHealthBanner from "@/components/WorkerHealthBanner";
 const Home = lazy(() => import("@/pages/Home"));
 const Landing = lazy(() => import("@/pages/Landing"));
 const Login = lazy(() => import("@/pages/Login"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const Positions = lazy(() => import("@/pages/Positions"));
 const PositionDetail = lazy(() => import("@/pages/PositionDetail"));
 const CandidatesTable = lazy(() => import("@/pages/CandidatesTable"));
@@ -68,6 +69,7 @@ export default function App() {
             <Route path="/app" element={<Home />} />
 
             {/* staff — the internal tracker */}
+            <Route path="/dashboard" element={<RequireRole roles={STAFF}><Dashboard /></RequireRole>} />
             <Route path="/positions" element={<RequireRole roles={STAFF}><Positions /></RequireRole>} />
             <Route path="/positions/:id" element={<RequireRole roles={STAFF}><PositionDetail /></RequireRole>} />
             <Route path="/candidates" element={<RequireRole roles={RECRUITERS}><CandidatesTable /></RequireRole>} />

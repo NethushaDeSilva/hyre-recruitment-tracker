@@ -24,7 +24,7 @@ export const ROLE_LABELS = {
 //  - Candidate: apply to open roles and manage their own application only.
 const MATRIX = {
   // internal / staff tracking
-  accessDashboard: [ROLES.MANAGEMENT], // dashboard is management-only (Sprint 2)
+  accessDashboard: [ROLES.HR, ROLES.INTERVIEWER, ROLES.MANAGEMENT], // role-tabbed landing dashboard — any staff member
   managePositions: [ROLES.HR], // open + configure positions — HR only
   approvePositions: [ROLES.HR], // close / reopen a vacancy — HR only
   deletePositions: [ROLES.HR], // destructive — HR only

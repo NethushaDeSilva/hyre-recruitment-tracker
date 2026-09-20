@@ -1,8 +1,8 @@
 import { useToast } from "@/components/ui/ToastProvider";
 import { isActiveCandidate } from "@/lib/candidateCounts";
 // Positions page — grid of position cards with live candidate counts + progress.
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, ChevronRight, Clock } from "lucide-react";
 import { useHyreData, deletePosition, positionDeletionSummary } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
@@ -45,7 +45,18 @@ export default function Positions() {
   const { positions: allPositions, candidates, loading } = useHyreData();
   const [filter, setFilter] = useState("All");
   const [openModal, setOpenModal] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const canManage = can(user?.role, "managePositions");
+
+  // ?create=1 (from the Dashboard's "Create Position" quick action) opens the
+  // modal on arrival, then strips the param so a refresh doesn't reopen it.
+  useEffect(() => {
+    if (canManage && searchParams.get("create") === "1") {
+      setOpenModal(true);
+      setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete("create"); return next; }, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const canDeletePos = can(user?.role, "deletePositions"); // HR only
   // HR & Interviewers see only positions they're assigned to; Management sees all.
   const positions = useMemo(() => visiblePositions(allPositions, user), [allPositions, user]);

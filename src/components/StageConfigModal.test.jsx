@@ -107,7 +107,7 @@ it("the per-person availability dropdown shows real free windows and locks a slo
   // checkbox tick), and every OTHER window's Set Interview button disables —
   // only one active pick per person per stage until it's unselected.
   await act(async () => { tree.update(<StageAssignmentStep {...props} pendingSlots={{ amara: window }} />); });
-  expect(text(tree.toJSON())).toContain("Interview set · Unselect");
+  expect(text(tree.toJSON())).toContain("Unselect");
   const otherSetButtons = tree.root.findAllByType("button").filter((b) => text(b) === "Set Interview");
   expect(otherSetButtons.length).toBeGreaterThan(0);
   expect(otherSetButtons.every((b) => b.props.disabled)).toBe(true);

@@ -286,7 +286,7 @@ export default function StageConfigModal({ open, position, onClose }) {
       <fieldset disabled={busy} className="min-w-0" onChange={() => setSaveStatus("")}>
       {/* progress breadcrumb */}
       {canAssign && assignable.length > 0 && (
-        <div className="mb-4 flex items-center gap-1 overflow-x-auto pb-1">
+        <div className="mb-2 flex items-center gap-1 overflow-x-auto pb-1">
           <StepChip active={step === 0} done={step > 0} onClick={() => goTo(0)}>Stages</StepChip>
           {assignable.map((r, i) => (
             <span key={r.id} className="flex items-center gap-1">
@@ -296,15 +296,10 @@ export default function StageConfigModal({ open, position, onClose }) {
           ))}
         </div>
       )}
-
-      {/* save — right here at the top, next to nothing you'd have to scroll
-          for, instead of only at the bottom of a long assignment list. */}
-      {canAssign && (
-        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-secondary/40 px-3 py-2.5">
-          <Button onClick={save} disabled={busy} className="shrink-0">{busy ? "Saving…" : "Save now"}</Button>
-          {saveStatus && <p role="status" className="text-sm font-medium text-[#15803D]">{saveStatus}</p>}
-          {saveError && <p role="alert" className="text-sm font-medium text-[#DC2626]">{saveError}</p>}
-        </div>
+      {(saveStatus || saveError) && (
+        <p role={saveError ? "alert" : "status"} className={`mb-3 text-sm font-medium ${saveError ? "text-[#DC2626]" : "text-[#15803D]"}`}>
+          {saveError || saveStatus}
+        </p>
       )}
 
       {step === 0 ? (
@@ -312,7 +307,7 @@ export default function StageConfigModal({ open, position, onClose }) {
           rows={rows} assign={assign} move={move} rename={rename} remove={remove}
           adding={adding} setAdding={setAdding} newLabel={newLabel} setNewLabel={setNewLabel}
           addCustom={addCustom} addBuiltin={addBuiltin} availableBuiltin={availableBuiltin} canAssign={canAssign}
-          locked={started}
+          locked={started} onSave={save} busy={busy}
         />
       ) : (
         <AssignStep
@@ -330,6 +325,7 @@ export default function StageConfigModal({ open, position, onClose }) {
           onToggle={(p) => { toggle(current.id, p); setSaveStatus(""); }}
           onSetMany={(people) => { setMany(current.id, people); setSaveStatus(""); }}
           stepInfo={`Step ${step} of ${lastStep}`}
+          onSave={save} busy={busy}
         />
       )}
       </fieldset>
@@ -338,20 +334,27 @@ export default function StageConfigModal({ open, position, onClose }) {
 }
 
 // ---------------------------------------------------------------- step 0
-function PipelineStep({ rows, assign, move, rename, remove, adding, setAdding, newLabel, setNewLabel, addCustom, addBuiltin, availableBuiltin, canAssign, locked }) {
+function PipelineStep({ rows, assign, move, rename, remove, adding, setAdding, newLabel, setNewLabel, addCustom, addBuiltin, availableBuiltin, canAssign, locked, onSave, busy }) {
   return (
     <div className="space-y-2.5">
-      {locked ? (
-        <div className="flex items-start gap-2 rounded-lg border border-[#F0C4C4] bg-[#FBE9E9] px-3 py-2.5 text-[12px] font-medium text-[#B91C1C]">
-          <Lock size={14} className="mt-0.5 shrink-0" />
-          <span>Recruitment has started — candidates have moved past Applied, so the stages are locked and can’t be added, removed, renamed or reordered. {canAssign ? "You can still change who’s assigned to each stage." : ""}</span>
-        </div>
-      ) : (
-        <p className="text-[13px] text-muted-foreground">
-          Every vacancy starts at <b className="text-foreground">Applied</b> and ends at <b className="text-foreground">Hired</b>. Rename,
-          reorder, remove or add the stages in between{canAssign ? ", then continue to assign a team to each one." : "."}
-        </p>
-      )}
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        {locked ? (
+          <div className="flex items-start gap-2 rounded-lg border border-[#F0C4C4] bg-[#FBE9E9] px-3 py-2.5 text-[12px] font-medium text-[#B91C1C]">
+            <Lock size={14} className="mt-0.5 shrink-0" />
+            <span>Recruitment has started — candidates have moved past Applied, so the stages are locked and can’t be added, removed, renamed or reordered. {canAssign ? "You can still change who’s assigned to each stage." : ""}</span>
+          </div>
+        ) : (
+          <p className="text-[13px] text-muted-foreground">
+            Every vacancy starts at <b className="text-foreground">Applied</b> and ends at <b className="text-foreground">Hired</b>. Rename,
+            reorder, remove or add the stages in between{canAssign ? ", then continue to assign a team to each one." : "."}
+          </p>
+        )}
+        {canAssign && (
+          <button type="button" onClick={onSave} disabled={busy} className="shrink-0 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50">
+            {busy ? "Saving…" : "Save now"}
+          </button>
+        )}
+      </div>
       <LockedRow label="Applied" />
       {rows.map((r, i) => {
         const n = (assign[r.id] || []).length;

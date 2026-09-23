@@ -1,3 +1,4 @@
+import { useAutomaticScoring } from "@/lib/useAutomaticScoring";
 import { isActiveCandidate } from "@/lib/candidateCounts";
 import { canBulkSelect, isScoreStale, staleReason, notScoredReason, scorePillClass } from "@/lib/scoreStaleness";
 import AssessmentStatus from "@/components/AssessmentStatus";
@@ -15,10 +16,10 @@ import AssessmentStatus from "@/components/AssessmentStatus";
 import { useMemo, useState, useEffect } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronRight, Plus, Settings2, Pencil, Check, ArrowLeft, X, Search, SlidersHorizontal, RefreshCw, AlertCircle } from "lucide-react";
-import { useHyreData, advanceStage, rejectCandidate, bulkReject, rescoreVacancy, updatePositionThreshold } from "@/data/store";
+import { useHyreData, advanceStage, rejectCandidate, bulkReject, updatePositionThreshold } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 import { can, ROLE_LABELS, ROLES } from "@/lib/permissions";
-import { resolveStage, canActOnStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
+import { resolveStage, canActOnStageFor, canAdvanceStageFor, assigneesFor, positionVisibleTo, nextStage } from "@/lib/stages";
 import { effectiveStatus } from "@/lib/positions";
 import { sortApplications } from "../../functions/_lib/filtration/engine.js";
 import { useToast } from "@/components/ui/ToastProvider";
@@ -60,8 +61,7 @@ export default function PositionDetail() {
   // DIFFERENT position, so it never fights a live Firestore update mid-drag.
   const [threshold, setThreshold] = useState(0);
   const [savingThreshold, setSavingThreshold] = useState(false);
-  const [rescoring, setRescoring] = useState(false);
-  const [rescoreMsg, setRescoreMsg] = useState("");
+
   // UI chrome: the header shrinks as you scroll the board (reclaims space).
   const [collapsed, setCollapsed] = useState(false);
   // Collapse past 44px of board scroll, expand back under 16px (hysteresis stops flicker).
@@ -76,6 +76,7 @@ export default function PositionDetail() {
   const toast = useToast();
 
   const position = positions.find((p) => p.id === id);
+  const { busy: rescoring, message: rescoreMsg, retry: runRescore } = useAutomaticScoring(position, candidates, scores, isHR && !loading);
 
   // Reset the threshold to this position's stored default only when the
   // position actually changes (never on every Firestore update, or a live
@@ -166,7 +167,9 @@ export default function PositionDetail() {
   // comment + score first (enforced in store.advanceStage). If it's missing we open
   // the candidate's profile and show a "review first" message instead of moving.
   const attemptMove = async (c) => {
-    const res = await advanceStage(c.id, actor);
+    let res;
+    try { res = await advanceStage(c.id, actor); }
+    catch (error) { toast.error(error.message || "Could not move candidate. Please retry."); return; }
     if (res && res.ok === false && (res.reason === "review-required" || res.reason === "comment-required")) {
       setReviewFor(c.id);
       setMustReview(true);
@@ -174,6 +177,8 @@ export default function PositionDetail() {
     } else if (res && res.ok === false && res.reason === "offer-required") {
       toast.error(`${displayName(c)} needs an accepted offer before they can be hired.`);
       setDetail(c);
+    } else if (res?.ok === false && res.error) {
+      toast.error(res.error);
     } else if (res?.hired) {
       // Hired: the candidate is now an employee, issued an employee ID.
       toast.success(
@@ -208,13 +213,7 @@ export default function PositionDetail() {
   const appliedHiddenByThreshold = appliedOrdered.length - appliedVisibleEntries.length;
   const appliedUnscoredCount = appliedOrdered.filter((e) => e.status !== "scored").length;
   const appliedStaleCount = appliedOrdered.filter((e) => e.status === "scored" && isScoreStale(scores.get(e.candidateId))).length;
-  const runRescore = async () => {
-    setRescoring(true);
-    setRescoreMsg("");
-    const res = await rescoreVacancy(position.id);
-    setRescoring(false);
-    setRescoreMsg(res.ok ? `Re-scored ${res.scored} application${res.scored === 1 ? "" : "s"}${res.failed ? `, ${res.failed} failed` : ""}.` : res.error);
-  };
+
 
   // Persist on release (mouseup/touchend/blur), not on every `input` tick of
   // the drag — the slider still updates `threshold` live via onChange for
@@ -362,16 +361,10 @@ export default function PositionDetail() {
               </span>
             )}
           </div>
-          <button
-            onClick={runRescore}
-            disabled={rescoring}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/40 bg-card px-2.5 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
-          >
-            <RefreshCw size={12} className={rescoring ? "animate-spin" : ""} /> {rescoring ? "Re-scoring…" : "Re-score all"}
-          </button>
+          <span role="status" className="text-xs text-muted-foreground">{rescoring ? "Scoring automatically?" : "Automatic scoring"}</span>
         </div>
       )}
-      {isHR && rescoreMsg && <p className="mt-1.5 text-xs text-muted-foreground">{rescoreMsg}</p>}
+      {isHR && rescoreMsg && <p className="mt-1.5 text-xs text-muted-foreground">{rescoreMsg}{rescoreMsg.startsWith("Automatic scoring could not finish") && <button disabled={rescoring} onClick={runRescore} className="ml-2 font-semibold underline">Retry scoring</button>}</p>}
       {isHR && !position.requirements && (
         <div className="mt-2 flex items-start gap-2 rounded-lg border border-[#F0DFA6] bg-[#FBF1DC] px-3 py-2 text-[13px] text-[#8A6314] dark:border-[#5a4a1a] dark:bg-[#3a2f0f] dark:text-[#F5D77E]">
           <AlertCircle size={15} className="mt-0.5 shrink-0" />
@@ -469,7 +462,7 @@ export default function PositionDetail() {
 
               <div className="space-y-3">
                 {inStage.map((c) => {
-                  const mayAct = canActOnStageFor(user, position, c.stage);
+                  const mayAct = canAdvanceStageFor(user, position, c.stage);
                   return (
                     <div key={c.id} className={`space-y-3 rounded-xl border bg-card p-3 shadow-card ${isHR && stageId === "applied" && picked.has(c.id) ? "border-primary ring-1 ring-primary" : "border-border"}`}>
                       <div className="flex items-start gap-2">
@@ -516,7 +509,7 @@ export default function PositionDetail() {
                           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                             <AlertCircle size={11} className="shrink-0" />
                             Not scored — {notScoredReason(scores.get(c.id), position)}
-                            <button onClick={runRescore} className="font-semibold text-primary hover:underline">Retry</button>
+                            {!rescoring && rescoreMsg.startsWith("Automatic scoring could not finish") && <button onClick={runRescore} className="font-semibold text-primary hover:underline">Retry scoring</button>}
                           </div>
                         )
                       )}
@@ -533,7 +526,7 @@ export default function PositionDetail() {
                       ) : mayAct ? (
                         <div className="space-y-1.5">
                           <button
-                            onClick={() => (c.stage === "applied" ? advanceStage(c.id, actor) : attemptMove(c))}
+                            onClick={() => attemptMove(c)}
                             className="flex w-full items-center justify-center gap-1 rounded-lg bg-[#F1F5FA] py-2 text-xs font-semibold text-primary transition-colors hover:bg-[#E5EBF3] dark:bg-[#242427] dark:hover:bg-[#2d2d31]"
                           >
                             Move to next stage <ChevronRight size={14} />
@@ -555,9 +548,10 @@ export default function PositionDetail() {
                         </div>
                       ) : (
                         <div className="rounded-lg bg-[#F5F7FA] py-2 text-center text-[11px] font-medium text-[#94A3B8] dark:bg-[#242427]">
-                          {team.length ? `Assigned to ${teamLabel}` : ownerLabel ? `${ownerLabel} owns this stage` : "View only"}
+                          {c.stage === "screening" ? (team.length ? `Only assigned HR can advance: ${teamLabel}` : "Configure HR Screening: select an HR recruiter and interview time") : team.length ? `Assigned to ${teamLabel}` : ownerLabel ? `${ownerLabel} owns this stage` : "View only"}
                         </div>
                       )}
+                      {!mayAct && !["hired", "rejected", "withdrawn"].includes(c.stage) && canActOnStageFor(user, position, c.stage) && <button onClick={() => setRejectTarget(c)} className="w-full py-1.5 text-xs font-semibold text-red-600">Reject</button>}
                     </div>
                   );
                 })}

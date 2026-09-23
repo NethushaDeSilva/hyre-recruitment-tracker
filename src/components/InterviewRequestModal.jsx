@@ -36,7 +36,7 @@ export default function InterviewRequestModal({ open, onClose }) {
     try {
       const res = await respondToInterviewRequest(id, { accept, actor: user });
       if (!accept && res.ok) {
-        setLastOutcome(res.status === "needs_attention" ? "No one else was left — HR has been surfaced this one." : "Passed to the next ranked interviewer.");
+      setLastOutcome(res.status === "needs_attention" ? "The coordinator has been notified to reassign this interview." : "Passed to the next ranked interviewer.");
       }
       load();
     } catch (e) { setLastOutcome(e.message); }

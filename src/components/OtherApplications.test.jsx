@@ -1,0 +1,20 @@
+﻿import React from 'react';
+import { act, create } from 'react-test-renderer';
+import { expect, it, vi } from 'vitest';
+import OtherApplications from './OtherApplications';
+const mocks=vi.hoisted(()=>({save:vi.fn(async()=>{}),candidates:[],positions:[]}));
+vi.mock('@/data/store',()=>({useHyreData:()=>({candidates:mocks.candidates,positions:mocks.positions}),getOtherActiveApplications:async()=>[{id:'other',positionTitle:'Manager',stage:'applied'}],crossRejectApplication:(...args)=>mocks.save(...args)}));
+vi.mock('@/context/AuthContext',()=>({useAuth:()=>({user:{uid:'hr',role:'HR'}})}));
+vi.mock('@/components/ui/Modal',()=>({Modal:({open,children,footer})=>open?<div>{children}{footer}</div>:null}));
+it('requires comment, defaults score and targets only the other application',async()=>{
+ let tree;await act(async()=>{tree=create(<OtherApplications candidate={{id:'current',personId:'person',positionId:'p1',stage:'interview'}} positionTitle="Developer"/>);});
+ const button=label=>tree.root.findAllByType('button').find(b=>b.children.join('').includes(label));
+ act(()=>button('Reject from').props.onClick());
+ expect(tree.root.findByType('textarea').props.value).toContain('Developer');
+ act(()=>tree.root.findByType('textarea').props.onChange({target:{value:' '}}));
+ expect(button('Confirm rejection').props.disabled).toBe(true);
+ act(()=>tree.root.findByType('textarea').props.onChange({target:{value:'Candidate confirmed their preference.'}}));
+ await act(async()=>{await button('Confirm rejection').props.onClick();});
+ expect(mocks.save).toHaveBeenCalledWith('current','other',expect.objectContaining({score:'',comment:'Candidate confirmed their preference.'}));
+ act(()=>tree.unmount());
+});

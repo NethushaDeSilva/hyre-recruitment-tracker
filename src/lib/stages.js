@@ -15,6 +15,7 @@ export const STAGES = {
   interview2: { id: "interview2", label: "Further Interview",  dot: "#7C3AED", badgeBg: "#F1EBFC", badgeFg: "#7C3AED", owner: ROLES.INTERVIEWER },
   final:      { id: "final",      label: "Final Interview",    dot: "#E0A422", badgeBg: "#FBF1DC", badgeFg: "#A9781A", owner: ROLES.MANAGEMENT },
   hired:      { id: "hired",      label: "Hired",              dot: "#16A34A", badgeBg: "#E7F6EC", badgeFg: "#16A34A", owner: null },
+  withdrawn: { id: "withdrawn", label: "Withdrawn ? candidate preference", dot: "#64748B", badgeBg: "#EEF1F5", badgeFg: "#64748B", owner: null },
   rejected:   { id: "rejected",   label: "Rejected",           dot: "#DC2626", badgeBg: "#FBE9E9", badgeFg: "#DC2626", owner: null },
   hold:       { id: "hold",       label: "On hold",            dot: "#94A3B8", badgeBg: "#EEF1F5", badgeFg: "#94A3B8", owner: ROLES.HR },
 };
@@ -49,7 +50,7 @@ export const stageOwner = (stageId) => STAGES[stageId]?.owner || null;
 // position-agnostic). Management can act on any stage; otherwise the role must
 // own the stage. Kept for callers that don't have the position in scope.
 export function canActOnStage(role, stageId) {
-  if (!role) return false;
+  if (!role || stageId === "withdrawn") return false;
   if (role === ROLES.MANAGEMENT) return true;
   return stageOwner(stageId) === role;
 }
@@ -141,7 +142,7 @@ function sameStaff(a, user) {
 //  • Otherwise the user's role must own the stage, AND if a team is assigned, the
 //    user must be ONE of them. (App-level; DB enforcement = S2.)
 export function canActOnStageFor(user, position, stageId) {
-  if (!user?.role) return false;
+  if (!user?.role || stageId === "withdrawn") return false;
   if (user.role === ROLES.MANAGEMENT) return true;
   if (stageOwnerRole(position, stageId) !== user.role) return false;
   const team = assigneesFor(position, stageId);
@@ -171,3 +172,10 @@ export function positionVisibleTo(position, user) {
   return onAnyTeam(position, user) || createdByMe;
 }
 export const visiblePositions = (positions, user) => (positions || []).filter((p) => positionVisibleTo(p, user));
+
+export function canAdvanceStageFor(user, position, stageId) {
+  if (!user?.role) return false;
+  if (stageId === "applied") return user.role === ROLES.HR;
+  if (stageId === "screening") return user.role === ROLES.HR && !!user.uid && assigneesFor(position, stageId).some(a => a.uid === user.uid);
+  return canActOnStageFor(user, position, stageId);
+}

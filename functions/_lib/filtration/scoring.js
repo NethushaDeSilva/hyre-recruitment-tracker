@@ -112,7 +112,26 @@ export function qualificationScore(requiredQualification, { levelMet, fieldMatch
  * Math.min(raw, 40) would flatten every under-levelled candidate to exactly
  * 40 and destroy rank order among them.
  */
-export function aggregateScore({ qual, skillsScore, experienceScoreValue, niceToHaveScore }) {
+export function aggregateScore({ qual, skillsScore, experienceScoreValue, niceToHaveScore, roleCoverage = false }) {
+  if (roleCoverage) {
+    // No qualification required at all: skills(45)+experience(20) are the
+    // ONLY mandatory components (65 max), so they're rescaled up to a
+    // 100-point base before adding niceToHaveScore — otherwise nobody could
+    // ever clear ~70, even with a perfect match, just because the vacancy
+    // has no degree requirement to fill the other 25 points.
+    if (!qual) {
+      const base = (skillsScore + experienceScoreValue) / 65 * 100;
+      return { overallScore: Math.round(Math.min(100, base + niceToHaveScore)), capApplied: false };
+    }
+    // Qualification required: qual(25)+skills(45)+experience(20) already sum
+    // to a 90-point mandatory total on their own scale — a direct sum, NOT a
+    // rescale-to-100 first. The previous version rescaled this 90 up to 100
+    // before adding niceToHaveScore, so any candidate clearing every
+    // mandatory point auto-hit 100 regardless of preferred-skill credit
+    // (e.g. 90/90 real points inflated to 100, discarding niceToHaveScore).
+    const raw = Math.min(100, qual.score + skillsScore + experienceScoreValue + niceToHaveScore);
+    return { overallScore: Math.round(qual.levelMet ? raw : raw * 0.4), capApplied: !qual.levelMet };
+  }
   if (!qual) {
     const overallScore = Math.round(((skillsScore + experienceScoreValue + niceToHaveScore) / 75) * 100);
     return { overallScore, capApplied: false };

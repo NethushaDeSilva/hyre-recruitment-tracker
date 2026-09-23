@@ -46,11 +46,11 @@ export function materializeSlots(record, fromMs, toMs) {
     const exceptioned = (record.exceptions || []).some((e) => e.date === dateStr);
     if (!exceptioned) {
       for (const s of record.slots || []) {
-        if (s.dayOfWeek !== cursor.dayOfWeek) continue;
+        if (s.dayOfWeek !== cursor.dayOfWeek || (s.date && s.date !== dateStr)) continue;
         const [sh, sm] = String(s.startTime).split(":").map(Number);
         const [eh, em] = String(s.endTime).split(":").map(Number);
-        const startMs = wallTimeToUTC({ ...cursor, hour: sh, minute: sm });
-        const endMs = wallTimeToUTC({ ...cursor, hour: eh, minute: em });
+        const startMs = wallTimeToUTC({ ...cursor, timeZone: tz, hour: sh, minute: sm });
+        const endMs = wallTimeToUTC({ ...cursor, timeZone: tz, hour: eh, minute: em });
         if (endMs > fromMs && startMs < toMs) out.push({ startMs, endMs });
       }
     }
@@ -72,7 +72,7 @@ export function slotIsDeclaredFree(record, targetMs) {
   if ((record.exceptions || []).some((e) => e.date === dateStrOf(wall))) return false;
   const minutesOfDay = wall.hour * 60 + wall.minute;
   return (record.slots || []).some(
-    (s) => s.dayOfWeek === wall.dayOfWeek && minutesOfDay >= toMinutes(s.startTime) && minutesOfDay < toMinutes(s.endTime)
+    (s) => (!s.date || s.date === dateStrOf(wall)) && s.dayOfWeek === wall.dayOfWeek && minutesOfDay >= toMinutes(s.startTime) && minutesOfDay < toMinutes(s.endTime)
   );
 }
 

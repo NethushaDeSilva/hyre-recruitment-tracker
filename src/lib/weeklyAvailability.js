@@ -212,8 +212,21 @@ export function toLegacyAvailabilitySlots(days) {
 export function buildLegacyAvailabilityDoc(days, { exceptions = [], now = Date.now(), timeZone = "Asia/Colombo", validityMs } = {}) {
   return {
     timeZone,
-    slots: toLegacyAvailabilitySlots(days),
+    slots: toLegacyAvailabilitySlots(days).map(slot => {
+      const date = currentWeekDates(now, timeZone)[slot.dayOfWeek];
+      return { ...slot, date: `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}` };
+    }),
     exceptions,
     validUntil: new Date(now + validityMs),
+  };
+}
+
+// Concrete bounds shared by the weekly editor and interview picker.
+export function currentWeekBoundsMs(now = Date.now(), timeZone = "Asia/Colombo") {
+  const dates = currentWeekDates(now, timeZone);
+  const first = dates[0], last = dates[6];
+  return {
+    fromMs: wallTimeToUTC({ ...first, timeZone }),
+    toMs: wallTimeToUTC({ ...last, timeZone, hour: 23, minute: 59 }) + 60000,
   };
 }

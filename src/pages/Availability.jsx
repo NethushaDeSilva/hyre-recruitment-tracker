@@ -66,7 +66,7 @@ export default function Availability() {
       setDays(week);
     }).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [user?.uid]);
+  }, [user?.uid, weekDates[0].year, weekDates[0].month, weekDates[0].day]);
 
   const validation = useMemo(() => validateWeek(days), [days]);
   const dirty = useMemo(() => JSON.stringify(days) !== JSON.stringify(saved), [days, saved]);
@@ -113,7 +113,7 @@ export default function Availability() {
     <div className="p-4 sm:p-7">
       <h1 className="text-[27px] font-extrabold tracking-tight text-foreground">Schedule availability</h1>
       <p className="mt-1.5 text-sm text-muted-foreground">
-        Your own recurring week. This is what HR sees when scheduling interviews.
+        Save your available dates for this week. These are the times HR sees when scheduling interviews.
       </p>
       <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-semibold text-foreground">
         <CalendarDays size={14} className="text-primary" />

@@ -3,6 +3,7 @@ import { scoreOneApplication, scoreVacancyApplications, ScoringError } from "./f
 import { ENGINE_VERSION } from "./filtration/engine.js";
 import { getThresholds } from "./filtration/thresholds.js";
 import { EMBEDDING_MODEL } from "./embeddings.js";
+import { ELIGIBILITY_VERSION } from "./filtration/eligibility.js";
 
 const unit = (cosineValue) => [cosineValue, Math.sqrt(1 - cosineValue * cosineValue)];
 const REF = [1, 0];
@@ -67,7 +68,7 @@ describe("scoreOneApplication — meta is assembled after the engine returns", (
       skillThreshold: getThresholds().SKILL_SIMILARITY_THRESHOLD,
       qualThreshold: getThresholds().QUAL_SIMILARITY_THRESHOLD,
       engineVersion: ENGINE_VERSION,
-      eligibilityVersion: 1,
+      eligibilityVersion: ELIGIBILITY_VERSION,
       correctnessVersion: 1,
       scoredAt: "2026-09-10T12:00:00.000Z",
     });

@@ -1,3 +1,4 @@
+import { publicSkillLabels } from "@/lib/organizeSkills";
 // Candidate-facing job detail page — one per position, built entirely from
 // what HR already entered in OpenPositionModal. Reached by clicking any card
 // on /jobs (Jobs.jsx), or directly by URL. The apply form at the bottom
@@ -71,8 +72,8 @@ export default function JobDetail() {
   }
 
   const req = position.requirements || {};
-  const skills = req.requiredSkills || [];
-  const niceToHave = req.niceToHave || [];
+  const skills = publicSkillLabels(req);
+  const niceToHave = publicSkillLabels(req, true);
   const minYears = Number(req.minYearsExperience) || 0;
   const fieldOfStudy = req.requiredQualification?.field || "";
   const open = isOpenNow(position);

@@ -1,3 +1,4 @@
+import OtherApplications from "@/components/OtherApplications";
 import ScoreBreakdown from "@/components/ScoreBreakdown";
 // Full CV / application detail for a candidate — opened from the candidates
 // table and the board. Shows every structured field, the attached CV, the
@@ -12,10 +13,10 @@ import { Avatar } from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/components/ui/ToastProvider";
 import { can } from "@/lib/permissions";
-import { stageLabelOf, canActOnStageFor, nextStage, resolveStage } from "@/lib/stages";
+import { stageLabelOf, canAdvanceStageFor, nextStage, resolveStage } from "@/lib/stages";
 import { formatDate, displayName } from "@/lib/format";
 import { downloadDataUrl, openDataUrl, humanSize } from "@/lib/file";
-import { reconsiderCandidate, addComment, deleteComment, advanceStage, sendOffer, respondToOffer } from "@/data/store";
+import { reconsiderCandidate, addComment, deleteComment, advanceStage, saveAcceptedOffer } from "@/data/store";
 import { meetsShortlistThreshold, evaluateReviewGate } from "@/lib/scoreStaleness";
 import InterviewStatusPanel from "@/components/InterviewStatusPanel";
 
@@ -53,6 +54,7 @@ function describe(e) {
     case "apply": return { icon: UserPlus, tone: "#64748B", text: "Applied" };
     case "stage": return { icon: ArrowRight, tone: "#2563EB", text: `Moved ${stageLabel(e.from)} → ${stageLabel(e.to)}` };
     case "hire": return { icon: Check, tone: "#16A34A", text: `Hired (from ${stageLabel(e.from)})` };
+    case "withdraw": return { icon: LogIn, tone: "#64748B", text: "Withdrawn ? candidate preference" };
     case "reject": return { icon: Ban, tone: "#DC2626", text: `Rejected at ${stageLabel(e.from)}${e.reason ? ` — ${e.reason}` : ""}` };
     case "reconsider": return { icon: RotateCcw, tone: "#7C3AED", text: "Moved back into review" };
     case "offer": return { icon: Briefcase, tone: OFFER_STATUS_TONE[e.status] || "#2563EB", text: `Offer ${e.status === "sent" ? "sent" : OFFER_STATUS_LABEL[e.status]?.toLowerCase() || e.status}` };
@@ -65,11 +67,9 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   const toast = useToast();
   const [draft, setDraft] = useState("");
   const [score, setScore] = useState("");
-  const [recommendation, setRecommendation] = useState("");
   const [posting, setPosting] = useState(false);
   const [moving, setMoving] = useState(false);
   const [offerSalary, setOfferSalary] = useState("");
-  const [offerStartDate, setOfferStartDate] = useState("");
   const [offerBusy, setOfferBusy] = useState(false);
   if (!candidate) return null;
   const c = candidate;
@@ -86,7 +86,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   // terminal stages) — unconditionally, regardless of threshold. Each user gets
   // ONE comment per stage — they may delete it (before the move is confirmed)
   // and re-add.
-  const isTerminal = c.stage === "hired" || c.stage === "rejected";
+  const isTerminal = c.stage === "hired" || c.stage === "rejected" || c.stage === "withdrawn";
   const isApplied = c.stage === "applied";
   const scoreRequired = !isTerminal && !isApplied;
   const myComment = comments.find((cm) => (cm.byUid || cm.by) === myId && cm.stage === c.stage);
@@ -105,16 +105,10 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   // this modal and finding them again elsewhere. Only shown when the caller passed
   // a `position` (PositionDetail does; the cross-position CandidatesTable/Employees
   // views don't, so this stays hidden there) and this user may act on this stage.
-  const mayMove = !!position && !isTerminal && canActOnStageFor(user, position, c.stage);
+  const mayMove = !!position && !isTerminal && canAdvanceStageFor(user, position, c.stage);
   const nextId = position ? nextStage(position.stages, c.stage) : null;
   const nextLabel = nextId ? resolveStage(position, nextId)?.label : null;
   const offerRequired = nextId === "hired" && c.offer?.status !== "accepted"; // ties the loop closed
-  // Recommendation (Advance/Hold/Reject) and the Offer box are both scoped to
-  // the one transition that actually needs them: the final stage moving into
-  // Hired. Every earlier stage-to-stage move (HR screening → department
-  // review → initial interview → final interview) only ever needs a comment
-  // + score — no recommendation buttons, no offer box.
-  const recommendationOk = nextId !== "hired" || !!recommendation;
   // The SAME evaluateReviewGate() call advanceStage() makes server-side —
   // not a hand-rolled re-check — so this can never drift from what the
   // actual move will do. Re-evaluated on every render, so a threshold change
@@ -128,32 +122,26 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   };
 
   const submitOffer = async () => {
-    if (!offerSalary.trim() || !offerStartDate) return;
+    if (!offerSalary.trim()) return;
     setOfferBusy(true);
-    await sendOffer(c.id, { salary: offerSalary, startDate: offerStartDate, actor });
-    setOfferSalary("");
-    setOfferStartDate("");
-    setOfferBusy(false);
-  };
-
-  const setOfferStatus = async (status) => {
-    setOfferBusy(true);
-    await respondToOffer(c.id, { status, actor });
-    setOfferBusy(false);
+    try {
+      await saveAcceptedOffer(c.id, { salary: offerSalary, actor });
+      setOfferSalary("");
+      toast.success("Accepted offer saved.");
+    } catch (error) { toast.error(error.message || "Could not save accepted offer."); }
+    finally { setOfferBusy(false); }
   };
 
   const postComment = async () => {
-    if ((commentRequired && !draft.trim()) || !scoreOk || !recommendationOk) return;
+    if ((commentRequired && !draft.trim()) || !scoreOk) return;
     setPosting(true);
     await addComment(c.id, {
       text: draft,
       score: scoreRequired ? Number(score) : null,
-      recommendation: nextId === "hired" ? recommendation : null,
       actor,
     });
     setDraft("");
     setScore("");
-    setRecommendation("");
     setPosting(false);
   };
 
@@ -164,9 +152,11 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
 
   const moveNext = async () => {
     setMoving(true);
-    const res = await advanceStage(c.id, actor);
-    setMoving(false);
-    if (res && res.ok === false) return; // e.g. review-required — button stays put
+    let res;
+    try { res = await advanceStage(c.id, actor); }
+    catch (error) { toast.error(error.message || "Could not move candidate. Check your stage assignment and interview time."); return; }
+    finally { setMoving(false); }
+    if (res && res.ok === false) { if (res.error) toast.error(res.error); return; } // e.g. review-required — button stays put
     if (res?.hired) {
       toast.success(res.employeeId ? `${displayName(c)} hired — employee ID ${res.employeeId} issued.` : `${displayName(c)} hired.`);
     }
@@ -227,6 +217,10 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
             </div>
           </div>
         )}
+
+        {c.stage === "screening" && <p className="rounded-lg bg-secondary p-3 text-sm">To move forward from HR Screening, you must be an assigned HR recruiter with a saved interview date and time in Configure stages.</p>}
+
+        {open && <OtherApplications key={c.id} candidate={c} positionTitle={position?.title || positionTitle || c.appliedRole || c.positionId} />}
 
         {/* rejection record + talent-pool reconsider */}
         {c.stage === "rejected" && (
@@ -337,7 +331,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           {/* one review per user per stage — hidden once you've left yours (delete it to redo) */}
           {canPost ? (
             <div className="mt-3 space-y-2">
-              <Textarea
+              <Textarea autoGrow
                 rows={2}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
@@ -366,29 +360,8 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                   <span className="text-xs text-muted-foreground">out of 100 (required to move on)</span>
                 </div>
               )}
-              {nextId === "hired" && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-[13px] font-semibold text-foreground">Recommendation</label>
-                  <div className="flex gap-1.5">
-                    {RECOMMENDATIONS.map((r) => {
-                      const active = recommendation === r.id;
-                      return (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onClick={() => setRecommendation(r.id)}
-                          className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${active ? "text-white" : "border-border text-foreground hover:bg-secondary"}`}
-                          style={active ? { background: r.tone, borderColor: r.tone } : undefined}
-                        >
-                          {r.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
               <div className="flex justify-end">
-                <Button onClick={postComment} disabled={(commentRequired && !draft.trim()) || !scoreOk || !recommendationOk || posting}>
+                <Button onClick={postComment} disabled={(commentRequired && !draft.trim()) || !scoreOk || posting}>
                   <Send size={14} /> {posting ? "Posting…" : "Post review"}
                 </Button>
               </div>
@@ -400,63 +373,20 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           )}
         </div>
 
-        {/* offer — required before this candidate can be hired. The "make an
-            offer" form only shows on the one transition that leads into Hired
-            (final interview → hired); an already-sent offer's status stays
-            visible regardless, same as before. */}
-        {!isTerminal && (c.offer || (canManage && nextId === "hired")) && (
+        {!isTerminal && (c.offer || (user?.role === "Management" && nextId === "hired")) && (
           <div className="rounded-lg border border-border bg-background p-4">
             <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">
-              <Briefcase size={13} /> Offer
+              <Briefcase size={13} /> Accepted Offer
             </div>
-            {c.offer ? (
-              <div className="space-y-2.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                    style={{ background: `${OFFER_STATUS_TONE[c.offer.status]}18`, color: OFFER_STATUS_TONE[c.offer.status] }}
-                  >
-                    {OFFER_STATUS_LABEL[c.offer.status] || c.offer.status}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Sent {formatDate(c.offer.sentAt)}{c.offer.respondedAt ? ` · updated ${formatDate(c.offer.respondedAt)}` : ""}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <Row label="Salary" value={c.offer.salary} />
-                  <Row label="Start date" value={c.offer.startDate} />
-                </div>
-                {canManage && c.offer.status !== "accepted" && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {["accepted", "negotiating", "declined"]
-                      .filter((s) => s !== c.offer.status)
-                      .map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          disabled={offerBusy}
-                          onClick={() => setOfferStatus(s)}
-                          className="rounded-full border border-border px-3 py-1 text-xs font-bold text-foreground transition-colors hover:bg-secondary disabled:opacity-50"
-                        >
-                          Mark {OFFER_STATUS_LABEL[s]}
-                        </button>
-                      ))}
-                  </div>
-                )}
-              </div>
-            ) : canManage ? (
+            {c.offer?.status === "accepted" ? <Row label="Salary" value={c.offer.salary} /> : user?.role === "Management" && nextId === "hired" ? (
               <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <Input value={offerSalary} onChange={(e) => setOfferSalary(e.target.value)} placeholder="Salary, e.g. £45,000" />
-                  <Input type="date" value={offerStartDate} onChange={(e) => setOfferStartDate(e.target.value)} />
-                </div>
+                <Input aria-label="Accepted salary" value={offerSalary} onChange={e => setOfferSalary(e.target.value)} placeholder="Enter agreed salary" />
+                <p className="text-xs text-muted-foreground">Record the salary already agreed with the candidate.</p>
                 <div className="flex justify-end">
-                  <Button onClick={submitOffer} disabled={!offerSalary.trim() || !offerStartDate || offerBusy}>
-                    <Send size={14} /> {offerBusy ? "Sending…" : "Send offer"}
-                  </Button>
+                  <Button onClick={submitOffer} disabled={!offerSalary.trim() || offerBusy}>{offerBusy ? "Saving..." : "Save accepted offer"}</Button>
                 </div>
               </div>
-            ) : null}
+            ) : <p className="text-sm text-muted-foreground">Management must record the accepted salary before hiring.</p>}
           </div>
         )}
 

@@ -29,7 +29,7 @@ export default function MyApplications() {
     // rows so they only ever see their hire plus any genuine past rejections — an
     // "Applied / in review" row can no longer coexist with a hire.
     const hired = all.some((c) => c.stage === "hired");
-    return hired ? all.filter((c) => c.stage === "hired" || c.stage === "rejected") : all;
+    return hired ? all.filter((c) => c.stage === "hired" || c.stage === "rejected" || c.stage === "withdrawn") : all;
   }, [candidates, user]);
 
   // What stage did we last show this candidate? If it changed since, we flag an
@@ -102,7 +102,7 @@ export default function MyApplications() {
                 {moved && <UpdateNotice stage={c.stage} />}
 
                 {/* progress tracker */}
-                {c.stage === "rejected" ? (
+                {c.stage === "withdrawn" ? <p className="text-sm text-muted-foreground">Withdrawn based on your preference to continue with another position.</p> : c.stage === "rejected" ? (
                   <p className="text-[13px] font-medium text-muted-foreground">
                     This application wasn't successful this time — but you're kept in our talent pool for future roles.
                   </p>
@@ -154,6 +154,7 @@ function ProgressTrack({ stages, current }) {
 
 // The "you've moved" banner — tone depends on where they landed.
 function UpdateNotice({ stage }) {
+  if (stage === "withdrawn") return <p className="text-sm text-muted-foreground">This application was withdrawn based on your position preference.</p>;
   if (stage === "hired") {
     return (
       <div className="flex items-center gap-2 rounded-lg bg-[#E7F6EC] px-3 py-2.5 text-[13px] font-semibold text-[#16A34A] dark:bg-[#16A34A]/15">

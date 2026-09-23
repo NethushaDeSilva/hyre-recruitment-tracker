@@ -21,7 +21,7 @@ import { Input, Select } from "@/components/ui/Field";
 import { STAGES, CONFIGURABLE_STAGES } from "@/lib/stages";
 import { ROLES, ROLE_LABELS, can } from "@/lib/permissions";
 import { ROLE_USERS, cleanTitle } from "@/context/auth-config";
-import { savePipeline, useHyreData, subscribeInterviewBookings, getAvailabilityRecords } from "@/data/store";
+import { savePipeline, useHyreData, subscribeInterviewBookings, subscribeAvailabilityRecords } from "@/data/store";
 import { useAuth } from "@/context/AuthContext";
 
 import AssignStep from "./StageAssignmentStep";
@@ -68,6 +68,7 @@ export default function StageConfigModal({ open, position, onClose }) {
   const [savedRows, setSavedRows] = useState([]);
   const [assign, setAssign] = useState({}); // stageId -> [{uid,name,role,title}]
   const [savedAssign, setSavedAssign] = useState({});
+  const [removedBookingIds, setRemovedBookingIds] = useState([]);
   const [personSlots, setPersonSlots] = useState({}); // stageId -> { uid -> {scheduledAt, durationMs} }
   const [availabilityByUid, setAvailabilityByUid] = useState({});
   const [bookings, setBookings] = useState([]);
@@ -102,6 +103,7 @@ export default function StageConfigModal({ open, position, onClose }) {
     setAssign(norm);
     setSavedAssign(norm);
     setPersonSlots({});
+    setRemovedBookingIds([]);
     setSaveStatus("");
     setSaveError("");
     setAdding(false);
@@ -176,9 +178,10 @@ export default function StageConfigModal({ open, position, onClose }) {
   // dropdown reads from this rather than making its own Firestore call per row.
   useEffect(() => {
     if (!open || !staff.length) return;
-    let alive = true;
-    getAvailabilityRecords(staff.map((s) => s.uid)).then((records) => { if (alive) setAvailabilityByUid(records); });
-    return () => { alive = false; };
+    return subscribeAvailabilityRecords(staff.map(s => s.uid), setAvailabilityByUid, error => {
+      setAvailabilityByUid({});
+      setSaveError(`Couldn't load availability: ${error.message}`);
+    });
   }, [open, staff]);
 
   // --- structure editing (step 0) ---
@@ -206,29 +209,21 @@ export default function StageConfigModal({ open, position, onClose }) {
   };
 
   // --- assignment (steps 1..N) ---
-  const toggle = (stageId, person) => setAssign((prev) => {
-    const list = prev[stageId] ? [...prev[stageId]] : [];
-    const i = list.findIndex((x) => x.uid === person.uid);
-    if (i >= 0) list.splice(i, 1);
-    else {
-      list.push({ uid: person.uid, name: person.name, role: person.role, title: person.title || "", email: person.email || "" });
-    }
-    return { ...prev, [stageId]: list };
-  });
-  const setMany = (stageId, people) => setAssign((prev) => ({ ...prev, [stageId]: people.map((p) => ({ uid: p.uid, name: p.name, role: p.role, title: p.title || "", email: p.email || "" })) }));
-
-  // Booking a specific person's real available window as their interview
-  // slot for this stage — replaces the old manual "Book a time slot" typed
-  // date/time, which applied one slot to the whole team. Only one pending
-  // window per person per stage; picking a new one replaces the old pick.
-  const setPersonSlot = (stageId, person, window) =>
-    setPersonSlots((prev) => ({ ...prev, [stageId]: { ...prev[stageId], [person.uid]: window } }));
-  const clearPersonSlot = (stageId, uid) =>
-    setPersonSlots((prev) => {
-      const next = { ...(prev[stageId] || {}) };
-      delete next[uid];
+  const setPersonSlot = (stageId, person, window) => {
+    setAssign(prev => ({ ...prev, [stageId]: [...(prev[stageId] || []).filter(p => p.uid !== person.uid), person] }));
+    setPersonSlots(prev => ({ ...prev, [stageId]: { ...prev[stageId], [person.uid]: window } }));
+  };
+  const clearPersonSlot = (stageId, uid) => {
+    setAssign(prev => ({ ...prev, [stageId]: (prev[stageId] || []).filter(p => p.uid !== uid) }));
+    setPersonSlots(prev => {
+      const next = { ...prev[stageId] }; delete next[uid];
       return { ...prev, [stageId]: next };
     });
+    setRemovedBookingIds(prev => [...new Set([...prev, ...bookings.filter(b =>
+      b.kind === "stage_assignment" && b.positionId === position.id && b.stageId === stageId
+      && b.interviewerId === uid && BOOKED_STATUSES.includes(b.status)).map(b => b.id)])]);
+  };
+  const visibleBookings = bookings.filter(b => !removedBookingIds.includes(b.id));
 
   const save = async () => {
     setBusy(true);
@@ -246,19 +241,22 @@ export default function StageConfigModal({ open, position, onClose }) {
       for (const [id, list] of Object.entries(assign)) if (ids.has(id) && list?.length) stageAssignees[id] = list;
 
       const pendingCount = rows.reduce((n, r) => n + Object.keys(personSlots[r.id] || {}).length, 0);
-      if (pendingCount && (bookingsLoading || bookingError)) throw new Error("Wait until bookings can be checked before saving an interview slot.");
+      if ((pendingCount || removedBookingIds.length) && (bookingsLoading || bookingError)) throw new Error("Wait until bookings can be checked before saving an interview slot.");
       const stageSlots = rows.flatMap((r) => Object.entries(personSlots[r.id] || {}).flatMap(([uid, window]) => {
         // Already a real, persisted booking for this exact person/stage/time — nothing new to write.
-        const persisted = bookings.some((b) => b.positionId === position.id && b.stageId === r.id
+        const persisted = visibleBookings.some((b) => b.positionId === position.id && b.stageId === r.id
           && b.interviewerId === uid && b.scheduledAt === window.scheduledAt && BOOKED_STATUSES.includes(b.status));
         if (persisted) return [];
         const person = (assign[r.id] || []).find((p) => p.uid === uid) || staff.find((s) => s.uid === uid);
         return [{ stageId: r.id, stageLabel: r.label, interviewerId: uid, interviewerName: person?.name || "", scheduledAt: window.scheduledAt, durationMs: window.durationMs }];
       }));
 
-      await savePipeline(position.id, { stages, stageMeta, stageAssignees, stageSlots, actor: user });
+      await savePipeline(position.id, { stages, stageMeta, stageAssignees, stageSlots, removedBookingIds, actor: user });
+      setBookings(prev => prev.filter(b => !removedBookingIds.includes(b.id)));
+      setRemovedBookingIds([]);
       setSavedRows(rows);
       setSavedAssign(stageAssignees);
+      setAssign(stageAssignees);
       // personSlots is NOT cleared here — a saved pick still needs to stay the
       // "active" one for its row (AvailabilityDropdown then reads `bookings`,
       // refreshed by the live subscription, to show it as persisted/locked).
@@ -272,7 +270,7 @@ export default function StageConfigModal({ open, position, onClose }) {
   // write. Otherwise the button would stay permanently enabled for anything
   // ever picked, even after it's long been committed.
   const hasUnsavedSlot = Object.entries(personSlots).some(([stageId, byUid]) =>
-    Object.entries(byUid).some(([uid, window]) => !bookings.some((b) =>
+    Object.entries(byUid).some(([uid, window]) => !visibleBookings.some((b) =>
       b.positionId === position?.id && b.stageId === stageId && b.interviewerId === uid
       && b.scheduledAt === window.scheduledAt && BOOKED_STATUSES.includes(b.status))));
 
@@ -281,7 +279,7 @@ export default function StageConfigModal({ open, position, onClose }) {
   // picked interview slot not yet committed).
   const dirty = JSON.stringify(rows) !== JSON.stringify(savedRows)
     || JSON.stringify(assign) !== JSON.stringify(savedAssign)
-    || hasUnsavedSlot;
+    || hasUnsavedSlot || removedBookingIds.length > 0;
 
   const assignable = canAssign ? rows : [];
   const lastStep = assignable.length; // step index of the final assignment screen (0 if none)
@@ -341,13 +339,11 @@ export default function StageConfigModal({ open, position, onClose }) {
           q={q} setQ={setQ}
           savedSelected={savedAssign[current.id] || []}
           assignments={assign} positions={positions} positionId={position.id}
-          bookings={bookings} bookingsLoading={bookingsLoading} bookingError={bookingError}
+          bookings={visibleBookings} bookingsLoading={bookingsLoading} bookingError={bookingError}
           availabilityByUid={availabilityByUid} pendingSlots={personSlots[current.id] || {}}
           onSetPersonSlot={(person, window) => { setPersonSlot(current.id, person, window); setSaveStatus(""); }}
           onClearPersonSlot={(uid) => { clearPersonSlot(current.id, uid); setSaveStatus(""); }}
           loading={staffLoading} error={staffError}
-          onToggle={(p) => { toggle(current.id, p); setSaveStatus(""); }}
-          onSetMany={(people) => { setMany(current.id, people); setSaveStatus(""); }}
           stepInfo={`Step ${step} of ${lastStep}`}
         />
       )}

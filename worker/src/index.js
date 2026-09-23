@@ -7,7 +7,7 @@
 //   ->   { summary: string,
 //          ranked: [{ id, score (0-100), verdict, reason }] }  (best first)
 //
-// It runs Meta Llama via Cloudflare Workers AI (env.AI) — no API key involved.
+// It runs GPT-OSS-20B via Cloudflare Workers AI (env.AI) — no API key involved.
 // The model is told to READ the recruiter's request as priorities + rules (not
 // just keywords): infer must-haves vs nice-to-haves, honour flexible instructions
 // (e.g. "qualifications matter less than skills", "give strong juniors a chance"),
@@ -15,7 +15,7 @@
 // experience / qualifications — never any protected attribute. It ranks and
 // explains; a human still makes every decision.
 
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"; // current, capable Meta model
+import { MODEL, modelResponse } from "../../functions/_lib/cv-ai.js";
 const MAX_CANDIDATES = 50;
 const MAX_NOTE = 1000; // give the model more of the cover note to reason over
 
@@ -92,7 +92,7 @@ Cover note: ${String(c.coverNote || "").slice(0, MAX_NOTE) || "-"}`
       return json({ error: "AI call failed", detail: String(e) }, 502, cors);
     }
 
-    const raw = (ai && (ai.response ?? ai.result?.response)) ?? "";
+    const raw = modelResponse(ai);
     // Newer Workers AI models return `response` already parsed as an object;
     // older ones return a JSON string. Handle both.
     const parsed = raw && typeof raw === "object" ? raw : extractJson(raw);

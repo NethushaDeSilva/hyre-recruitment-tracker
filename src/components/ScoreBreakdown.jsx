@@ -45,10 +45,14 @@ function SkillsBlock({ title, block }) {
         <span className="text-xs font-bold text-foreground">{block.score}/{block.max}</span>
       </div>
       <Bar score={block.score} max={block.max} />
+      {block.capabilities?.map((g, i) => <div key={i} className="text-xs">
+        <p>{g.label}: {Math.round(g.coverage * 100)}% coverage (weight {g.weight})</p>
+        <p className="text-muted-foreground">{g.alternatives.map(branch => branch.join(" + ")).join(" OR ")}</p>
+      </div>)}
       {block.matched?.length > 0 && <ul className="space-y-1 pt-1">{block.matched.map((m, i) => <SkillRow key={i} m={m} />)}</ul>}
       {block.missing?.length > 0 && (
         <p className="text-[12px] text-muted-foreground">
-          Missing: <span className="text-[#DC2626]">{block.missing.join(", ")}</span>
+          Not evidenced (may include unused alternatives): <span className="text-[#DC2626]">{block.missing.join(", ")}</span>
         </p>
       )}
     </div>
@@ -66,6 +70,15 @@ export default function ScoreBreakdown({ score, position, candidate }) {
         <span className="text-sm font-bold text-foreground">Score breakdown</span>
         <span className="text-lg font-extrabold text-primary">{overallScore}<span className="text-xs font-medium text-muted-foreground">/100</span></span>
       </div>
+
+      {score.descriptionFit && <div className="space-y-2 rounded-lg border border-border p-3 text-xs">
+        <h4 className="font-bold">Company job-description fit</h4>
+        {score.descriptionFit.status === "assessed" ? <>
+          <p>Structured requirements: {score.descriptionFit.structuredScore}/100 (90% weight). Description evidence: {score.descriptionFit.score}/10 (10% weight).{capApplied ? " The existing qualification cap applies to both components." : ""}</p>
+          <p className="text-muted-foreground">Semantic matches are inferred, earn half credit and should be reviewed. No new mandatory requirements are added.</p>
+          <ul className="space-y-3">{score.descriptionFit.responsibilities.map((item, i) => <li key={i}><p className="font-medium">Description: {item.description}</p><p>{item.status === "verified" ? "Direct text match" : item.status === "inferred" ? "Possible match ? review evidence" : "No supporting evidence found"}</p>{item.evidence && <blockquote className="mt-1 border-l-2 border-border pl-2 text-muted-foreground">CV: {item.evidence}</blockquote>}</li>)}</ul>
+        </> : <p>{score.descriptionFit.reason} The existing requirements score is used without a description adjustment.</p>}
+      </div>}
 
       {capApplied && (
         <div className="flex items-start gap-1.5 rounded-md bg-[#FBF1DC] px-2.5 py-2 text-[12px] font-medium text-[#8A6314] dark:bg-[#3a2f0f] dark:text-[#F5D77E]">

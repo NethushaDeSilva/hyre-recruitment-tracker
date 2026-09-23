@@ -82,7 +82,8 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: true, ...reconcile(batchId, results) }, 200, cors);
   } catch (e) {
     console.error("rescore-vacancy:", e);
-    return json({ ok: false, ...unprocessed("batch-failed"), error: e.message || "Batch scoring failed." }, 503, cors);
+    const retryable = !/invalid passage|unsupported text|too long|invalid responsibilities/i.test(e.message || "");
+    return json({ ok: false, ...unprocessed("batch-failed"), retryable, error: e.message || "Batch scoring failed." }, retryable ? 503 : 422, cors);
   }
 }
 

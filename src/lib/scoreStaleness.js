@@ -1,3 +1,4 @@
+import { scoringRequirements } from "./scoringRequirements";
 // WS5 5.2 — "never silently mix scores computed under different rules."
 // A score can go stale two ways: an explicit flag (requirements were edited —
 // see updatePosition() in data/store.js) or a DRIFT between what the score
@@ -39,7 +40,7 @@ export function assessmentEligibility(score, position, candidate) {
   if (score.eligibility) return score.eligibility;
   // Never fabricate correspondence between old evidence and new requirements.
   // When a snapshot exists, derive eligibility locally without an AI rescore.
-  if (candidate && position?.requirements && score.requirementsSnapshot && snapshotKey(score.requirementsSnapshot) === snapshotKey(position.requirements)) {
+  if (candidate && position?.requirements && score.requirementsSnapshot && snapshotKey(score.requirementsSnapshot) === snapshotKey(scoringRequirements(position))) {
     return assessEligibility(candidate, position.requirements, score);
   }
   return review("Legacy score retained; mandatory eligibility needs review (no matching requirements snapshot).");
@@ -117,7 +118,7 @@ export function isScoreStale(score) {
  * isScoreStale() so the first true reason shown is the first one that fired. */
 export function staleReason(score) {
   if (!score || !score.meta) return "";
-  if (score.stale) return "The vacancy's requirements were edited after this was scored.";
+  if (score.stale) return "The vacancy's requirements or job description were edited after this was scored.";
   const { SKILL_SIMILARITY_THRESHOLD, QUAL_SIMILARITY_THRESHOLD } = getThresholds();
   if (score.meta.engineVersion !== ENGINE_VERSION) return "Scored under an older version of the scoring engine.";
   if (score.meta.skillThreshold !== SKILL_SIMILARITY_THRESHOLD || score.meta.qualThreshold !== QUAL_SIMILARITY_THRESHOLD) {

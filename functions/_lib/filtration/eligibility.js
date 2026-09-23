@@ -1,7 +1,7 @@
 import { classifyCandidateEducation } from "./scoring.js";
 import { matchTermSet } from "./matching.js";
 
-export const ELIGIBILITY_VERSION = 1;
+export const ELIGIBILITY_VERSION = 2;
 export const CORRECTNESS_VERSION = 1;
 
 // Eligibility is separate from arithmetic. Unknown evidence never establishes
@@ -16,9 +16,8 @@ export function assessEligibility(candidate, requirements, assessment) {
   }
   if (candidate.needsReview) add("EXTRACTION_REVIEW", "needs_review", "CV extraction or validation needs human review.");
   const core = assessment.breakdown?.coreSkills;
-  for (const skill of requirements.requiredSkills || []) {
-    const record = core?.matched?.find(r => r.required === skill);
-    if (!record || record.status !== "verified") add("SKILL_NOT_ESTABLISHED", "needs_review", `Mandatory skill ${skill} is not established by verified CV evidence.`);
+  for (const requirement of core?.mandatory || []) {
+    if (!requirement.met) add("SKILL_NOT_ESTABLISHED", "needs_review", `Mandatory requirement ${requirement.name} is not established by verified CV evidence.`);
   }
   if (requirements.minYearsExperience > 0) {
     const years = candidate.totalYearsExperience;

@@ -1,3 +1,4 @@
+import NotificationSettings from "@/components/NotificationSettings";
 // Settings — reachable from the account menu (gear icon). Three sections a web
 // app usually has: your account, appearance (light/dark), and security.
 import { useState } from "react";
@@ -38,7 +39,7 @@ export default function Settings() {
   return (
     <div className="p-4 sm:p-7">
       <h1 className="text-[27px] font-extrabold tracking-tight text-foreground">Settings</h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">Manage your account, appearance and security.</p>
+      <p className="mt-1.5 text-sm text-muted-foreground">Manage your account, notifications, appearance and security.</p>
 
       <div className="mt-6 max-w-2xl space-y-4">
         {/* 1 · Account */}
@@ -56,6 +57,8 @@ export default function Settings() {
             </Link>
           </div>
         </section>
+
+        <NotificationSettings />
 
         {/* 2 · Appearance */}
         <section className="rounded-lg border border-[#E9EEF4] bg-card p-5 shadow-card">

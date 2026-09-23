@@ -1,4 +1,15 @@
-import { commitInterviewChanges } from "@/lib/interviewPersistence";
+import { confirmedAvailabilitySlots } from "@/lib/confirmedAvailability";
+import { currentWeekBoundsMs } from "@/lib/weeklyAvailability";
+import { cancelStageBookings } from "@/lib/stageBookingChanges";
+import { screeningAuthorization } from "@/lib/screeningAuthorization";
+import { scoringRequirements } from "@/lib/scoringRequirements";
+import { needsAutomaticScore } from "@/lib/automaticScoring";
+import { persistCandidatePreference, preferencePlan, withdrawalPatch } from "@/lib/candidatePreference";
+import { crossRejectActive, crossRejectionPatch, persistCrossRejection } from "@/lib/crossRejection";
+import { writeNotifications, persistAvailabilityReminder } from "@/lib/notificationPersistence";
+import { teamNotifications, hireNotification } from "@/lib/notifications";
+import { COMPANY } from "@/lib/company";
+import { commitInterviewChanges, respondToOwnInterview } from "@/lib/interviewPersistence";
 import { bookingConflict, BOOKED_STATUSES, timeMs } from "@/lib/interviewSchedule";
 import { allocatePosition, removePersistedPosition, getPositionDeletionSummary } from "@/lib/positionPersistence";
 import { positionIdFor, positionCode, hiredPositionSnapshot } from "@/lib/positionLifecycle";
@@ -178,6 +189,7 @@ function recomputeMock() {
 let positions = firebaseReady ? [] : SEED_POSITIONS;
 let candidates = [];
 let employees = []; // hired people — Firebase: the /employees collection; mock: derived below
+let mockScreeningBookings = [];
 let notifications = []; // in-app notifications addressed to the signed-in user
 let scores = new Map(); // WS5 — applicationId -> applicationScores doc; staff-only, empty for a Candidate
 let loading = firebaseReady; // true until the first Firestore data arrives
@@ -225,7 +237,7 @@ const mapPosition = (d) => {
     // mandatory auto-close date (ms) — the vacancy closes itself once this passes
     closesAt: x.closesAt ? ms(x.closesAt) : 0,
     // headcount target vs. how many have been hired into this requisition so far —
-    // hireCandidate() increments hiredCount and closes the position once it's filled
+    // hireCandidate() increments hiredCount; only the closing date controls automatic closure
     headcount: x.headcount || 1,
     hiredCount: x.hiredCount || 0,
     hiringManagerUid: x.hiringManagerUid || "",
@@ -304,6 +316,7 @@ const mapApplication = (d) => {
     hiredAt: x.hiredAt ? ms(x.hiredAt) : 0,
     history: Array.isArray(x.history) ? x.history : [],
     rejection: x.rejection || null,
+    withdrawal: x.withdrawal || null,
     comments: Array.isArray(x.comments) ? x.comments : [],
   };
 };
@@ -356,6 +369,7 @@ const mapEmployee = (d) => {
     cvValidation: x.cvValidation || null,
     history: Array.isArray(x.history) ? x.history : [],
     rejection: x.rejection || null,
+    withdrawal: x.withdrawal || null,
     comments: Array.isArray(x.comments) ? x.comments : [],
   };
 };
@@ -412,6 +426,7 @@ function joinFlat(identity, app) {
     cvValidation: app.cvValidation,
     history: app.history || [],
     rejection: app.rejection || null,
+    withdrawal: app.withdrawal || null,
     comments: app.comments || [],
   };
 }
@@ -489,6 +504,7 @@ export function syncAuth(user) {
     return;
   }
 
+  notifications = [];
   loading = true;
   commit();
 
@@ -618,6 +634,11 @@ export async function notifyUser({ uid, type, message, candidateId = "", positio
   }
 }
 
+export async function ensureAvailabilityReminder(user) {
+  if (!firebaseReady) return;
+  return persistAvailabilityReminder(db, user);
+}
+
 export async function markNotificationRead(id) {
   if (!firebaseReady) return;
   try {
@@ -738,7 +759,7 @@ export async function updatePosition(id, {
   // Staleness is keyed on requirements ONLY — shortlistThreshold is a sibling
   // field computed and diffed separately, and never enters this comparison,
   // so editing it alone can never mark a score stale.
-  const requirementsChanged = JSON.stringify(current.requirements || null) !== JSON.stringify(requirements || null);
+  const requirementsChanged = snapshotKey(scoringRequirements(current)) !== snapshotKey(scoringRequirements({ requirements, title, department, description }));
 
   const data = {
     title: title.trim(),
@@ -806,25 +827,31 @@ export async function updatePositionThreshold(id, shortlistThreshold) {
  */
 const rescoreRuns = new Map();
 const rescoreBusy = new Set();
-export async function rescoreVacancy(positionId) {
+export async function rescoreVacancy(positionId, options = {}) {
   if (rescoreBusy.has(positionId)) return { ok: false, error: "A rescore is already running for this position." };
   rescoreBusy.add(positionId);
   try {
-    return await rescoreApplied(positionId);
+    return await rescoreApplied(positionId, options);
   } catch (e) {
     return { ok: false, error: e.message || "Rescoring failed. Retry to resume." };
   } finally {
     rescoreBusy.delete(positionId);
   }
 }
-async function rescoreApplied(positionId) {
+async function rescoreApplied(positionId, { applicationIds } = {}) {
   if (!firebaseReady) return { ok: false, error: "Not available in demo mode." };
   const position = positions.find((p) => p.id === positionId);
   if (!position) return { ok: false, error: "Position not found." };
   if (!position.requirements) return { ok: false, error: "This vacancy has no structured requirements set." };
 
+  const scoringSnapshot = scoringRequirements(position);
   const appsSnap = await getDocs(query(collection(db, "applications"), where("positionId", "==", positionId)));
-  const apps = appsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(a => a.stage === "applied");
+  let apps = appsSnap.docs.map((d) => ({ id: d.id, ...d.data() })).filter(a => a.stage === "applied" && (!applicationIds || applicationIds.includes(a.id)));
+  if (applicationIds) {
+    // Check persisted scores too: the score listener may still be loading on entry.
+    const existing = await Promise.all(apps.map(a => getDoc(doc(db, "applicationScores", a.id))));
+    apps = apps.filter((a, i) => needsAutomaticScore(a, position, existing[i].exists() ? existing[i].data() : null));
+  }
   if (!apps.length) return { ok: true, scored: 0, failed: 0 };
 
   // Each application's scorable profile lives on its IDENTITY doc, not the
@@ -849,21 +876,25 @@ async function rescoreApplied(positionId) {
   });
 
   let run = rescoreRuns.get(positionId);
-  if (run && snapshotKey(run.requirements) !== snapshotKey(position.requirements)) {
+  if (applicationIds && run && snapshotKey(run.candidates) !== snapshotKey(candidatesPayload)) {
+    rescoreRuns.delete(positionId);
+    run = null;
+  }
+  if (run && snapshotKey(run.requirements) !== snapshotKey(scoringSnapshot)) {
     rescoreRuns.delete(positionId);
     return { ok: false, error: "Requirements changed. Previous retry snapshot discarded; start a new rescore." };
   }
   if (!run) {
-    run = createRescoreRun(candidatesPayload, position.requirements);
+    run = createRescoreRun(candidatesPayload, scoringSnapshot);
     rescoreRuns.set(positionId, run);
   }
   const summary = await executeRescoreRun(run, {
     send: async body => {
-      const res = await fetch("/api/rescore-vacancy", { method: "POST", headers: await scoringHeaders(), body: JSON.stringify(body) });
+      const res = await fetch("/api/rescore-vacancy", { method: "POST", headers: await scoringHeaders(), body: JSON.stringify(body), signal: AbortSignal.timeout(120000) });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) {
         const error = new Error(data?.error || `HTTP ${res.status}`);
-        error.fatal = [400, 401, 403, 413].includes(res.status);
+        error.fatal = data?.retryable === false || [400, 401, 403, 413, 422].includes(res.status);
         throw error;
       }
       return data;
@@ -872,7 +903,7 @@ async function rescoreApplied(positionId) {
       await runTransaction(db, async tx => {
         const pos = await tx.get(doc(db, "positions", positionId));
         const app = await tx.get(doc(db, "applications", applicationId));
-        if (!pos.exists() || snapshotKey(pos.data().requirements) !== snapshotKey(requirements) || !app.exists() || app.data().stage !== "applied" || app.data().positionId !== positionId) {
+        if (!pos.exists() || snapshotKey(scoringRequirements(pos.data())) !== snapshotKey(requirements) || !app.exists() || app.data().stage !== "applied" || app.data().positionId !== positionId) {
           const error = new Error("Application stage or requirements changed. Start a new rescore; historical assessments were not overwritten.");
           error.fatal = true;
           rescoreRuns.delete(positionId);
@@ -1204,6 +1235,16 @@ export async function getAvailabilityStates(uids) {
 }
 
 /** Full declared-availability RECORDS (not just state) for a set of staff — what the ranking engine needs to check a specific proposed time. */
+export function subscribeAvailabilityRecords(uids, callback, onError) {
+  if (!firebaseReady || !uids.length) { callback({}); return () => {}; }
+  const records = {};
+  const stops = uids.map(uid => onSnapshot(doc(db, "availability", uid), snap => {
+    records[uid] = snap.exists() ? mapAvailabilityDoc(snap.data()) : null;
+    callback({ ...records });
+  }, onError));
+  return () => stops.forEach(stop => stop());
+}
+
 export async function getAvailabilityRecords(uids) {
   if (!firebaseReady || !uids.length) return {};
   const snaps = await Promise.all(uids.map((id) => getDoc(doc(db, "availability", id))));
@@ -1226,7 +1267,9 @@ export async function getAvailabilityRecords(uids) {
 export async function getWeeklyAvailability(uid) {
   if (!firebaseReady || !uid) return normalizeWeek(null);
   const snap = await getDoc(doc(db, "weeklyAvailability", uid));
-  return normalizeWeek(snap.exists() ? snap.data() : null);
+  const raw = snap.exists() ? snap.data() : null;
+  const savedAt = ms(raw?.updatedAt);
+  return normalizeWeek(savedAt && currentWeekBoundsMs(savedAt).fromMs === currentWeekBoundsMs().fromMs ? raw : null);
 }
 
 /**
@@ -1308,12 +1351,12 @@ function mapInterviewDoc(d) {
     overriddenBy: x.overriddenBy || null,
   };
 }
-export function subscribeInterviewBookings(onChange, onError) {
+export function subscribeInterviewBookings(onChange, onError, interviewerId) {
   if (!firebaseReady) { onChange([]); return () => {}; }
-  return onSnapshot(collection(db, "interviews"), (snap) => onChange(snap.docs.map(mapInterviewDoc)), onError);
+  const source = interviewerId ? query(collection(db, "interviews"), where("interviewerId", "==", interviewerId)) : collection(db, "interviews");
+  return onSnapshot(source, (snap) => onChange(snap.docs.map(mapInterviewDoc)), onError);
 }
 
-const interviewMessage = (candidateName) => `New interview request${candidateName ? ` for ${candidateName}` : ""} — respond from your notifications.`;
 
 // A uid-keyed lookup of "who comes after this person in the ranking" — the
 // mechanism the decline-cascade rule reads from. Chosen over indexing into
@@ -1373,9 +1416,6 @@ export async function createInterviewRequest({ applicationId, positionId, stageI
     };
     return [{ id: ref.id, data }];
   });
-  if (ranked.length) {
-    await notifyUser({ uid: ranked[0].uid, type: "interview_request", message: interviewMessage(candidateName), candidateId: applicationId, positionId });
-  }
   return mapInterviewDoc({ id: ref.id, data: () => data });
 }
 
@@ -1391,7 +1431,8 @@ export async function createInterviewRequest({ applicationId, positionId, stageI
  */
 export async function respondToInterviewRequest(interviewId, { accept, actor }) {
   if (!firebaseReady) return { ok: false };
-  let outcome, notification;
+  if (actor?.role === ROLES.INTERVIEWER) return respondToOwnInterview(db, interviewId, { accept, actor });
+  let outcome;
   await commitInterviewChanges(db, (bookings) => {
     const x = bookings.find((b) => b.id === interviewId);
     if (!x || x.status !== "pending_confirmation" || x.interviewerId !== actor?.uid) throw new Error("This request has changed. Refresh and try again.");
@@ -1404,14 +1445,12 @@ export async function respondToInterviewRequest(interviewId, { accept, actor }) 
     // If so, release the request to HR rather than double-booking the next person.
     const nextUid = proposedNext && !bookingConflict(bookings, { ...x, interviewerId: proposedNext }) ? proposedNext : NO_NEXT;
     outcome = { ok: true, status: nextUid ? "pending_confirmation" : "needs_attention" };
-    notification = nextUid ? { uid: nextUid, candidateId: x.applicationId, positionId: x.positionId, message: interviewMessage(x.candidateName) } : null;
     return [{ id: interviewId, update: true, data: {
       interviewerId: nextUid, status: outcome.status,
       requestedAt: nextUid ? new Date() : null,
       respondedBy: [...(x.respondedBy || []), { uid: actor.uid, name: actor.name || "", action: "declined", at: Date.now() }],
     } }];
   });
-  if (notification) await notifyUser({ ...notification, type: "interview_request" });
   return outcome;
 }
 
@@ -1441,7 +1480,6 @@ export async function overrideInterviewRequest({ interviewId = null, application
   });
   await commitInterviewChanges(db, () => [{ id: ref.id, update: !!interviewId, data }]);
   interviewId = ref.id;
-  await notifyUser({ uid: interviewerId, type: "interview_request", message: interviewMessage(candidateName), candidateId: applicationId, positionId });
   return { ok: true, id: interviewId };
 }
 
@@ -1528,6 +1566,21 @@ export async function advanceStage(candidateId, actor, opts = {}) {
   if (cand.stage === "applied" && (opts.screeningBulk || opts.overrideBulk) && !canBulkSelect(scores.get(candidateId), pos, cand)) {
     return { ok: false, reason: "mandatory-eligibility-required" };
   }
+  if (cand.stage === "applied" && actor?.role !== ROLES.HR) return { ok: false, reason: "hr-required", error: "Only HR can move candidates out of Applied." };
+  let screeningPermit = null;
+  if (cand.stage === "screening") {
+    let currentPosition = pos;
+    let bookings = mockScreeningBookings;
+    if (firebaseReady) {
+      const positionSnap = await getDoc(doc(db, "positions", cand.positionId));
+      currentPosition = positionSnap.exists() ? { ...positionSnap.data(), id: positionSnap.id } : null;
+      const bookingSnap = await getDocs(query(collection(db, "interviews"), where("interviewerId", "==", actor?.uid || "")));
+      bookings = bookingSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+    }
+    const permission = screeningAuthorization(currentPosition, actor, bookings);
+    if (!permission.ok) return permission;
+    screeningPermit = permission.authorization;
+  }
   const nx = nextStage(pos ? pos.stages : DEFAULT_PIPELINE, cand.stage);
   if (!nx) return { ok: false, reason: "terminal" };
 
@@ -1555,11 +1608,12 @@ export async function advanceStage(candidateId, actor, opts = {}) {
   if (nx === "hired") {
     const deptName = (pos && pos.department) || "";
     const title = (pos && pos.title) || cand.appliedRole || "";
+    if (screeningPermit) await writeApplication(candidateId, { set: { screeningAuthorization: screeningPermit } });
     const employeeId = await hireCandidate(candidateId, { deptName, title, entry, positionId: cand.positionId, personId: cand.personId });
     return { ok: true, hired: true, employeeId };
   }
 
-  await writeApplication(candidateId, { set: { stage: nx }, appendHistory: entry });
+  await writeApplication(candidateId, { set: { stage: nx, ...(screeningPermit ? { screeningAuthorization: screeningPermit } : {}) }, appendHistory: entry });
   return { ok: true };
 }
 
@@ -1570,8 +1624,8 @@ export async function advanceStage(candidateId, actor, opts = {}) {
  * at all). The transaction reads the application + its identity + the position,
  * writes a full flattened snapshot into /employees (same shape as before this
  * split), deletes the application (its identity persists — a person's CV/profile
- * outlive any one application), and bumps the position's hiredCount, closing it
- * once headcount is filled (WS1 "hire and close"). Returns the issued employee
+ * outlive any one application), and bumps the position's hiredCount without
+ * changing its status or closing date. Returns the issued employee
  * ID string.
  */
 async function hireCandidate(applicationId, { deptName, title, entry, positionId, personId }) {
@@ -1629,6 +1683,7 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
         cvValidation: app.cvValidation || null,
         offer: app.offer || null,
         rejection: app.rejection || null,
+    withdrawal: app.withdrawal || null,
         comments: Array.isArray(app.comments) ? app.comments : [],
         stage: "hired",
         employeeId,
@@ -1639,14 +1694,15 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
         appliedAt: app.appliedAt || new Date(),
         history,
       });
+      const recipientUid = identity.submittedByUid || app.submittedByUid;
+      if (recipientUid) writeNotifications(tx, db, [hireNotification({ uid: recipientUid, employeeId, title, company: COMPANY.name })]);
       tx.delete(appRef);
       tx.set(counterRef, { next: next + 1 });
-      // Fill the requisition: bump hiredCount, close the position once headcount is met.
+      // A hire is not a vacancy closure. Preserve status and the configured deadline.
       if (posSnap && posSnap.exists()) {
         const p = posSnap.data();
-        const headcount = Number(p.headcount) || 1;
         const hiredCount = (Number(p.hiredCount) || 0) + 1;
-        tx.update(posRef, hiredCount >= headcount ? { hiredCount, status: "Closed" } : { hiredCount });
+        tx.update(posRef, { hiredCount });
       }
     });
     return employeeId;
@@ -1667,7 +1723,7 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
   positions = positions.map((p) => {
     if (p.id !== positionId) return p;
     const hiredCount = (p.hiredCount || 0) + 1;
-    return { ...p, hiredCount, status: hiredCount >= (p.headcount || 1) ? "Closed" : p.status };
+    return { ...p, hiredCount };
   });
   recomputeMock();
   commit();
@@ -1765,6 +1821,19 @@ export async function deleteComment(candidateId, { at, byUid }) {
   await writeApplication(candidateId, { removeComment: target });
 }
 
+/** Management records an already agreed salary at the final hiring stage. */
+export async function saveAcceptedOffer(candidateId, { salary, actor }) {
+  const cand = candidates.find(c => c.id === candidateId);
+  const position = cand && positions.find(p => p.id === cand.positionId);
+  if (actor?.role !== ROLES.MANAGEMENT || !cand || nextStage(position?.stages || DEFAULT_PIPELINE, cand.stage) !== "hired") {
+    throw new Error("Only Management can record an accepted offer at the final hiring stage.");
+  }
+  if (!String(salary || "").trim()) throw new Error("Enter the agreed salary.");
+  const at = Date.now();
+  const offer = { salary: String(salary).trim(), status: "accepted", respondedAt: at, ...actorFields(actor) };
+  await writeApplication(candidateId, { set: { offer }, appendHistory: { type: "offer", status: "accepted", at, ...actorFields(actor) } });
+}
+
 const OFFER_STATUSES = ["sent", "accepted", "declined", "negotiating"];
 
 /** Create and send an offer — salary + start date, status starts at "sent". */
@@ -1806,10 +1875,18 @@ export async function updatePositionStages(positionId, stages) {
  * that file), not one slot applied to a whole stage's team: {stageId,
  * stageLabel, interviewerId, interviewerName, scheduledAt, durationMs}[].
  */
-export async function savePipeline(positionId, { stages, stageMeta = {}, stageAssignees = {}, stageSlots = [], actor }) {
+export async function savePipeline(positionId, { stages, stageMeta = {}, stageAssignees = {}, stageSlots = [], removedBookingIds = [], actor }) {
   const patch = { stages, stageMeta, stageAssignees };
   if (firebaseReady) {
     const position = positions.find((p) => p.id === positionId);
+    if (stageSlots.length) {
+      const availability = await getAvailabilityRecords([...new Set(stageSlots.map(slot => slot.interviewerId))]);
+      for (const slot of stageSlots) {
+        const matching = confirmedAvailabilitySlots(availability[slot.interviewerId]).some(window =>
+          window.startMs === timeMs(slot.scheduledAt) && window.endMs - window.startMs === slot.durationMs);
+        if (!matching) throw new Error(`${slot.interviewerName || "This person"}'s availability has changed. Choose a currently confirmed time and save again.`);
+      }
+    }
     const changes = stageSlots.map((slot) => ({
       id: doc(collection(db, "interviews")).id,
       data: {
@@ -1821,10 +1898,21 @@ export async function savePipeline(positionId, { stages, stageMeta = {}, stageAs
         createdAt: new Date(), createdByUid: actor?.uid || "", createdByName: actor?.name || "",
       },
     }));
-    if (changes.length) await commitInterviewChanges(db, () => changes, { id: positionId, data: patch });
-    else await updateDoc(doc(db, "positions", positionId), patch);
+    const labels = Object.fromEntries(stages.map((id) => [id, { label: stageMeta[id]?.label || resolveStage(position, id).label }]));
+    const notificationsFor = (previous) => teamNotifications({ ...previous, id: positionId }, stageAssignees, labels, stageSlots);
+    if (changes.length || removedBookingIds.length) await commitInterviewChanges(db, (bookings) => [...cancelStageBookings(bookings, positionId, removedBookingIds), ...changes], { id: positionId, data: patch, notificationsFor });
+    else await runTransaction(db, async (tx) => {
+      const ref = doc(db, "positions", positionId);
+      const previous = await tx.get(ref);
+      if (!previous.exists()) throw new Error("Position no longer exists.");
+      tx.update(ref, patch);
+      writeNotifications(tx, db, notificationsFor(previous.data()));
+    });
     return;
   }
+  const cancellations = cancelStageBookings(mockScreeningBookings, positionId, removedBookingIds);
+  mockScreeningBookings = mockScreeningBookings.map(b => cancellations.some(c => c.id === b.id) ? { ...b, status: "cancelled" } : b);
+  mockScreeningBookings.push(...stageSlots.map((slot, index) => ({ ...slot, id: `mock-${Date.now()}-${index}`, positionId, kind: "stage_assignment", status: "confirmed" })));
   positions = positions.map((p) => (p.id === positionId ? { ...p, ...patch } : p));
   publishStageMeta(positions);
   commit();
@@ -1907,4 +1995,47 @@ export async function deletePosition(positionId) {
   positions = positions.filter(p => p.id !== positionId);
   recomputeMock();
   commit();
+}
+
+
+// personId is the canonical candidate identity, not an individual application ID.
+export async function getOtherActiveApplications(personId, excludePositionId) {
+  if (!personId) return [];
+  const rows = firebaseReady
+    ? (await getDocs(query(collection(db, "applications"), where("personId", "==", personId)))).docs.map(d => ({ ...d.data(), id: d.id }))
+    : mockApplications;
+  return rows.filter(a => a.personId === personId && a.positionId !== excludePositionId && crossRejectActive(a))
+    .map(a => ({ ...a, positionTitle: positions.find(p => p.id === a.positionId)?.title || a.positionTitle || a.positionId }));
+}
+export async function crossRejectApplication(sourceId, targetId, options) {
+  if (firebaseReady) return persistCrossRejection(db, sourceId, targetId, options);
+  const source = mockApplications.find(a => a.id === sourceId), target = mockApplications.find(a => a.id === targetId);
+  const patch = crossRejectionPatch(source, target, options);
+  await writeApplication(targetId, { set: patch });
+}
+
+
+let mockPreferences = [];
+export function subscribeCandidatePreferences(personId, onChange, onError) {
+  if (!firebaseReady) { onChange(mockPreferences.filter(p => p.personId === personId)); return () => {}; }
+  if (!personId) { onChange([]); return () => {}; }
+  return onSnapshot(query(collection(db, "candidatePreferences"), where("personId", "==", personId)), snap => onChange(snap.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => b.at-a.at)), onError);
+}
+export async function recordCandidatePreference(sourceId, reviewedApplicationIds, options) {
+  const source = candidates.find(a => a.id === sourceId);
+  if (!source) throw new Error("The current application no longer exists.");
+  const other = await getOtherActiveApplications(source.personId, source.positionId);
+  const ids = [sourceId, ...other.map(a => a.id)].sort();
+  if (JSON.stringify(ids) !== JSON.stringify([...reviewedApplicationIds].sort())) throw new Error("The active applications changed. Close this dialog and review the updated list.");
+  if (firebaseReady) return persistCandidatePreference(db, ids, sourceId, options);
+  const applications = mockApplications.filter(a => ids.includes(a.id));
+  const { record, withdraw } = preferencePlan(applications, sourceId, options);
+  const id = `preference-${Date.now()}`;
+  mockPreferences.unshift({ ...record, id });
+  for (const application of withdraw) {
+    const index = mockApplications.findIndex(a => a.id === application.id);
+    mockApplications[index] = { ...application, ...withdrawalPatch(application, id, record) };
+  }
+  recomputeMock(); commit();
+  return id;
 }

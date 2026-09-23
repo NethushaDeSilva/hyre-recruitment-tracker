@@ -111,6 +111,116 @@ service cloud.firestore {
             && request.resource.data.history.size() >= resource.data.history.size());
     }
 
+    function activeCrossApplication(a) {
+      return !(a.stage in ['rejected', 'withdrawn', 'hired'])
+        && !(a.get('status', '') in ['Rejected', 'Withdrawn', 'Hired', 'rejected', 'withdrawn', 'hired']);
+    }
+    function validCrossRejection() {
+      let old = resource.data;
+      let next = request.resource.data;
+      let audit = next.crossRejection;
+      let sourcePath = /databases/$(database)/documents/applications/$(audit.sourceApplicationId);
+      let source = get(sourcePath).data;
+      let comments = old.get('comments', []);
+      let history = old.get('history', []);
+      let feedback = next.comments[comments.size()];
+      let event = next.history[history.size()];
+      return myRole() in ['HR', 'Interviewer']
+        && activeCrossApplication(old) && activeCrossApplication(source)
+        && source.stage in ['screening', 'dept', 'interview', 'interview2', 'final']
+        && source.personId is string && source.personId.size() > 0
+        && source.personId == old.personId && audit.personId == old.personId
+        && source.positionId != old.positionId && positionAvailable(source.positionId)
+        && getAfter(sourcePath).data == source
+        && next.diff(old).affectedKeys().hasOnly(['stage', 'status', 'comments', 'history', 'rejection', 'crossRejection'])
+        && next.stage == 'rejected'
+        && (!('status' in old) ? !('status' in next) : next.status == 'Rejected')
+        && audit.keys().hasOnly(['sourceApplicationId', 'personId', 'byUid', 'at', 'committedAt'])
+        && audit.byUid == request.auth.uid && audit.committedAt == request.time && audit.at is int
+        && feedback.keys().hasOnly(['byUid', 'by', 'byRole', 'at', 'text', 'score', 'stage', 'sourceApplicationId', 'type'])
+        && feedback.byUid == request.auth.uid && feedback.byRole == myRole()
+        && feedback.at == audit.at && feedback.stage == old.stage
+        && feedback.type == 'cross_reject' && feedback.sourceApplicationId == audit.sourceApplicationId
+        && feedback.text is string && feedback.text.matches('[\\s\\S]*[^\\s][\\s\\S]*')
+        && feedback.score is number && feedback.score >= 0 && feedback.score <= 100
+        && next.comments == comments.concat([feedback])
+        && next.history == history.concat([event])
+        && event == {'byUid': feedback.byUid, 'by': feedback.by, 'byRole': feedback.byRole, 'at': feedback.at,
+          'type': 'reject', 'from': old.stage, 'to': 'rejected', 'reason': 'Candidate chose another position',
+          'comment': feedback.text, 'score': feedback.score, 'sourceApplicationId': audit.sourceApplicationId}
+        && next.rejection == {'byUid': feedback.byUid, 'by': feedback.by, 'byRole': feedback.byRole, 'at': feedback.at,
+          'reason': 'Candidate chose another position', 'comment': feedback.text, 'score': feedback.score, 'stage': old.stage};
+    }
+
+    function validPreferenceRecord() {
+      let p = request.resource.data;
+      let source = get(/databases/$(database)/documents/applications/$(p.sourceApplicationId)).data;
+      return myRole() == 'HR'
+        && p.keys().hasOnly(['personId','sourceApplicationId','choice','selectedApplicationId','selectedPositionTitle','applicationIds','byUid','by','at','note','createdAt'])
+        && p.byUid == request.auth.uid && p.by is string && p.at is int
+        && p.createdAt == request.time && p.note is string
+        && p.personId is string && p.personId.size() > 0 && source.personId == p.personId
+        && activeCrossApplication(source) && source.stage in ['screening','dept','interview','interview2','final']
+        && positionAvailable(source.positionId)
+        && p.applicationIds is list && p.applicationIds.size() >= 2 && p.applicationIds.size() <= 50
+        && p.sourceApplicationId in p.applicationIds
+        && p.choice in ['both','one','undecided']
+        && (p.choice != 'one' ? p.selectedApplicationId == '' : (
+          p.selectedApplicationId in p.applicationIds
+          && getAfter(/databases/$(database)/documents/applications/$(p.selectedApplicationId)).data.personId == p.personId
+          && activeCrossApplication(getAfter(/databases/$(database)/documents/applications/$(p.selectedApplicationId)).data)));
+    }
+    function validPreferenceWithdrawal(id) {
+      let old = resource.data;
+      let next = request.resource.data;
+      let event = next.withdrawal;
+      let path = /databases/$(database)/documents/candidatePreferences/$(event.preferenceId);
+      let preference = getAfter(path).data;
+      let kept = getAfter(/databases/$(database)/documents/applications/$(preference.selectedApplicationId)).data;
+      return myRole() == 'HR' && !exists(path)
+        && preference.choice == 'one' && preference.byUid == request.auth.uid
+        && preference.personId == old.personId && kept.personId == old.personId
+        && id in preference.applicationIds && id != preference.selectedApplicationId
+        && kept.positionId != old.positionId && activeCrossApplication(kept)
+        && activeCrossApplication(old) && next.stage == 'withdrawn'
+        && next.diff(old).affectedKeys().hasOnly(['stage','status','withdrawal','history'])
+        && (!('status' in old) ? !('status' in next) : next.status == 'Withdrawn')
+        && event == {'type':'withdraw','from':old.stage,'to':'withdrawn','reason':'Candidate preference',
+          'comment':preference.note,'preferenceId':event.preferenceId,'selectedApplicationId':preference.selectedApplicationId,
+          'byUid':preference.byUid,'by':preference.by,'byRole':'HR','at':preference.at}
+        && next.history == old.get('history', []).concat([event]);
+    }
+    match /candidatePreferences/{id} {
+      allow read: if isStaff();
+      allow create: if validPreferenceRecord();
+      allow update, delete: if false;
+    }
+
+    // HR Screening is an assigned live interview. UID and the saved booking
+    // are checked at commit time, not trusted from the browser's role alone.
+    function screeningPermit(positionId, permit) {
+      let position = get(/databases/$(database)/documents/positions/$(positionId)).data;
+      let team = position.get('stageAssignees', {}).get('screening', []);
+      let booking = get(/databases/$(database)/documents/interviews/$(permit.interviewId)).data;
+      return myRole() == 'HR'
+        && permit.assignmentIndex is int && permit.assignmentIndex >= 0
+        && (team is list ? (permit.assignmentIndex < team.size() && team[permit.assignmentIndex].uid == request.auth.uid)
+          : (team is map && permit.assignmentIndex == 0 && team.uid == request.auth.uid))
+        && booking.kind == 'stage_assignment' && booking.positionId == positionId
+        && booking.stageId == 'screening' && booking.interviewerId == request.auth.uid
+        && booking.status == 'confirmed' && booking.scheduledAt is timestamp
+        && booking.durationMs is number && booking.durationMs > 0;
+    }
+    function screeningProgressAllowed() {
+      let old = resource.data;
+      let next = request.resource.data;
+      let progressing = !(next.stage in ['applied', 'screening', 'rejected', 'withdrawn']);
+      return (!next.diff(old).affectedKeys().hasAny(['screeningAuthorization'])
+          || (old.stage == 'screening' && screeningPermit(old.positionId, next.screeningAuthorization)))
+        && (old.stage != 'screening' || !progressing || screeningPermit(old.positionId, next.screeningAuthorization))
+        && (old.stage != 'applied' || next.stage in ['applied', 'rejected', 'withdrawn'] || myRole() == 'HR');
+    }
+
     // --- user profiles ---
     match /users/{uid} {
       allow read: if signedIn();
@@ -397,22 +507,23 @@ service cloud.firestore {
       //       (rejected → applied). ONLY HR may reconsider — not Management.
       allow update: if positionAvailable(resource.data.positionId)
         && request.resource.data.positionId == resource.data.positionId
-        && isStaff()
-        && historyAppendOnly()
-        && (
-             request.resource.data.stage == resource.data.stage
-             || ownsStage(resource.data.stage)
-             || (resource.data.stage == 'rejected'
-                 && request.resource.data.stage == 'applied'
-                 && myRole() == 'HR')
-           );
+        && request.resource.data.get('personId', '') == resource.data.get('personId', '')
+        && isStaff() && historyAppendOnly() && screeningProgressAllowed()
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['crossRejection'])
+        && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['withdrawal'])
+          || (request.resource.data.stage == 'withdrawn' && resource.data.stage != 'withdrawn')
+          ? validPreferenceWithdrawal(id)
+          : (request.resource.data.stage == resource.data.stage
+            || (resource.data.stage != 'withdrawn' && ownsStage(resource.data.stage))
+            || (resource.data.stage == 'rejected' && request.resource.data.stage == 'applied' && myRole() == 'HR')));
 
       // delete: explicit position cleanup, or as part of a HIRE transfer — a stage owner (or Management)
       // removes the application the instant it's written into `employees`.
       // Rejected applications otherwise remain in the talent pool.
       allow delete: if deletingPosition(resource.data.positionId) || (isStaff()
-        && resource.data.stage != 'rejected'
-        && ownsStage(resource.data.stage));
+        && !(resource.data.stage in ['rejected', 'withdrawn'])
+        && ownsStage(resource.data.stage)
+        && (resource.data.stage != 'screening' || screeningPermit(resource.data.positionId, resource.data.screeningAuthorization)));
     }
 
     // --- employees (HIRED people) ---

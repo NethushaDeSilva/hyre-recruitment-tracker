@@ -8,8 +8,8 @@
 // and "what does this CV say," never a second copy that can quietly drift
 // from the first.
 
-export const MODEL = "@cf/meta/llama-3.1-8b-instruct-fast";
-const MODEL_TIMEOUT_MS = 15000;
+export const MODEL = "@cf/openai/gpt-oss-20b";
+const MODEL_TIMEOUT_MS = 25000;
 
 // Keep in sync with SECTION_MARKERS in src/lib/cv-extract.js — the two run
 // independently (client heuristic vs. this shared server-side one) but should
@@ -184,8 +184,8 @@ export async function parseCvProfile(env, text) {
     "do not calculate durations yourself), skills, certifications, languages.";
   const messages = [{ role: "system", content: system }, { role: "user", content: user }];
 
-  let result = await tryModel(env, messages, PARSE_SCHEMA, 1400, normalizeParse);
-  if (!result) result = await tryModel(env, messages, PARSE_SCHEMA, 1400, normalizeParse);
+  let result = await tryModel(env, messages, PARSE_SCHEMA, 4000, normalizeParse);
+  if (!result) result = await tryModel(env, messages, PARSE_SCHEMA, 4000, normalizeParse);
   return result;
 }
 
@@ -195,7 +195,7 @@ async function tryModel(env, messages, schema, maxTokens, normalizeFn) {
       env.AI.run(MODEL, { messages, max_tokens: maxTokens, temperature: 0.1, response_format: schema }),
       MODEL_TIMEOUT_MS
     );
-    const raw = (ai && (ai.response ?? ai.result?.response)) ?? "";
+    const raw = modelResponse(ai);
     const obj = raw && typeof raw === "object" ? raw : extractJson(raw);
     if (!obj || typeof obj !== "object") return null;
     return normalizeFn(obj);
@@ -262,8 +262,10 @@ function heuristicFallback(sectionsFound) {
   };
 }
 
-function withTimeout(promise, ms) {
-  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error("model-timeout")), ms))]);
+async function withTimeout(promise, ms) {
+  let timer;
+  try { return await Promise.race([promise, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("model-timeout")), ms); })]); }
+  finally { clearTimeout(timer); }
 }
 
 function extractJson(text) {
@@ -274,4 +276,9 @@ function extractJson(text) {
   const m = s.match(/\{[\s\S]*\}/);
   if (m) { try { return JSON.parse(m[0]); } catch {} }
   return null;
+}
+
+// Accept Workers AI and chat-completions response envelopes; never use reasoning as output.
+export function modelResponse(value) {
+  return value?.response ?? value?.result?.response ?? value?.choices?.[0]?.message?.content ?? "";
 }

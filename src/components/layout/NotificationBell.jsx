@@ -1,3 +1,7 @@
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { notificationPath, notificationTime } from "@/lib/notifications";
+import NotificationDelivery from "./NotificationDelivery";
 // In-app notifications — the replacement for "someone should really tell them
 // this" living only in a chat thread. A rejected candidate hears it here
 // (WS1); staff pings (stage change, feedback requested, offer response,
@@ -10,6 +14,8 @@ import InterviewRequestModal from "@/components/InterviewRequestModal";
 
 export default function NotificationBell() {
   const { notifications } = useHyreData();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [interviewRequestsOpen, setInterviewRequestsOpen] = useState(false);
   const list = notifications || [];
@@ -20,6 +26,9 @@ export default function NotificationBell() {
     if (n.type === "interview_request") {
       setInterviewRequestsOpen(true);
       setOpen(false);
+    } else {
+      setOpen(false);
+      navigate(notificationPath(n, user?.role));
     }
   };
 
@@ -53,7 +62,7 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={close} aria-hidden="true" />
-          <div className="absolute right-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-card shadow-lg" role="menu">
+          <div className="absolute right-0 z-50 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-lg" role="menu">
             <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
               <span className="text-sm font-bold text-foreground">Notifications</span>
               {unread.length > 0 && (
@@ -62,6 +71,7 @@ export default function NotificationBell() {
                 </button>
               )}
             </div>
+            <Link to="/settings#notifications" onClick={close} className="block border-b border-border px-4 py-2 text-xs font-semibold text-primary hover:underline">Notification settings</Link>
             <div className="max-h-80 overflow-y-auto p-1.5">
               {list.length === 0 ? (
                 <p className="px-3 py-6 text-center text-sm text-muted-foreground">You're all caught up.</p>
@@ -72,10 +82,12 @@ export default function NotificationBell() {
                     onClick={() => openNotification(n)}
                     className={`flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-secondary ${!n.read ? "bg-primary/[0.05]" : ""}`}
                   >
+                    {n.title && <span className="text-[13px] font-semibold text-foreground">{n.title}</span>}
                     <div className="flex w-full items-center gap-2">
                       {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
                       <span className="text-[13px] text-foreground">{n.message}</span>
                     </div>
+                    {n.stageId && <span className="pl-3.5 text-xs text-muted-foreground">{notificationTime(n)}</span>}
                     <span className="pl-3.5 text-[11px] text-muted-foreground">{formatDate(n.createdAt)}</span>
                   </button>
                 ))
@@ -84,6 +96,7 @@ export default function NotificationBell() {
           </div>
         </>
       )}
+      <NotificationDelivery notifications={list} onOpen={openNotification} />
       <InterviewRequestModal open={interviewRequestsOpen} onClose={() => setInterviewRequestsOpen(false)} />
     </div>
   );

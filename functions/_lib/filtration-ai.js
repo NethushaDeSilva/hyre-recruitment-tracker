@@ -1,3 +1,5 @@
+import { planRequirements } from "./requirement-plan.js";
+import { analyzeDescription, applyDescriptionFit } from "./job-description.js";
 // WS5 — the orchestration layer around the pure scoring engine. Everything
 // here is the IMPURE half of 5.1's hybrid architecture: it touches Workers
 // AI (embeddings) and the clock, then hands off to engine.js for the actual
@@ -46,9 +48,12 @@ function buildMeta(candidate, now) {
  *   capApplied, breakdown, meta, instrumentation
  */
 export async function scoreOneApplication({ candidate, requirements, env, now = () => new Date() }) {
+  if (!requirements?.requiredSkills?.length) throw new ScoringError("Vacancy has no structured requirements to score against.");
   const embedTexts = (texts) => runEmbeddings(env, texts);
-  const result = await scoreApplication(candidate, requirements, { embedTexts });
-  return { ...result, meta: buildMeta(candidate, now) };
+  const requirementPlan = await planRequirements(requirements, env);
+  const result = await scoreApplication(candidate, requirements, { embedTexts, requirementPlan });
+  const contextual = requirements?.jobContext?.description ? await applyDescriptionFit(result, candidate, await analyzeDescription(requirements, env), embedTexts) : result;
+  return { ...contextual, meta: buildMeta(candidate, now) };
 }
 
 /**
@@ -62,9 +67,25 @@ export async function scoreOneApplication({ candidate, requirements, env, now = 
  * @returns {Promise<Array<{candidateId: string, status: "scored"|"failed", result?: object, error?: string}>>}
  */
 export async function scoreVacancyApplications({ candidates, requirements, env, now = () => new Date() }) {
+  if (!requirements?.requiredSkills?.length) throw new ScoringError("Vacancy has no structured requirements to score against.");
   const embedTexts = (texts) => runEmbeddings(env, texts);
-  const results = await scoreApplications(candidates, requirements, { embedTexts });
-  return results.map((r) =>
-    r.status === "scored" ? { ...r, result: { ...r.result, meta: buildMeta(candidates.find((c) => (c.candidateId || c.id) === r.candidateId) || {}, now) } } : r
-  );
+  const responsibilities = requirements?.jobContext?.description ? await analyzeDescription(requirements, env) : null;
+  const cache = new Map();
+  const cachedEmbed = async texts => {
+    const missing = [...new Set(texts.filter(t => !cache.has(t)))];
+    if (missing.length) { const vectors = await embedTexts(missing); missing.forEach((t,i) => cache.set(t,vectors[i])); }
+    return texts.map(t => cache.get(t));
+  };
+  const requirementPlan = await planRequirements(requirements, env);
+  const results = await scoreApplications(candidates, requirements, { embedTexts: cachedEmbed, requirementPlan });
+  const output = [];
+  for (const row of results) {
+    if (row.status !== "scored") { output.push(row); continue; }
+    const candidate = candidates.find(c => (c.candidateId || c.id) === row.candidateId) || {};
+    try {
+      const result = responsibilities === null ? row.result : await applyDescriptionFit(row.result, candidate, responsibilities, cachedEmbed);
+      output.push({ ...row, result: { ...result, meta: buildMeta(candidate, now) } });
+    } catch (error) { output.push({ candidateId: row.candidateId, status: "failed", error: error.message }); }
+  }
+  return output;
 }

@@ -1,24 +1,13 @@
-// WS5 — the initial filtration engine. Orchestrates matching.js (who
-// matches — layer 1, normalisation only, since 2026-09-12: see 5.4),
-// verification.js (is it grounded in the CV text — 5.6, still
-// embedding-backed and deliberately kept), and scoring.js (how many points —
-// 5.3) into the 5.7 output schema for one application, plus the
-// verification-firing-rate and BORDERLINE instrumentation the 5.4 decision
-// record (test-fixtures/ws6-results.md) was built on.
-//
-// Nothing here calls an LLM. verifyTerm()'s embedding call is the one model
-// call left in the scoring path, and 5.1 explicitly allows that — it's the
-// generative judgement model that's banned at scoring time, not the
-// embedding model 5.6 depends on.
-
+// Evidence-grounded role coverage. AI builds a candidate-independent rubric
+// in filtration-ai.js; this engine evaluates that rubric deterministically.
+import { requirementEntries, defaultGroups, coverage } from "./requirements.js";
 import { matchTermSet } from "./matching.js";
-import { verifyTerm, verifyTerms } from "./verification.js";
+import { verifyTerm } from "./verification.js";
 import {
   classifyCandidateEducation,
   levelMetFor,
   qualificationScore,
   experienceScore,
-  weightedSkillsScore,
   aggregateScore,
   creditWeightForStatus,
 } from "./scoring.js";
@@ -29,7 +18,7 @@ import { assessEligibility } from "./eligibility.js";
 // here (see the note on scoreApplication's return below). Exported so
 // filtration-ai.js and the client's staleness check both read the same
 // literal rather than each hand-typing a copy that could drift apart.
-export const ENGINE_VERSION = "1.0.0";
+export const ENGINE_VERSION = "2.0.0";
 
 export class ScoringError extends Error {}
 
@@ -56,22 +45,38 @@ function tallyVerification(results) {
  * only), verify each match against the stored extracted text, and return
  * both the scored component and the raw matched/missing records for the 5.7
  * breakdown, plus the raw verifyTerm() results for instrumentation. */
-async function scoreSkillList(requiredList, candidateSkills, extractedText, weight, deps) {
-  const { embedTexts, threshold } = deps;
-  const { matched, missing } = matchTermSet(requiredList, candidateSkills);
-  const verified = await verifyTerms(matched.map((m) => m.found), extractedText, { embedTexts, threshold });
-
-  const records = matched.map((m, i) => ({
-    required: m.required,
-    found: m.found,
-    status: verified[i].status,
-    evidence: verified[i].evidence,
-    offset: verified[i].offset,
-  }));
-  const creditWeights = records.map((r) => creditWeightForStatus(r.status));
-  const score = weightedSkillsScore(creditWeights, requiredList.length, weight);
-
-  return { score, max: weight, matched: records, missing, verification: verified };
+async function scoreSkillList(entries, groups, candidateSkills, extractedText, weight, deps) {
+  const terms = [...new Set(entries.flatMap(e => e.alternatives.flat()))];
+  const { matched } = matchTermSet(terms, candidateSkills);
+  // Coalesce semantic checks: a long list must not make one network call per skill.
+  let pending = [];
+  const embedTexts = texts => new Promise((resolve, reject) => {
+    pending.push({ texts, resolve, reject });
+    if (pending.length !== 1) return;
+    Promise.resolve().then(async () => {
+      const batch = pending; pending = [];
+      const unique = [...new Set(batch.flatMap(item => item.texts))];
+      try {
+        const vectors = await deps.embedTexts(unique);
+        const lookup = new Map(unique.map((text, i) => [text, vectors[i]]));
+        batch.forEach(item => item.resolve(item.texts.map(text => lookup.get(text))));
+      } catch (error) { batch.forEach(item => item.reject(error)); }
+    });
+  });
+  const verified = await Promise.all(terms.map(term => verifyTerm(matched.find(m => m.required === term)?.found || term, extractedText, { ...deps, embedTexts })));
+  const records = terms.map((term, i) => ({ required: term,
+    found: matched.find(m => m.required === term)?.found || term,
+    status: verified[i].status, evidence: verified[i].evidence, offset: verified[i].offset }));
+  const credits = new Map(records.map(r => [r.required, creditWeightForStatus(r.status)]));
+  const capabilities = coverage(groups, entries, credits);
+  const totalWeight = groups.reduce((sum, g) => sum + g.weight, 0);
+  const score = totalWeight ? Math.round(weight * capabilities.reduce((sum, g) => sum + g.weight * g.coverage, 0) / totalWeight * 10) / 10 : 0;
+  const mandatory = entries.filter(e => e.mandatory).map(e => ({ name: e.name,
+    met: e.alternatives.some(branch => branch.every(term => records.find(r => r.required === term)?.status === "verified")) }));
+  return { score, max: weight, matched: records.filter(r => r.status !== "unverifiable"),
+    missing: records.filter(r => r.status === "unverifiable").map(r => r.required), verification: verified,
+    capabilities: capabilities.map(g => ({ label: g.label, weight: g.weight, coverage: g.coverage,
+      alternatives: g.alternatives.map(branch => branch.map(id => entries[id].name)) })), mandatory };
 }
 
 /**
@@ -100,13 +105,14 @@ export async function scoreApplication(candidate, requirements, deps) {
   const candidateSkills = candidate.skills || [];
   const extractedText = candidate.extractedText || "";
 
-  const core = await scoreSkillList(requirements.requiredSkills, candidateSkills, extractedText, 45, {
+  const entries = deps.requirementPlan?.entries || requirementEntries(requirements);
+  const groups = deps.requirementPlan?.groups || defaultGroups(entries);
+  const core = await scoreSkillList(entries, groups, candidateSkills, extractedText, 45, {
     embedTexts, threshold: SKILL_SIMILARITY_THRESHOLD,
   });
-  const niceToHave = requirements.niceToHave || [];
-  const preferred = niceToHave.length
-    ? await scoreSkillList(niceToHave, candidateSkills, extractedText, 10, { embedTexts, threshold: SKILL_SIMILARITY_THRESHOLD })
-    : { score: 0, max: 10, matched: [], missing: [], verification: [] };
+  const preferredEntries = requirementEntries(requirements, true);
+  const preferred = await scoreSkillList(preferredEntries, defaultGroups(preferredEntries), candidateSkills, extractedText, 5,
+    { embedTexts, threshold: SKILL_SIMILARITY_THRESHOLD });
 
   const experience = {
     score: experienceScore(candidate.totalYearsExperience || 0, requirements.minYearsExperience || 0),
@@ -179,6 +185,7 @@ export async function scoreApplication(candidate, requirements, deps) {
     skillsScore: core.score,
     experienceScoreValue: experience.score,
     niceToHaveScore: preferred.score,
+    roleCoverage: true,
   });
 
   const allVerifications = qualVerification ? [...core.verification, ...preferred.verification, qualVerification] : [...core.verification, ...preferred.verification];
@@ -190,7 +197,7 @@ export async function scoreApplication(candidate, requirements, deps) {
     ...(allVerifications.some(v => v.inputTruncated) ? { inputTruncated: true } : {}),
     breakdown: {
       qualifications: qualBreakdown,
-      coreSkills: { score: core.score, max: core.max, matched: core.matched, missing: core.missing },
+      coreSkills: { score: core.score, max: core.max, matched: core.matched, missing: core.missing, capabilities: core.capabilities, mandatory: core.mandatory },
       experience,
       preferredSkills: { score: preferred.score, max: preferred.max, matched: preferred.matched, missing: preferred.missing },
     },

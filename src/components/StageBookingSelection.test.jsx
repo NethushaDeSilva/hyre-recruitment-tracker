@@ -1,0 +1,38 @@
+import React from 'react';
+import { act, create } from 'react-test-renderer';
+import { expect, it, vi } from 'vitest';
+import StageConfigModal from './StageConfigModal';
+import StageAssignmentStep from './StageAssignmentStep';
+const mocks=vi.hoisted(()=>({save:vi.fn(async()=>{}),bookings:[]}));
+vi.mock('@/firebase/config',()=>({firebaseReady:false,db:null}));
+vi.mock('@/context/AuthContext',()=>({useAuth:()=>({user:{uid:'hr',role:'HR',name:'HR'}})}));
+vi.mock('@/data/store',()=>({useHyreData:()=>({positions:[],candidates:[]}),savePipeline:(...a)=>mocks.save(...a),subscribeInterviewBookings:cb=>{cb(mocks.bookings);return ()=>{};},subscribeAvailabilityRecords:(_ids,cb)=>{cb({});return ()=>{};}}));
+vi.mock('@/components/ui/Modal',()=>({Modal:({open,children,footer})=>open?<div>{children}{footer}</div>:null}));
+const position={id:'p',title:'Developer',stages:['applied','screening','dept','hired'],stageAssignees:{}};
+const text=n=>typeof n==='string'?n:(n.children||[]).map(text).join('');
+const button=(tree,label)=>tree.root.findAllByType('button').find(b=>text(b).includes(label));
+it('choosing a time selects its person without a checkbox and saves both while staying open',async()=>{
+ mocks.bookings=[];mocks.save.mockClear();let tree;const close=vi.fn();
+ await act(async()=>{tree=create(<StageConfigModal open position={position} onClose={close}/>);});
+ act(()=>button(tree,'Assign people').props.onClick());
+ const picker=()=>tree.root.findByType(StageAssignmentStep);
+ expect(tree.root.findAllByType('input').some(n=>n.props.type==='checkbox')).toBe(false);
+ act(()=>picker().props.onSetPersonSlot(picker().props.staff[0],{scheduledAt:Date.now()+3600000,durationMs:3600000}));
+ expect(picker().props.selected).toHaveLength(1);
+ await act(async()=>{await button(tree,'Save now').props.onClick();});
+ expect(mocks.save.mock.calls[0][1].stageAssignees.screening[0].uid).toBe('hr');
+ expect(mocks.save.mock.calls[0][1].stageSlots).toHaveLength(1);
+ expect(close).not.toHaveBeenCalled();
+ act(()=>tree.unmount());
+});
+it('removes a saved booking after reopening and saves cancellation with the team removal',async()=>{
+ mocks.save.mockClear();mocks.bookings=[{id:'slot',kind:'stage_assignment',positionId:'p',stageId:'screening',interviewerId:'hr',status:'confirmed',scheduledAt:Date.now(),durationMs:3600000}];
+ let tree;await act(async()=>{tree=create(<StageConfigModal open position={{...position,stageAssignees:{screening:[{uid:'hr',name:'HR',role:'HR'}]}}} onClose={()=>{}}/>);});
+ act(()=>button(tree,'Assign people').props.onClick());
+ act(()=>button(tree,'Remove interview / assignment').props.onClick());
+ expect(tree.root.findByType(StageAssignmentStep).props.selected).toHaveLength(0);
+ await act(async()=>{await button(tree,'Save now').props.onClick();});
+ expect(mocks.save.mock.calls[0][1]).toMatchObject({removedBookingIds:['slot'],stageAssignees:{},stageSlots:[]});
+ expect(button(tree,'Save now').props.disabled).toBe(true);
+ act(()=>tree.unmount());
+});

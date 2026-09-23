@@ -1,10 +1,15 @@
 ﻿import { collection, doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { crossRejectActive, canCrossRejectFromStage } from "./crossRejection.js";
 
+// The most positions a candidate may be actively pursuing in parallel at
+// once — enforced at apply-time (see applyToPosition in data/store.js).
+// Defined once here since it's the natural home of cross-position policy.
+export const MAX_CONCURRENT_POSITIONS = 2;
+
 export function preferencePlan(applications, sourceId, { choice, selectedApplicationId = "", note = "", actor }, at = Date.now()) {
   const source = applications.find(a => a.id === sourceId);
   if (actor?.role !== "HR" || !actor.uid) throw new Error("Only HR can record a candidate's position preference.");
-  if (!source?.personId || !crossRejectActive(source) || !canCrossRejectFromStage(source)) throw new Error("Open an active application in HR Screening or a later interview stage.");
+  if (!source?.personId || !crossRejectActive(source) || !canCrossRejectFromStage(source)) throw new Error("Open an active application at the Final Interview stage.");
   if (!["both", "one", "undecided"].includes(choice)) throw new Error("Choose a preference.");
   if (applications.length < 2 || applications.some(a => a.personId !== source.personId || !crossRejectActive(a))) throw new Error("The active applications changed. Review the list and try again.");
   if (new Set(applications.map(a => a.positionId)).size !== applications.length) throw new Error("The application list contains duplicate positions.");

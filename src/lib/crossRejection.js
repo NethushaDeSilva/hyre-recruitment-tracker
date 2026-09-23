@@ -1,7 +1,14 @@
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 
 export const crossRejectActive = (a) => !!a?.stage && !["rejected", "withdrawn", "hired"].includes(a.stage.toLowerCase()) && !["rejected", "withdrawn", "hired"].includes((a.status || "").toLowerCase());
-export const canCrossRejectFromStage = (a) => ["screening", "dept", "interview", "interview2", "final"].includes(a?.stage);
+// Cross-position exclusivity (both the "record candidate's choice" withdrawal
+// and this manual cross-reject) only kicks in once an application reaches
+// Final — a candidate applying to several positions must be free to progress
+// independently through every earlier stage. Used to gate from HR Screening
+// onward; that forced an exclusive choice far too early (before any real
+// interview had happened on the sibling position) and defeated the purpose
+// of allowing multi-position applications in the first place.
+export const canCrossRejectFromStage = (a) => a?.stage === "final";
 export function crossRejectionPatch(source, target, { comment, score = 0, actor }, at = Date.now()) {
   const value = score === "" ? 0 : Number(score);
   if (!comment?.trim()) throw new Error("A comment is required.");

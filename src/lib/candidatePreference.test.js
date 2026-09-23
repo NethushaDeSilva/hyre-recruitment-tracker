@@ -1,9 +1,9 @@
 ﻿import { expect, it } from 'vitest';
 import { preferencePlan, withdrawalPatch } from './candidatePreference';
-const apps=[{id:'a',personId:'p',positionId:'one',positionTitle:'Developer',stage:'screening',comments:[{score:70}],history:[]},{id:'b',personId:'p',positionId:'two',stage:'applied',comments:[],history:[]}];
+const apps=[{id:'a',personId:'p',positionId:'one',positionTitle:'Developer',stage:'final',comments:[{score:70}],history:[]},{id:'b',personId:'p',positionId:'two',stage:'applied',comments:[],history:[]}];
 const actor={uid:'hr',name:'HR',role:'HR'};
 it.each(['both','undecided'])('%s keeps all applications active without requiring a note',choice=>{
- const plan=preferencePlan(apps,'a',{choice,actor});expect(plan.withdraw).toEqual([]);expect(plan.record.note).toBe('');expect(apps[0].stage).toBe('screening');
+ const plan=preferencePlan(apps,'a',{choice,actor});expect(plan.withdraw).toEqual([]);expect(plan.record.note).toBe('');expect(apps[0].stage).toBe('final');
 });
 it.each(['a','b'])('can keep %s and withdraw only the other application without review scores',selectedApplicationId=>{
  const plan=preferencePlan(apps,'a',{choice:'one',selectedApplicationId,actor});expect(plan.withdraw).toHaveLength(1);expect(plan.withdraw[0].id).not.toBe(selectedApplicationId);

@@ -15,7 +15,14 @@ export default function OtherApplications({ candidate, positionTitle }) {
   const [selected, setSelected] = useState(""), [note, setNote] = useState("");
   const [busy, setBusy] = useState(false), [error, setError] = useState("");
   const [notice, setNotice] = useState(""), [decisions, setDecisions] = useState([]);
-  const allowed = user?.role === "HR" && crossRejectActive(candidate) && canCrossRejectFromStage(candidate);
+  // The exclusive "pick one" choice only surfaces once the candidate reaches
+  // Final in MORE THAN ONE active application at the same time — canCrossRejectFromStage
+  // restricts the current application to Final, and the rows.some check below
+  // requires at least one sibling to ALSO be at Final right now. A sibling
+  // that's still earlier in its own pipeline (or was already rejected there)
+  // never forces this choice — see the multi-position bug fix in store.js/crossRejection.js.
+  const othersAtFinal = rows.some((r) => r.stage === "final");
+  const allowed = user?.role === "HR" && crossRejectActive(candidate) && canCrossRejectFromStage(candidate) && othersAtFinal;
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -47,9 +54,10 @@ export default function OtherApplications({ candidate, positionTitle }) {
     <h4 className="text-sm font-medium">Other Positions Applied To</h4>
     {loading ? <p className="text-sm text-muted-foreground">Loading other applications…</p> : !rows.length ? <p className="text-sm text-muted-foreground">No other active applications.</p> : <>
       <ul className="space-y-2">{rows.map(row => <li key={row.id} className="text-sm"><strong>{row.positionTitle}</strong> · {stageLabelOf(row.stage)} · Active</li>)}</ul>
+      {allowed && <p role="status" className="rounded-lg bg-primary/10 p-3 text-sm font-medium text-primary">This candidate has reached Final Interview in more than one active position — record their choice below.</p>}
       <p className="text-sm text-muted-foreground">Ask during the online conversation whether the candidate wants to continue with all positions or focus on one. An undecided preference does not block moving stages.</p>
       <Button disabled={!allowed || loading || busy} onClick={open}>Record candidate’s choice</Button>
-      {!allowed && <p className="text-xs text-muted-foreground">HR can record this decision from HR Screening onward.</p>}
+      {!allowed && <p className="text-xs text-muted-foreground">HR can record this decision once the candidate reaches Final Interview in more than one active position at the same time.</p>}
     </>}
     {!!decisions.length && <details><summary className="cursor-pointer text-sm font-medium">Recorded preferences</summary><ul className="mt-2 space-y-3">{decisions.map(d => <li key={d.id} className="text-sm"><strong>{d.choice === "one" ? `Continue only with ${positions.find(p => p.id === candidates.find(a => a.id === d.selectedApplicationId)?.positionId)?.title || d.selectedPositionTitle}` : d.choice === "both" ? "Continue with all active positions" : "Not decided yet"}</strong><p className="text-xs text-muted-foreground">Recorded by {d.by} · {new Date(d.at).toLocaleString()}</p>{d.note && <p>{d.note}</p>}</li>)}</ul><p className="mt-2 text-xs text-muted-foreground">Previous withdrawals are not reopened automatically when a later preference is recorded.</p></details>}
     <Modal open={!!reviewed} onClose={() => { if (!busy) setReviewed(null); }} title="Record candidate’s choice" footer={<><Button variant="ghost" disabled={busy} onClick={() => setReviewed(null)}>Cancel</Button><Button disabled={busy || (choice === "one" && !selected)} onClick={confirm}>{busy ? "Saving…" : "Confirm choice"}</Button></>}>

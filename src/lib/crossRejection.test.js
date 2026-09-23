@@ -1,6 +1,6 @@
 ﻿import { expect, it } from 'vitest';
 import { crossRejectionPatch, crossRejectActive } from './crossRejection';
-const source={id:'a',personId:'person',positionId:'p1',stage:'interview'};
+const source={id:'a',personId:'person',positionId:'p1',stage:'final'};
 const target={id:'b',personId:'person',positionId:'p2',stage:'screening',comments:[{text:'old'}],history:[]};
 const options={comment:' Chosen position ',score:'',actor:{uid:'hr',role:'HR'}};
 it('appends attributed feedback with zero default and preserves source',()=>{
@@ -15,8 +15,11 @@ it('requires comment, valid score and matching person in different active positi
  expect(()=>crossRejectionPatch({...source,stage:'applied'},target,options)).toThrow();
  expect(crossRejectActive({...target,status:'Withdrawn'})).toBe(false);
 });
-it.each(['screening', 'dept'])('allows cross-rejection from %s without moving the current application', (stage) => {
+it('allows cross-rejection from final without moving the current application',()=>{
+ expect(crossRejectionPatch(source, target, options).stage).toBe('rejected');
+ expect(source.stage).toBe('final');
+});
+it.each(['screening', 'dept', 'interview', 'interview2'])('rejects cross-rejection from %s — a candidate must reach Final before an exclusive choice is forced', (stage) => {
  const current = {...source, stage};
- expect(crossRejectionPatch(current, target, options).stage).toBe('rejected');
- expect(current.stage).toBe(stage);
+ expect(()=>crossRejectionPatch(current, target, options)).toThrow();
 });

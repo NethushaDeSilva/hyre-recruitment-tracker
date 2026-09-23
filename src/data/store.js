@@ -4,7 +4,7 @@ import { cancelStageBookings } from "@/lib/stageBookingChanges";
 import { screeningAuthorization } from "@/lib/screeningAuthorization";
 import { scoringRequirements } from "@/lib/scoringRequirements";
 import { needsAutomaticScore } from "@/lib/automaticScoring";
-import { persistCandidatePreference, preferencePlan, withdrawalPatch } from "@/lib/candidatePreference";
+import { persistCandidatePreference, preferencePlan, withdrawalPatch, MAX_CONCURRENT_POSITIONS } from "@/lib/candidatePreference";
 import { crossRejectActive, crossRejectionPatch, persistCrossRejection } from "@/lib/crossRejection";
 import { writeNotifications, persistAvailabilityReminder } from "@/lib/notificationPersistence";
 import { teamNotifications, hireNotification } from "@/lib/notifications";
@@ -1077,6 +1077,15 @@ export async function applyToPosition(payload) {
     throw err;
   }
 
+  // At most MAX_CONCURRENT_POSITIONS active applications in parallel — the
+  // exclusive "pick one" decision doesn't happen until Final (see
+  // canCrossRejectFromStage), so this is the only place concurrency is capped.
+  if (mine.filter((c) => crossRejectActive(c)).length >= MAX_CONCURRENT_POSITIONS) {
+    const err = new Error(`You can be active in at most ${MAX_CONCURRENT_POSITIONS} positions at once. Wait for a decision on an existing application before applying to another.`);
+    err.code = "max-concurrent-positions";
+    throw err;
+  }
+
   // No duplicate record for the SAME vacancy — but applying to a DIFFERENT
   // vacancy while this one is still active is exactly what WS1 asks for.
   if (mine.some((c) => c.positionId === payload.positionId && c.stage !== "rejected")) {
@@ -1705,6 +1714,22 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
         tx.update(posRef, { hiredCount });
       }
     });
+    // Safety net: a hire is the one point where exclusivity is unconditional,
+    // regardless of what stage any other active application was at (Final's
+    // own "pick one" choice only covers applications that were AT Final
+    // together — it doesn't cover a sibling still earlier in its pipeline).
+    // Best-effort and non-transactional by design; the hire itself has already
+    // committed above.
+    if (personId) {
+      const others = await getOtherActiveApplications(personId, positionId);
+      for (const other of others) {
+        const withdrawEntry = { type: "withdraw", from: other.stage, to: "withdrawn", reason: "Hired elsewhere", at: Date.now() };
+        await writeApplication(other.id, {
+          set: { stage: "withdrawn", withdrawal: withdrawEntry, ...(Object.hasOwn(other, "status") ? { status: "Withdrawn" } : {}) },
+          appendHistory: withdrawEntry,
+        });
+      }
+    }
     return employeeId;
   }
   // mock mode

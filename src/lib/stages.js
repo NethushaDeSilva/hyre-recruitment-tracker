@@ -138,16 +138,26 @@ function sameStaff(a, user) {
 }
 
 // Assignment-aware permission: may THIS user act on a candidate in `stageId`?
-//  • Management → always (mirrors the DB rules).
-//  • Otherwise the user's role must own the stage, AND if a team is assigned, the
-//    user must be ONE of them. (App-level; DB enforcement = S2.)
+// ASSIGNMENT IS THE ONLY AUTHORITY. Being assigned by HR is what grants the
+// right to advance or reject at a stage — a role alone never does.
+//
+//  • Nobody assigned to the stage  → NOBODY may act. HR configuring the stage
+//    team is a prerequisite for the pipeline moving at all, not an optional
+//    refinement. (This used to return true — "owned by the role, nobody
+//    specifically assigned" — which meant an unconfigured stage was open to
+//    every holder of the owning role, the exact opposite of the intent.)
+//  • Management is NOT exempt. It used to short-circuit to true for every
+//    stage, so a Management user could advance or reject anywhere without
+//    being assigned. Management now needs an assignment like anyone else;
+//    what it keeps is eligibility to BE assigned to any stage (StageConfigModal
+//    offers Management alongside the stage's owning role), which is why the
+//    owning-role check below tolerates it.
 export function canActOnStageFor(user, position, stageId) {
   if (!user?.role || stageId === "withdrawn") return false;
-  if (user.role === ROLES.MANAGEMENT) return true;
-  if (stageOwnerRole(position, stageId) !== user.role) return false;
   const team = assigneesFor(position, stageId);
-  if (!team.length) return true; // owned by the role, nobody specifically assigned
-  return team.some((a) => sameStaff(a, user));
+  if (!team.length) return false;
+  if (!team.some((a) => sameStaff(a, user))) return false;
+  return user.role === ROLES.MANAGEMENT || stageOwnerRole(position, stageId) === user.role;
 }
 
 // True if `user` is on the assigned team of ANY stage of this position.

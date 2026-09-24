@@ -1,59 +1,109 @@
-// Regression test for the stage-move/reject authorization bug: a candidate
-// in "Initial Interview" was moved to "Final Interview" by an Interviewer
-// who was NOT the interviewer assigned to that stage for that position — the
-// UI already hid the button correctly (canAdvanceStageFor in src/lib/stages.js),
-// but advanceStage()/rejectCandidate() themselves never verified assignment
-// before writing, so a direct call (bypassing the UI) went through anyway.
+// Stage gate: ASSIGNMENT IS THE ONLY AUTHORITY.
 //
-// Runs in mock/demo mode (firebaseReady: false) — SEED_POSITIONS/SEED_CANDIDATES
-// give a real in-memory pipeline with no Firestore mocking needed; savePipeline's
-// mock-mode branch lets us assign a specific interviewer to pos_1's "interview"
-// stage exactly like HR would via StageConfigModal.
-import { beforeEach, expect, it, vi } from "vitest";
+// To move OR reject a candidate sitting in a configured stage, the actor must
+// BOTH (a) have been assigned to that stage on that position by HR, and
+// (b) hold a confirmed interview booking for it. Three former escape hatches
+// are gone, and each is pinned below:
+//   1. Management short-circuited to allowed on every stage.
+//   2. A stage with NOBODY assigned was open to every holder of the owning role.
+//   3. Only HR Screening required a booked time; the other four stages let an
+//      assigned-but-never-scheduled person through.
+//
+// Runs in mock/demo mode (firebaseReady false) against the seed pipeline. The
+// store module is re-imported per test because mock mode keeps pipeline state
+// in module scope — a test that successfully rejects someone would otherwise
+// leave them terminal for every test after it.
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/firebase/config", () => ({ db: {}, firebaseReady: false }));
 
-const { advanceStage, rejectCandidate, savePipeline } = await import("./store.js");
+const ASSIGNED = { uid: "assigned-uid", role: "Interviewer", name: "Dinesh Kunawardena" };
+const OTHER_INTERVIEWER = { uid: "rehan-uid", role: "Interviewer", name: "Rehan Silva" };
+const MANAGEMENT = { uid: "mgmt-uid", role: "Management", name: "Buddhi Wijayaratne" };
+const HR = { uid: "hr-uid", role: "HR", name: "Priya Fernando" };
 
-const ASSIGNED = { uid: "assigned-uid", role: "Interviewer", name: "Assigned Person" };
-const UNASSIGNED = { uid: "rehan-uid", role: "Interviewer", name: "Rehan Silva" };
-const MANAGEMENT = { uid: "mgmt-uid", role: "Management", name: "Management Person" };
+const STAGES = ["applied", "screening", "dept", "interview", "final", "hired"];
+// cand_6 is a seed application sitting in "interview" (Initial Interview) on pos_1.
+const CANDIDATE = "cand_6";
+const STAGE = "interview";
 
-beforeEach(async () => {
-  // pos_1 / cand_6 are seed fixtures: cand_6 sits in "interview" ("Initial
-  // Interview") on pos_1. Assign ONLY "Assigned Person" to that stage.
-  await savePipeline("pos_1", {
-    stages: ["applied", "screening", "dept", "interview", "final", "hired"],
+let store;
+
+/** Configure pos_1: assign `team` to Initial Interview, and optionally book them a slot. */
+async function configure({ team, booked }) {
+  await store.savePipeline("pos_1", {
+    stages: STAGES,
     stageMeta: {},
-    stageAssignees: { interview: [ASSIGNED] },
-    stageSlots: [],
+    stageAssignees: team ? { [STAGE]: [team] } : {},
+    stageSlots: booked
+      ? [{ stageId: STAGE, stageLabel: "Initial Interview", interviewerId: booked.uid, interviewerName: booked.name, scheduledAt: Date.now() + 86400000, durationMs: 3600000 }]
+      : [],
     removedBookingIds: [],
-    actor: { uid: "hr-uid", role: "HR", name: "HR Person" },
+    actor: HR,
+  });
+}
+const advance = (actor) => store.advanceStage(CANDIDATE, actor);
+const reject = (actor) => store.rejectCandidate(CANDIDATE, { reason: "Not a fit", actor });
+
+// No default configuration here: savePipeline() APPENDS bookings in mock
+// mode, so a slot booked in beforeEach could not be un-booked by a test that
+// needs the "assigned but never scheduled" case. Each test states its own
+// full setup instead.
+beforeEach(async () => {
+  vi.resetModules();
+  store = await import("./store.js");
+});
+
+describe("assignment is required", () => {
+  it("lets the assigned, scheduled interviewer act — the whole point of the gate", async () => {
+    await configure({ team: ASSIGNED, booked: ASSIGNED });
+    expect((await reject(ASSIGNED)).ok).toBe(true);
+  });
+
+  it("refuses an interviewer who was never assigned to this stage", async () => {
+    await configure({ team: ASSIGNED, booked: ASSIGNED });
+    expect(await advance(OTHER_INTERVIEWER)).toMatchObject({ ok: false, reason: "stage-assignment-required" });
+    expect(await reject(OTHER_INTERVIEWER)).toMatchObject({ ok: false, reason: "stage-assignment-required" });
+  });
+
+  it("refuses HR too — HR configures the stage, it does not staff itself onto one", async () => {
+    await configure({ team: ASSIGNED, booked: ASSIGNED });
+    expect(await advance(HR)).toMatchObject({ ok: false, reason: "stage-assignment-required" });
   });
 });
 
-it("rejects a Move/Reject attempt from an Interviewer who IS NOT assigned to this stage on this position", async () => {
-  const moveResult = await advanceStage("cand_6", UNASSIGNED);
-  expect(moveResult.ok).toBe(false);
-  expect(moveResult.reason).toBe("stage-assignment-required");
+describe("Management has no special powers (gap 1)", () => {
+  it("refuses an UNASSIGNED Management user to move or reject, same as anyone else", async () => {
+    await configure({ team: ASSIGNED, booked: ASSIGNED });
+    expect(await advance(MANAGEMENT)).toMatchObject({ ok: false, reason: "stage-assignment-required" });
+    expect(await reject(MANAGEMENT)).toMatchObject({ ok: false, reason: "stage-assignment-required" });
+  });
 
-  const rejectResult = await rejectCandidate("cand_6", { reason: "Not a fit", actor: UNASSIGNED });
-  expect(rejectResult.ok).toBe(false);
-  expect(rejectResult.reason).toBe("stage-assignment-required");
+  it("still lets Management act where HR DID assign and schedule them", async () => {
+    await configure({ team: MANAGEMENT, booked: MANAGEMENT });
+    expect((await reject(MANAGEMENT)).ok).toBe(true);
+  });
 });
 
-it("lets the ASSIGNED interviewer past the assignment gate (any later failure is a different, unrelated check)", async () => {
-  const moveResult = await advanceStage("cand_6", ASSIGNED);
-  expect(moveResult.reason).not.toBe("stage-assignment-required");
-
-  const rejectResult = await rejectCandidate("cand_6", { reason: "Not a fit", actor: ASSIGNED });
-  expect(rejectResult.ok).toBe(true); // reject has no review-gate to clear, unlike advance
+describe("an unstaffed stage is closed to everyone (gap 2)", () => {
+  it("refuses every role when HR has assigned nobody to the stage", async () => {
+    await configure({ team: null, booked: null });
+    for (const actor of [ASSIGNED, OTHER_INTERVIEWER, MANAGEMENT, HR]) {
+      expect(await advance(actor)).toMatchObject({ ok: false, reason: "stage-assignment-required" });
+      expect(await reject(actor)).toMatchObject({ ok: false, reason: "stage-assignment-required" });
+    }
+  });
 });
 
-it("Management always passes the assignment gate, regardless of the per-stage team", async () => {
-  const moveResult = await advanceStage("cand_6", MANAGEMENT);
-  expect(moveResult.reason).not.toBe("stage-assignment-required");
+describe("a booked interview time is required on every stage, not just HR Screening (gap 3)", () => {
+  it("refuses the assigned interviewer when no time has been scheduled for them", async () => {
+    await configure({ team: ASSIGNED, booked: null });
+    expect(await advance(ASSIGNED)).toMatchObject({ ok: false, reason: "stage-time-required" });
+    expect(await reject(ASSIGNED)).toMatchObject({ ok: false, reason: "stage-time-required" });
+  });
 
-  const rejectResult = await rejectCandidate("cand_6", { reason: "Not a fit", actor: MANAGEMENT });
-  expect(rejectResult.ok).toBe(true);
+  it("refuses when the booked slot belongs to a DIFFERENT person on the same stage", async () => {
+    await configure({ team: ASSIGNED, booked: OTHER_INTERVIEWER });
+    expect(await advance(ASSIGNED)).toMatchObject({ ok: false, reason: "stage-time-required" });
+  });
 });

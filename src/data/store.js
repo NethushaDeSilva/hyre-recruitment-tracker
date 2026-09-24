@@ -1,7 +1,7 @@
 import { confirmedAvailabilitySlots } from "@/lib/confirmedAvailability";
 import { currentWeekBoundsMs } from "@/lib/weeklyAvailability";
 import { cancelStageBookings } from "@/lib/stageBookingChanges";
-import { screeningAuthorization } from "@/lib/screeningAuthorization";
+import { stageAuthorization } from "@/lib/screeningAuthorization";
 import { scoringRequirements } from "@/lib/scoringRequirements";
 import { needsAutomaticScore } from "@/lib/automaticScoring";
 import { persistCandidatePreference, preferencePlan, withdrawalPatch, MAX_CONCURRENT_POSITIONS } from "@/lib/candidatePreference";
@@ -32,7 +32,7 @@ import { canBulkSelect, evaluateReviewGate } from "@/lib/scoreStaleness";
 import { useSyncExternalStore } from "react";
 import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
-import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta, stageOwnerRole, resolveStage, canActOnStageFor } from "@/lib/stages";
+import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta, stageOwnerRole, resolveStage, canActOnStageFor, CONFIGURABLE_STAGES } from "@/lib/stages";
 import { departmentCode } from "@/lib/departments";
 import { isOpenNow } from "@/lib/positions";
 import { createRescoreRun, executeRescoreRun, snapshotKey } from "@/lib/rescoreBatch";
@@ -1588,6 +1588,20 @@ const commentId = (cm) => cm.byUid || cm.by || "";
  * The review is copied onto the history entry so it shows in the candidate's
  * timeline.
  */
+// Shared input fetch for the stage gate. The position is re-read from
+// Firestore rather than taken from the cached list: the stage team could have
+// been reassigned since this tab loaded, and the gate must judge on current
+// assignment, not on whatever this session happens to be holding.
+async function stageGateInputs(positionId, cachedPosition, actor) {
+  if (!firebaseReady) return { position: cachedPosition, bookings: mockScreeningBookings };
+  const positionSnap = await getDoc(doc(db, "positions", positionId));
+  const bookingSnap = await getDocs(query(collection(db, "interviews"), where("interviewerId", "==", actor?.uid || "")));
+  return {
+    position: positionSnap.exists() ? { ...positionSnap.data(), id: positionSnap.id } : null,
+    bookings: bookingSnap.docs.map((d) => ({ ...d.data(), id: d.id })),
+  };
+}
+
 export async function advanceStage(candidateId, actor, opts = {}) {
   const cand = candidates.find((c) => c.id === candidateId);
   if (!cand) return { ok: false, reason: "not-found" };
@@ -1596,28 +1610,17 @@ export async function advanceStage(candidateId, actor, opts = {}) {
     return { ok: false, reason: "mandatory-eligibility-required" };
   }
   if (cand.stage === "applied" && actor?.role !== ROLES.HR) return { ok: false, reason: "hr-required", error: "Only HR can move candidates out of Applied." };
-  let screeningPermit = null;
-  if (cand.stage === "screening") {
-    let currentPosition = pos;
-    let bookings = mockScreeningBookings;
-    if (firebaseReady) {
-      const positionSnap = await getDoc(doc(db, "positions", cand.positionId));
-      currentPosition = positionSnap.exists() ? { ...positionSnap.data(), id: positionSnap.id } : null;
-      const bookingSnap = await getDocs(query(collection(db, "interviews"), where("interviewerId", "==", actor?.uid || "")));
-      bookings = bookingSnap.docs.map(d => ({ ...d.data(), id: d.id }));
-    }
-    const permission = screeningAuthorization(currentPosition, actor, bookings);
+  // EVERY configurable stage (screening/dept/interview/interview2/final) now
+  // demands the same two things: HR assigned this actor to the stage, and the
+  // actor holds a confirmed interview booking for it. This check used to run
+  // for HR Screening alone — the other four accepted "assigned" with no time
+  // ever scheduled, and Management skipped even that.
+  let stagePermit = null;
+  if (CONFIGURABLE_STAGES.includes(cand.stage)) {
+    const { position: currentPosition, bookings } = await stageGateInputs(cand.positionId, pos, actor);
+    const permission = stageAuthorization(currentPosition, actor, bookings, cand.stage);
     if (!permission.ok) return permission;
-    screeningPermit = permission.authorization;
-  }
-  // Every other stage (dept/interview/interview2/final): the actual write
-  // used to trust the UI's canAdvanceStageFor() check entirely — the button
-  // was hidden for an unassigned interviewer, but nothing stopped a direct
-  // call (or a bypassed UI) from writing the move anyway. Re-check identity
-  // here, server-of-truth-side, with the SAME assignment-aware function the
-  // UI uses, so this can never drift from what's rendered.
-  if (cand.stage !== "applied" && cand.stage !== "screening" && !canActOnStageFor(actor, pos, cand.stage)) {
-    return { ok: false, reason: "stage-assignment-required", error: "You are not assigned to this stage for this position." };
+    stagePermit = permission.authorization;
   }
   const nx = nextStage(pos ? pos.stages : DEFAULT_PIPELINE, cand.stage);
   if (!nx) return { ok: false, reason: "terminal" };
@@ -1646,12 +1649,12 @@ export async function advanceStage(candidateId, actor, opts = {}) {
   if (nx === "hired") {
     const deptName = (pos && pos.department) || "";
     const title = (pos && pos.title) || cand.appliedRole || "";
-    if (screeningPermit) await writeApplication(candidateId, { set: { screeningAuthorization: screeningPermit } });
+    if (stagePermit) await writeApplication(candidateId, { set: { screeningAuthorization: stagePermit } });
     const employeeId = await hireCandidate(candidateId, { deptName, title, entry, positionId: cand.positionId, personId: cand.personId });
     return { ok: true, hired: true, employeeId };
   }
 
-  await writeApplication(candidateId, { set: { stage: nx, ...(screeningPermit ? { screeningAuthorization: screeningPermit } : {}) }, appendHistory: entry });
+  await writeApplication(candidateId, { set: { stage: nx, ...(stagePermit ? { screeningAuthorization: stagePermit } : {}) }, appendHistory: entry });
   return { ok: true };
 }
 
@@ -1799,12 +1802,28 @@ export async function rejectCandidate(candidateId, { reason = "", comment = "", 
   if (cand.stage === "applied" && actor?.role !== ROLES.HR) {
     return { ok: false, reason: "hr-required", error: "Only HR can reject a candidate in Applied." };
   }
-  if (cand.stage !== "applied" && !canActOnStageFor(actor, pos, cand.stage)) {
+  // Rejecting is the other half of acting on a stage, so it carries the SAME
+  // bar as advancing: assigned by HR to this stage, and holding a confirmed
+  // interview time for it. An interviewer who was never scheduled cannot
+  // reject a candidate any more than they can pass one.
+  let stagePermit = null;
+  if (CONFIGURABLE_STAGES.includes(cand.stage)) {
+    const { position: currentPosition, bookings } = await stageGateInputs(cand.positionId, pos, actor);
+    const permission = stageAuthorization(currentPosition, actor, bookings, cand.stage);
+    if (!permission.ok) return permission;
+    stagePermit = permission.authorization;
+  } else if (cand.stage !== "applied" && !canActOnStageFor(actor, pos, cand.stage)) {
     return { ok: false, reason: "stage-assignment-required", error: "You are not assigned to this stage for this position." };
   }
   const rejection = { reason, comment, stage: cand.stage, at: Date.now(), ...actorFields(actor) };
   const entry = { type: "reject", from: cand.stage, to: "rejected", reason, comment, at: Date.now(), ...actorFields(actor) };
-  await writeApplication(candidateId, { set: { stage: "rejected", rejection }, appendHistory: entry });
+  // The permit is persisted on a reject too, not just an advance — the rules
+  // require one for ANY move out of a configurable stage, and a rejection is
+  // exactly such a move.
+  await writeApplication(candidateId, {
+    set: { stage: "rejected", rejection, ...(stagePermit ? { screeningAuthorization: stagePermit } : {}) },
+    appendHistory: entry,
+  });
   // Notify the applicant, if this application is linked to a real account (a
   // candidate added directly by HR with no login has nowhere to be notified).
   if (cand.submittedByUid) {

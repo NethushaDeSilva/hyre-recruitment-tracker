@@ -112,11 +112,20 @@ service cloud.firestore {
     // stageAssignees (see stageAssigneeUidsOf() in src/data/store.js) —
     // rules can't iterate a list of {uid,...} maps, but can check a list of
     // plain uid strings.
+    // ASSIGNMENT IS THE ONLY AUTHORITY — mirrors canActOnStageFor() in
+    // src/lib/stages.js. Two former escape hatches are deliberately gone:
+    //   • Management no longer short-circuits to allowed. It may still BE
+    //     assigned to any stage (hence the Management branch below), but it
+    //     acts only where HR actually assigned it.
+    //   • An EMPTY team no longer means "anyone with the owning role". A
+    //     stage HR has not staffed is closed to everybody, so an unconfigured
+    //     pipeline cannot be walked forward by default.
     function stageAssignmentOk(positionId, stage) {
       let position = get(/databases/$(database)/documents/positions/$(positionId)).data;
       let uids = position.get('stageAssigneeUids', {}).get(stage, []);
-      return myRole() == 'Management'
-        || (myRole() == stageOwner(stage) && (uids.size() == 0 || request.auth.uid in uids));
+      return uids.size() > 0
+        && request.auth.uid in uids
+        && (myRole() == 'Management' || myRole() == stageOwner(stage));
     }
 
     // history[] may only grow — never shrink or be dropped. Tolerates docs that
@@ -231,10 +240,38 @@ service cloud.firestore {
       let old = resource.data;
       let next = request.resource.data;
       let progressing = !(next.stage in ['applied', 'screening', 'rejected', 'withdrawn']);
+      // The permit field may be written for ANY configurable stage now, not
+      // just screening — it is what proves a booking exists for the stage
+      // being left. Restricting it to screening would deny every
+      // Dept/Interview/Final move, since those now carry a permit too.
       return (!next.diff(old).affectedKeys().hasAny(['screeningAuthorization'])
-          || (old.stage == 'screening' && screeningPermit(old.positionId, next.screeningAuthorization)))
+          || stageBookingOk(old.positionId, old.stage, next.screeningAuthorization))
         && (old.stage != 'screening' || !progressing || screeningPermit(old.positionId, next.screeningAuthorization))
         && (old.stage != 'applied' || next.stage in ['applied', 'rejected', 'withdrawn'] || myRole() == 'HR');
+    }
+
+    // Every stage HR configures is an INTERVIEW stage, so leaving one requires
+    // the actor to actually hold a confirmed booking for it — being assigned
+    // but never scheduled is not enough. HR Screening already worked this way
+    // (screeningPermit above); this extends the same bar to Department Review,
+    // Initial/Further Interview and Final, which previously checked assignment
+    // alone. Applies to rejecting as well as advancing: both are moves out of
+    // the stage, and both write the permit (see advanceStage/rejectCandidate
+    // in src/data/store.js).
+    function stageBookingOk(positionId, stage, permit) {
+      let booking = get(/databases/$(database)/documents/interviews/$(permit.interviewId)).data;
+      return booking.kind == 'stage_assignment'
+        && booking.positionId == positionId
+        && booking.stageId == stage
+        && booking.interviewerId == request.auth.uid
+        && booking.status == 'confirmed'
+        && booking.scheduledAt is timestamp
+        && booking.durationMs is number && booking.durationMs > 0;
+    }
+    function leavingStageAllowed(positionId, stage) {
+      return stageAssignmentOk(positionId, stage)
+        && (!(stage in ['screening', 'dept', 'interview', 'interview2', 'final'])
+            || stageBookingOk(positionId, stage, request.resource.data.screeningAuthorization));
     }
 
     // --- user profiles ---
@@ -666,7 +703,7 @@ service cloud.firestore {
           || (request.resource.data.stage == 'withdrawn' && resource.data.stage != 'withdrawn')
           ? validPreferenceWithdrawal(id)
           : (request.resource.data.stage == resource.data.stage
-            || (resource.data.stage != 'withdrawn' && stageAssignmentOk(resource.data.positionId, resource.data.stage))
+            || (resource.data.stage != 'withdrawn' && leavingStageAllowed(resource.data.positionId, resource.data.stage))
             || (resource.data.stage == 'rejected' && request.resource.data.stage == 'applied' && myRole() == 'HR')));
 
       // delete: explicit position cleanup, or as part of a HIRE transfer — the

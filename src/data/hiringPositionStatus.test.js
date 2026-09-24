@@ -3,7 +3,22 @@
 // construct its purifier — this file imports store.js transitively.)
 import { expect, it, vi } from 'vitest';
 vi.mock('@/firebase/config',()=>({firebaseReady:false,db:null,auth:null,storage:null}));
-import { addComment, advanceStage, sendOffer, respondToOffer, getPosition, getCandidatesFor } from './store';
+import { addComment, advanceStage, sendOffer, respondToOffer, getPosition, getCandidatesFor, savePipeline } from './store';
+// The Final stage now requires its actor to be ASSIGNED to it and to hold a
+// confirmed interview booking (assignment is the only authority — Management
+// has no exemption). These cases are about the offer/hire flow, not the gate,
+// so the actor is staffed onto Final here the way HR would in Configure stages.
+async function staffFinal(savePipeline, actor) {
+  await savePipeline('pos_1', {
+    stages: ['applied','screening','dept','interview','final','hired'],
+    stageMeta: {},
+    stageAssignees: { final: [actor] },
+    stageSlots: [{ stageId: 'final', stageLabel: 'Final Interview', interviewerId: actor.uid, interviewerName: actor.name, scheduledAt: Date.now() + 86400000, durationMs: 3600000 }],
+    removedBookingIds: [],
+    actor: { uid: 'hr-cfg', name: 'HR', role: 'HR' },
+  });
+}
+
 import { effectiveStatus } from '@/lib/positions';
 it('hiring at the legacy headcount limit preserves the vacancy and its deadline',async()=>{
  const position=getPosition('pos_1');
@@ -12,6 +27,7 @@ it('hiring at the legacy headcount limit preserves the vacancy and its deadline'
  const candidate=getCandidatesFor(position.id).find(c=>c.stage==='final');
  expect(candidate).toBeTruthy();
  const actor={uid:'hr-test',name:'HR Test',role:'Management'};
+ await staffFinal(savePipeline,actor);
  await addComment(candidate.id,{text:'Approved after interview',score:90,recommendation:'advance',actor});
  await sendOffer(candidate.id,{salary:'100000',startDate:'2026-11-01',actor});
  await respondToOffer(candidate.id,{status:'accepted',actor});

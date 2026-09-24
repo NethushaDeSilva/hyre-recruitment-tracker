@@ -1,6 +1,6 @@
 import React from "react";
 import { act, create } from "react-test-renderer";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import Availability from "./Availability";
 import { emptyWeek } from "@/lib/weeklyAvailability";
 
@@ -18,7 +18,22 @@ const buttons = (tree) => tree.root.findAllByType("button");
 const tab = (tree, label) => buttons(tree).find((b) => text(b).startsWith(label));
 const button = (tree, label) => buttons(tree).find((b) => text(b).trim() === label);
 
-beforeEach(() => { mocks.save.mockReset().mockResolvedValue(); mocks.week = emptyWeek(); mocks.confirmResult = true; });
+// Pinned to Sunday 20 Sep 2026, 08:00 Colombo. These cases are about the
+// editor's mechanics (tab order, dirty/Save, Remove this day), not the
+// date/time gate added later — and on a Sunday nothing is in the past, so
+// every day stays selectable and a default 09:00–17:00 row is still valid.
+// Without a pin this file silently depended on which weekday the suite ran
+// on: from Monday onward the gate disables earlier tabs, which is the
+// intended new behaviour (see Availability.gate.test.jsx) but would make
+// these assertions fail for the wrong reason.
+beforeEach(() => {
+  mocks.save.mockReset().mockResolvedValue();
+  mocks.week = emptyWeek();
+  mocks.confirmResult = true;
+  vi.useFakeTimers();
+  vi.setSystemTime(Date.UTC(2026, 8, 20, 2, 30));
+});
+afterEach(() => { vi.useRealTimers(); });
 
 it("shows a real-date range banner (this calendar week, Sri Lanka time) and a per-tab date", async () => {
   let tree;

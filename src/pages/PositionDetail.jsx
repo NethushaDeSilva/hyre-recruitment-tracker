@@ -593,7 +593,8 @@ export default function PositionDetail() {
         candidate={rejectTarget}
         onClose={() => setRejectTarget(null)}
         onConfirm={async ({ reason, comment }) => {
-          await rejectCandidate(rejectTarget.id, { reason, comment, actor });
+          const res = await rejectCandidate(rejectTarget.id, { reason, comment, actor });
+          if (!res?.ok) toast.error(res?.error || "Could not reject this candidate.");
         }}
       />
       <RejectModal
@@ -603,7 +604,8 @@ export default function PositionDetail() {
         onConfirm={async ({ reason, comment }) => {
           const ids = appliedPicked.map((c) => c.id);
           setPicked(new Set());
-          await bulkReject(ids, { reason, comment, actor });
+          const rejected = await bulkReject(ids, { reason, comment, actor });
+          if (rejected < ids.length) toast.error(`${rejected}/${ids.length} rejected — the rest were skipped (not assigned to their stage).`);
         }}
       />
     </div>

@@ -32,16 +32,17 @@ import { canBulkSelect, evaluateReviewGate } from "@/lib/scoreStaleness";
 import { useSyncExternalStore } from "react";
 import { collection, doc, getDoc, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, arrayUnion, arrayRemove, runTransaction, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db, firebaseReady } from "@/firebase/config";
-import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta, stageOwnerRole, resolveStage } from "@/lib/stages";
+import { DEFAULT_PIPELINE, JUNIOR_PIPELINE, nextStage, registerStageMeta, stageOwnerRole, resolveStage, canActOnStageFor } from "@/lib/stages";
 import { departmentCode } from "@/lib/departments";
 import { isOpenNow } from "@/lib/positions";
 import { createRescoreRun, executeRescoreRun, snapshotKey } from "@/lib/rescoreBatch";
 import { scoringHeaders } from "@/lib/scoringAuth";
 import { createDeclaredAvailabilityProvider, availabilityState, AVAILABILITY_VALIDITY_MS } from "@/lib/availability";
-import { normalizeWeek, buildLegacyAvailabilityDoc } from "@/lib/weeklyAvailability";
+import { normalizeWeek, buildLegacyAvailabilityDoc, validateWeekTiming, weekHasErrors, DAY_KEYS } from "@/lib/weeklyAvailability";
 import { browserTimeZone } from "@/lib/wallClock";
 import { rankEligibleInterviewers } from "@/lib/interviewAssignment";
 import { ROLES } from "@/lib/permissions";
+import { sanitizeComment, isSanitizedCommentEmpty } from "@/lib/sanitizeHtml";
 
 const AVATAR_COLORS = ["#2563EB", "#4F46E5", "#E0A422", "#16A34A", "#DC2626", "#0EA5E9", "#DB2777", "#1F3A5F", "#64748B"];
 function pickColor(name) {
@@ -1299,6 +1300,25 @@ export async function getWeeklyAvailability(uid) {
  */
 export async function saveWeeklyAvailability(uid, days) {
   if (!firebaseReady || !uid) return;
+  // Re-check the clock HERE, at the moment of the write, against a FRESH
+  // Date.now() — never whatever the form happened to render with. A page left
+  // open past a slot's start time (or past Colombo midnight, which shifts
+  // which days count as past) would otherwise save times that were valid when
+  // the inputs were built and no longer are. Every caller reaches Firestore
+  // through this function, so the check holds whichever screen triggered it.
+  //
+  // This is still CLIENT code — the independent server-side copy of the same
+  // rule lives in firestore.rules (weeklyAvailability/{staffUid}); neither
+  // one is load-bearing on its own.
+  const storedWeek = await getDoc(doc(db, "weeklyAvailability", uid));
+  const savedDays = normalizeWeek(storedWeek.exists() ? storedWeek.data() : null);
+  const timing = validateWeekTiming(days, savedDays, Date.now());
+  if (weekHasErrors(timing)) {
+    const firstError = DAY_KEYS.map((k) => timing[k].errors[0]).find(Boolean);
+    const error = new Error(firstError?.message || "Some of these times have already passed. Reload and try again.");
+    error.code = "availability-past-time";
+    throw error;
+  }
   // Preserve whatever exceptions already exist on the legacy doc — this
   // dual-write derives `slots` from the template, but exceptions are a
   // one-off-date concept the template has no equivalent of, so they're
@@ -1590,6 +1610,15 @@ export async function advanceStage(candidateId, actor, opts = {}) {
     if (!permission.ok) return permission;
     screeningPermit = permission.authorization;
   }
+  // Every other stage (dept/interview/interview2/final): the actual write
+  // used to trust the UI's canAdvanceStageFor() check entirely — the button
+  // was hidden for an unassigned interviewer, but nothing stopped a direct
+  // call (or a bypassed UI) from writing the move anyway. Re-check identity
+  // here, server-of-truth-side, with the SAME assignment-aware function the
+  // UI uses, so this can never drift from what's rendered.
+  if (cand.stage !== "applied" && cand.stage !== "screening" && !canActOnStageFor(actor, pos, cand.stage)) {
+    return { ok: false, reason: "stage-assignment-required", error: "You are not assigned to this stage for this position." };
+  }
   const nx = nextStage(pos ? pos.stages : DEFAULT_PIPELINE, cand.stage);
   if (!nx) return { ok: false, reason: "terminal" };
 
@@ -1761,7 +1790,18 @@ async function hireCandidate(applicationId, { deptName, title, entry, positionId
  */
 export async function rejectCandidate(candidateId, { reason = "", comment = "", actor } = {}) {
   const cand = candidates.find((c) => c.id === candidateId);
-  if (!cand) return;
+  if (!cand) return { ok: false, reason: "not-found" };
+  // Same server-of-truth identity check as advanceStage — Reject is the
+  // other half of "act on a candidate in this stage" and was missing this
+  // entirely (the UI already hid the button correctly; this function itself
+  // never verified anything before writing).
+  const pos = positions.find((p) => p.id === cand.positionId);
+  if (cand.stage === "applied" && actor?.role !== ROLES.HR) {
+    return { ok: false, reason: "hr-required", error: "Only HR can reject a candidate in Applied." };
+  }
+  if (cand.stage !== "applied" && !canActOnStageFor(actor, pos, cand.stage)) {
+    return { ok: false, reason: "stage-assignment-required", error: "You are not assigned to this stage for this position." };
+  }
   const rejection = { reason, comment, stage: cand.stage, at: Date.now(), ...actorFields(actor) };
   const entry = { type: "reject", from: cand.stage, to: "rejected", reason, comment, at: Date.now(), ...actorFields(actor) };
   await writeApplication(candidateId, { set: { stage: "rejected", rejection }, appendHistory: entry });
@@ -1777,18 +1817,22 @@ export async function rejectCandidate(candidateId, { reason = "", comment = "", 
       positionId: cand.positionId,
     });
   }
+  return { ok: true };
 }
 
 /**
  * Reject several candidates in one go (e.g. everyone below the qualification bar).
  * Same rules as a single reject — nobody is deleted, each keeps a rejection
  * record — just applied across a list. Already-rejected ones are skipped.
+ * Each target still runs through rejectCandidate's own authorization check —
+ * a bulk call is not a way to reject a candidate in a stage the actor isn't
+ * assigned to; it silently skips those rather than failing the whole batch.
  * Returns the number actually rejected.
  */
 export async function bulkReject(candidateIds = [], { reason = "", comment = "", actor } = {}) {
   const targets = candidates.filter((c) => candidateIds.includes(c.id) && c.stage !== "rejected");
-  await Promise.all(targets.map((c) => rejectCandidate(c.id, { reason, comment, actor })));
-  return targets.length;
+  const results = await Promise.all(targets.map((c) => rejectCandidate(c.id, { reason, comment, actor })));
+  return results.filter((r) => r?.ok).length;
 }
 
 /**
@@ -1811,7 +1855,14 @@ const RECOMMENDATIONS = ["advance", "reject", "hold"];
 
 export async function addComment(candidateId, { text, score = null, recommendation = null, actor }) {
   const cand = candidates.find((c) => c.id === candidateId);
-  const hasText = !!(text && text.trim());
+  // Sanitize HERE, at the one place every comment gets written — never trust
+  // the caller (RichCommentEditor's toolbar restricts what a well-behaved UI
+  // produces, but the stored value is what every OTHER user later renders,
+  // so the strict allowlist is enforced at the boundary, not just in the UI).
+  // Render sites (SafeHtml) sanitize again independently — defense in depth,
+  // not "sanitize once and trust it forever."
+  const cleanText = sanitizeComment(text);
+  const hasText = !isSanitizedCommentEmpty(text);
   // Validate the score here too (not just below) so a text-less "score only"
   // review (WS8 §4 — comment text is optional at/above the position's
   // shortlist threshold) can still be told apart from truly empty input.
@@ -1823,7 +1874,7 @@ export async function addComment(candidateId, { text, score = null, recommendati
   const mine = idOf(actor);
   if ((cand.comments || []).some((cm) => commentId(cm) === mine && cm.stage === cand.stage)) return;
   const entry = { stage: cand.stage, at: Date.now(), ...actorFields(actor) };
-  if (hasText) entry.text = text.trim();
+  if (hasText) entry.text = cleanText;
   // Clamp to 0–100 — already validated finite above.
   if (hasScore) entry.score = Math.min(100, Math.max(0, Math.round(scoreNum)));
   // Structured recommendation (advance / reject / hold) — this is what turns a
@@ -1900,8 +1951,24 @@ export async function updatePositionStages(positionId, stages) {
  * that file), not one slot applied to a whole stage's team: {stageId,
  * stageLabel, interviewerId, interviewerName, scheduledAt, durationMs}[].
  */
+// A flat { stageId: [uid, ...] } mirror of stageAssignees, kept alongside it
+// on every write. Firestore security rules can't iterate a list of {uid,...}
+// maps to check membership, but they CAN check a list of primitive strings
+// with `in`/`hasAny` — this is what makes the rules-side per-stage
+// assignment check (see firestore.rules' stageAssignmentOk()) possible at
+// all. Derived, never hand-edited; always recomputed from stageAssignees.
+function stageAssigneeUidsOf(stageAssignees) {
+  const out = {};
+  for (const [stageId, value] of Object.entries(stageAssignees || {})) {
+    const list = Array.isArray(value) ? value : value ? [value] : [];
+    const uids = list.map((a) => a?.uid).filter(Boolean);
+    if (uids.length) out[stageId] = uids;
+  }
+  return out;
+}
+
 export async function savePipeline(positionId, { stages, stageMeta = {}, stageAssignees = {}, stageSlots = [], removedBookingIds = [], actor }) {
-  const patch = { stages, stageMeta, stageAssignees };
+  const patch = { stages, stageMeta, stageAssignees, stageAssigneeUids: stageAssigneeUidsOf(stageAssignees) };
   if (firebaseReady) {
     const position = positions.find((p) => p.id === positionId);
     if (stageSlots.length) {

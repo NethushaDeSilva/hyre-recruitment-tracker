@@ -97,10 +97,26 @@ service cloud.firestore {
            : stage == 'final' ? 'Management'
            : ''; // hired / rejected are terminal — no owner
     }
-    // May the caller act on a candidate currently in `stage`?
-    // Management can act on any stage; otherwise the caller must own it.
-    function ownsStage(stage) {
-      return myRole() == 'Management' || myRole() == stageOwner(stage);
+    // May the caller act on a candidate currently in `stage`? Mirrors
+    // src/lib/stages.js's canActOnStageFor(): Management always may act;
+    // otherwise the caller's role must own the stage, AND — if HR assigned a
+    // specific team to it — the caller must be on that team. A candidate in
+    // "Initial Interview" moved by an Interviewer who was never assigned to
+    // that stage on that position used to be accepted here: this match
+    // block's `update` rule used to call a ROLE-ONLY check (any Interviewer,
+    // regardless of assignment). The client already hid the "Move"/"Reject"
+    // buttons correctly (canActOnStageFor), but nothing stopped a direct
+    // write to this document bypassing the UI entirely — this function is
+    // what closes that gap for real, at the only layer that can't be
+    // bypassed. stageAssigneeUids is a flat { stageId: [uid,...] } mirror of
+    // stageAssignees (see stageAssigneeUidsOf() in src/data/store.js) —
+    // rules can't iterate a list of {uid,...} maps, but can check a list of
+    // plain uid strings.
+    function stageAssignmentOk(positionId, stage) {
+      let position = get(/databases/$(database)/documents/positions/$(positionId)).data;
+      let uids = position.get('stageAssigneeUids', {}).get(stage, []);
+      return myRole() == 'Management'
+        || (myRole() == stageOwner(stage) && (uids.size() == 0 || request.auth.uid in uids));
     }
 
     // history[] may only grow — never shrink or be dropped. Tolerates docs that
@@ -271,11 +287,102 @@ service cloud.firestore {
     // different document shape (a permanent weekly template, not a dated
     // declaration with an expiry), so it gets its own match block rather
     // than overloading the one above with two incompatible schemas.
+    // --- Availability date/time gating ------------------------------------
+    // The independent server-side half of validateWeekTiming() in
+    // src/lib/weeklyAvailability.js. There is no API endpoint in front of
+    // this collection — the client writes Firestore directly (see
+    // saveWeeklyAvailability in src/data/store.js) — so these rules ARE the
+    // server for availability, and the client-side check is not load-bearing
+    // on its own. A direct SDK/REST call with a past day or a past time on
+    // today is refused here exactly as the UI refuses it.
+    //
+    // request.time is the SERVER's clock, so a caller cannot backdate a write
+    // by lying about its own. Asia/Colombo is a fixed UTC+05:30 with no DST,
+    // so the zone conversion is a plain offset — the same simplification the
+    // Availability page already relies on.
+    function colomboNow() { return request.time + duration.value(330, 'm'); }
+    // DAY_KEYS index with Sunday = 0; dayOfWeek() is 1=Monday..7=Sunday.
+    function colomboDayIndex() {
+      return colomboNow().dayOfWeek() == 7 ? 0 : colomboNow().dayOfWeek();
+    }
+    function twoDigit(n) { return (n < 10 ? '0' : '') + string(n); }
+    // "HH:MM", zero-padded, so ordinary string ordering is chronological —
+    // which is exactly why every row's times must match that shape below.
+    // ("9:00" would sort after "14:00", so the padded format is enforced,
+    // not assumed.)
+    function colomboNowHHMM() {
+      return twoDigit(colomboNow().hours()) + ':' + twoDigit(colomboNow().minutes());
+    }
+    function storedDays() { return resource == null ? {} : resource.data.get('days', {}); }
+
+    // A past day may not change at all. On a FIRST-EVER save there is nothing
+    // stored to compare against, so the requirement becomes "declare nothing
+    // in the past" — otherwise a brand-new user saving midweek would be
+    // blocked outright by an equality test against a document that does not
+    // exist yet.
+    function pastDayOk(newDays, key) {
+      return resource == null
+        ? newDays.get(key, {}).get('available', []).size() == 0
+        : newDays.get(key, {}) == storedDays().get(key, {});
+    }
+    function pastDaysUnchanged(newDays, todayIdx) {
+      return (0 >= todayIdx || pastDayOk(newDays, 'sun'))
+        && (1 >= todayIdx || pastDayOk(newDays, 'mon'))
+        && (2 >= todayIdx || pastDayOk(newDays, 'tue'))
+        && (3 >= todayIdx || pastDayOk(newDays, 'wed'))
+        && (4 >= todayIdx || pastDayOk(newDays, 'thu'))
+        && (5 >= todayIdx || pastDayOk(newDays, 'fri'))
+        && (6 >= todayIdx || pastDayOk(newDays, 'sat'));
+    }
+
+    // One of today's rows is acceptable if it is ALREADY stored exactly as-is
+    // (grandfathered — a slot saved this morning must not be invalidated at
+    // 3pm just because the rest of the day is being edited) or it starts at
+    // or after the current wall-clock minute.
+    function rowOkToday(row, oldRows, nowStr) {
+      return row in oldRows
+        || (row.start is string
+            && row.start.matches('^[0-2][0-9]:[0-5][0-9]$')
+            && row.start >= nowStr);
+    }
+    // This language has no loops, so the per-row checks are unrolled to a
+    // fixed ceiling and anything beyond it is refused outright. 12 is far
+    // above any realistic day (a handful of separate windows at most).
+    function todayRowsOk(newDay, oldDay, nowStr) {
+      return newDay.get('available', []).size() <= 12
+        && (newDay.get('available', []).size() < 1  || rowOkToday(newDay.get('available', [])[0],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 2  || rowOkToday(newDay.get('available', [])[1],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 3  || rowOkToday(newDay.get('available', [])[2],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 4  || rowOkToday(newDay.get('available', [])[3],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 5  || rowOkToday(newDay.get('available', [])[4],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 6  || rowOkToday(newDay.get('available', [])[5],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 7  || rowOkToday(newDay.get('available', [])[6],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 8  || rowOkToday(newDay.get('available', [])[7],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 9  || rowOkToday(newDay.get('available', [])[8],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 10 || rowOkToday(newDay.get('available', [])[9],  oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 11 || rowOkToday(newDay.get('available', [])[10], oldDay.get('available', []), nowStr))
+        && (newDay.get('available', []).size() < 12 || rowOkToday(newDay.get('available', [])[11], oldDay.get('available', []), nowStr));
+    }
+    function todayNotInPast(newDays, todayIdx, nowStr) {
+      return (todayIdx != 0 || todayRowsOk(newDays.get('sun', {}), storedDays().get('sun', {}), nowStr))
+        && (todayIdx != 1 || todayRowsOk(newDays.get('mon', {}), storedDays().get('mon', {}), nowStr))
+        && (todayIdx != 2 || todayRowsOk(newDays.get('tue', {}), storedDays().get('tue', {}), nowStr))
+        && (todayIdx != 3 || todayRowsOk(newDays.get('wed', {}), storedDays().get('wed', {}), nowStr))
+        && (todayIdx != 4 || todayRowsOk(newDays.get('thu', {}), storedDays().get('thu', {}), nowStr))
+        && (todayIdx != 5 || todayRowsOk(newDays.get('fri', {}), storedDays().get('fri', {}), nowStr))
+        && (todayIdx != 6 || todayRowsOk(newDays.get('sat', {}), storedDays().get('sat', {}), nowStr));
+    }
+    function availabilityRespectsClock() {
+      return pastDaysUnchanged(request.resource.data.days, colomboDayIndex())
+        && todayNotInPast(request.resource.data.days, colomboDayIndex(), colomboNowHHMM());
+    }
+
     match /weeklyAvailability/{staffUid} {
       allow read: if isStaff();
       allow create, update: if isStaff() && request.auth.uid == staffUid
                     && request.resource.data.updatedByUid == staffUid
-                    && request.resource.data.days is map;
+                    && request.resource.data.days is map
+                    && availabilityRespectsClock();
       allow delete: if false; // same reasoning as /availability — re-saving supersedes
     }
 
@@ -353,9 +460,54 @@ service cloud.firestore {
     // A self-scoped query cannot return that document at all under a
     // self-scoped rule. Reported to the Product Owner rather than widened
     // silently a second time; see the two options above this match block.
+    //
+    // 2026-09-24 — added interviewerOnApplication() below. getInterviewsForApplication()
+    // (src/data/store.js) runs an UNFILTERED-on-interviewerId query
+    // (where('applicationId','==', id)) so the review modal can show every
+    // stage's comments (HR Screening + Dept Review + Initial Interview, each
+    // by a DIFFERENT person) — not just the current viewer's own docs. Under
+    // the isRecruiter()-OR-SELF rule above, that's provable for isRecruiter()
+    // (a request-only predicate, trivially true for every doc) but NEVER
+    // provable for a plain Interviewer: some returned docs necessarily belong
+    // to a different interviewerId, so Firestore can't guarantee the self-only
+    // branch holds for the whole result set and rejects the ENTIRE query —
+    // "Missing or insufficient permissions," even though the caller legitimately
+    // owns one of the returned docs. Read access and write/move access are
+    // different permissions (an Interviewer reading another reviewer's comment
+    // on this same application is not the same as acting on a stage they
+    // aren't assigned to — see stageAssignmentOk() above, which still gates
+    // the applications write separately and is UNCHANGED by this).
+    // interviewerOnApplication() is provable for an applicationId-equality
+    // query specifically because applicationId IS the query's own filter
+    // field — get(/applications/$(data.applicationId)) resolves to ONE fixed
+    // document for the whole result set, so its positionId is a single
+    // deterministic value Firestore can reason about without per-doc data.
+    // Membership is checked against stageAssigneeUids (see stageAssigneeUidsOf()
+    // in src/data/store.js) across every stage of that position, not just the
+    // one this interview doc happens to be for — "has an interview record on
+    // this application" means assigned SOMEWHERE on it, not on this exact
+    // stage. This intentionally does NOT help a fully-unfiltered
+    // collection("interviews") read (no applicationId filter to resolve
+    // get() against) — commitInterviewChanges()'s isRecruiter()-only
+    // unfiltered read above is untouched by this addition.
+    function interviewerOnApplication(data) {
+      let appId = data.get('applicationId', '');
+      let posId = (appId is string && appId != '' && exists(/databases/$(database)/documents/applications/$(appId)))
+        ? get(/databases/$(database)/documents/applications/$(appId)).data.get('positionId', '')
+        : '';
+      let uids = (posId is string && posId != '' && exists(/databases/$(database)/documents/positions/$(posId)))
+        ? get(/databases/$(database)/documents/positions/$(posId)).data.get('stageAssigneeUids', {})
+        : {};
+      return request.auth.uid in uids.get('screening', [])
+        || request.auth.uid in uids.get('dept', [])
+        || request.auth.uid in uids.get('interview', [])
+        || request.auth.uid in uids.get('interview2', [])
+        || request.auth.uid in uids.get('final', []);
+    }
     match /interviews/{interviewId} {
       allow read: if isRecruiter()
-        || (signedIn() && resource.data.interviewerId == request.auth.uid);
+        || (signedIn() && resource.data.interviewerId == request.auth.uid)
+        || (signedIn() && interviewerOnApplication(resource.data));
       allow create: if isStaff() && scheduleRevisionAdvanced() && positionAvailable(request.resource.data.positionId);
       allow update: if scheduleRevisionAdvanced() && positionAvailable(resource.data.positionId)
         && request.resource.data.positionId == resource.data.positionId
@@ -514,15 +666,16 @@ service cloud.firestore {
           || (request.resource.data.stage == 'withdrawn' && resource.data.stage != 'withdrawn')
           ? validPreferenceWithdrawal(id)
           : (request.resource.data.stage == resource.data.stage
-            || (resource.data.stage != 'withdrawn' && ownsStage(resource.data.stage))
+            || (resource.data.stage != 'withdrawn' && stageAssignmentOk(resource.data.positionId, resource.data.stage))
             || (resource.data.stage == 'rejected' && request.resource.data.stage == 'applied' && myRole() == 'HR')));
 
-      // delete: explicit position cleanup, or as part of a HIRE transfer — a stage owner (or Management)
-      // removes the application the instant it's written into `employees`.
-      // Rejected applications otherwise remain in the talent pool.
+      // delete: explicit position cleanup, or as part of a HIRE transfer — the
+      // interviewer/HR/Management actually ASSIGNED to the current stage (or
+      // Management) removes the application the instant it's written into
+      // `employees`. Rejected applications otherwise remain in the talent pool.
       allow delete: if deletingPosition(resource.data.positionId) || (isStaff()
         && !(resource.data.stage in ['rejected', 'withdrawn'])
-        && ownsStage(resource.data.stage)
+        && stageAssignmentOk(resource.data.positionId, resource.data.stage)
         && (resource.data.stage != 'screening' || screeningPermit(resource.data.positionId, resource.data.screeningAuthorization)));
     }
 

@@ -147,6 +147,105 @@ export function validateWeek(days) {
 
 export const weekHasErrors = (validation) => DAY_KEYS.some((k) => validation[k].errors.length > 0);
 
+// --- Date/time gating: the past is never schedulable -----------------------
+// Everything here evaluates in Sri Lanka time (Asia/Colombo), the SAME
+// convention currentWeekDates() above already uses — never the browser's own
+// zone and never UTC, so two people in different countries editing the same
+// week agree on which days have already passed. Asia/Colombo is a fixed
+// UTC+05:30 with no DST, which is also what lets the Firestore rules mirror
+// this check with a plain offset (see firestore.rules).
+//
+// The template itself is a timeless recurring pattern, but the Availability
+// page presents it against THIS week's real Sun..Sat dates, so "has this day
+// passed" is well defined: compare the day's index in DAY_KEYS against
+// today's.
+export const COLOMBO_TZ = "Asia/Colombo";
+
+/** Today's index within DAY_KEYS (0 = Sunday), in Sri Lanka time. */
+export function colomboTodayIndex(now = Date.now(), timeZone = COLOMBO_TZ) {
+  return utcToWallTime(now, timeZone).dayOfWeek;
+}
+
+/** Minutes since Sri-Lanka midnight — compared against a row's start/end in the same unit (never a string compare: "9:00" is accepted by validateDay but would sort after "14:00"). */
+export function colomboNowMinutes(now = Date.now(), timeZone = COLOMBO_TZ) {
+  const { hour, minute } = utcToWallTime(now, timeZone);
+  return hour * 60 + minute;
+}
+
+/** "HH:MM" in Sri Lanka time — display only (the inline message / the min= attribute). */
+export function colomboNowHHMM(now = Date.now(), timeZone = COLOMBO_TZ) {
+  const { hour, minute } = utcToWallTime(now, timeZone);
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+/** "past" | "today" | "future" for one day tab, within THIS week, Sri Lanka time. */
+export function dayTimeState(dayKey, now = Date.now(), timeZone = COLOMBO_TZ) {
+  const index = DAY_KEYS.indexOf(dayKey);
+  if (index < 0) return "future";
+  const today = colomboTodayIndex(now, timeZone);
+  if (index < today) return "past";
+  return index === today ? "today" : "future";
+}
+
+export const PAST_DAY_MESSAGE = "This day has already passed and can no longer be edited.";
+export const PAST_TIME_MESSAGE = "This time has already passed.";
+
+// A row is "already saved" if an identical start/end pair is present in the
+// stored day. Matching by VALUE rather than by index on purpose: removing an
+// earlier row shifts the ones after it, and a shift is not an edit.
+const canonicalDay = (day) => JSON.stringify({
+  enabled: day?.enabled !== false,
+  available: (day?.available || []).map((r) => ({ start: r.start, end: r.end })),
+});
+const rowAlreadySaved = (row, savedRows) =>
+  (savedRows || []).some((r) => r.start === row.start && r.end === row.end);
+
+/**
+ * Time-gate a week's edits against the current moment, given what is already
+ * stored. Returns the same `{ errors, warnings }` per-day shape validateWeek()
+ * produces, so the two merge (see mergeValidation).
+ *
+ * Past days must be byte-identical to what's stored — they stay VISIBLE and
+ * readable, they just can't change. Today's rows are only checked when they
+ * are new or edited: a slot saved this morning is not retroactively invalid
+ * at 3pm just because the rest of the day is being edited. Future days are
+ * unrestricted.
+ *
+ * `now` is injected rather than read here so the caller controls it — the
+ * save path deliberately passes a FRESH Date.now() rather than whatever the
+ * form was rendered with.
+ */
+export function validateWeekTiming(days, savedDays, now = Date.now(), timeZone = COLOMBO_TZ) {
+  const nowMinutes = colomboNowMinutes(now, timeZone);
+  return Object.fromEntries(DAY_KEYS.map((key) => {
+    const errors = [];
+    const state = dayTimeState(key, now, timeZone);
+    const day = days?.[key];
+    const savedDay = savedDays?.[key];
+    if (state === "past") {
+      if (canonicalDay(day) !== canonicalDay(savedDay)) {
+        errors.push({ list: "day", index: -1, message: PAST_DAY_MESSAGE });
+      }
+    } else if (state === "today") {
+      (day?.available || []).forEach((row, i) => {
+        if (rowAlreadySaved(row, savedDay?.available)) return; // untouched — grandfathered
+        if (toMinutes(row.start) < nowMinutes || toMinutes(row.end) <= nowMinutes) {
+          errors.push({ list: "available", index: i, message: PAST_TIME_MESSAGE });
+        }
+      });
+    }
+    return [key, { errors, warnings: [] }];
+  }));
+}
+
+/** Combine validateWeek()'s shape-checks with validateWeekTiming()'s clock-checks. */
+export function mergeValidation(a, b) {
+  return Object.fromEntries(DAY_KEYS.map((k) => [k, {
+    errors: [...(a?.[k]?.errors || []), ...(b?.[k]?.errors || [])],
+    warnings: [...(a?.[k]?.warnings || []), ...(b?.[k]?.warnings || [])],
+  }]));
+}
+
 /** Tab-chip text (Part A layout spec: "3 slots" / "None" / "Not working"). */
 export function daySummaryChip(day) {
   if (!day || day.enabled === false) return "Not working";

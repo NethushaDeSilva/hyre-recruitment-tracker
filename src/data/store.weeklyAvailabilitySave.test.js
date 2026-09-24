@@ -2,7 +2,7 @@
 // AND the derived availability/{uid} in one batch (never two separate
 // writes that could diverge), preserves existing exceptions untouched, and
 // derives the legacy slots correctly for a real template.
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   existingExists: true,
@@ -46,7 +46,15 @@ beforeEach(() => {
   state.existingExceptions = [{ date: "2026-01-01", type: "leave", reason: "" }];
   state.sets = [];
   state.commit.mockReset();
+  // Pinned to Sunday 20 Sep 2026, 08:30 Colombo. saveWeeklyAvailability now
+  // refuses writes that touch a day already past this week (see
+  // store.availabilityGate.test.js); this file is about the BATCH WRITE, not
+  // that gate, and on a Sunday no weekday is in the past — so the Monday
+  // template below stays writable whatever day the suite actually runs on.
+  vi.useFakeTimers();
+  vi.setSystemTime(Date.UTC(2026, 8, 20, 3, 0));
 });
+afterEach(() => { vi.useRealTimers(); });
 
 it("writes weeklyAvailability and the derived availability doc in exactly ONE batch", async () => {
   const days = {

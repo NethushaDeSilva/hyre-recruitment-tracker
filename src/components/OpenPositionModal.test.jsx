@@ -55,3 +55,32 @@ it("keeps a short 'X and Y' compound pair as one chip in the live preview, not s
   expect(text(tree.toJSON())).toContain("HTML and CSS");
   tree.unmount();
 });
+
+it("Description, Required skills and Nice-to-have are large resizable textareas, not single-line inputs", () => {
+  const tree = renderModal();
+  const description = tree.root.findAllByType("textarea").find((t) => t.props.placeholder?.startsWith("Describe the actual responsibilities"));
+  expect(description.props.rows).toBeGreaterThanOrEqual(6); // ~200px worth of lines
+  expect(description.props.className).toContain("min-h-[200px]");
+  expect(requiredSkillsTextarea(tree).props.className).toContain("min-h-[110px]");
+  expect(niceToHaveTextarea(tree).props.className).toContain("min-h-[110px]");
+  tree.unmount();
+});
+
+it("a full multi-paragraph description paste is preserved verbatim (this field is display-only, never parsed into a list)", () => {
+  const tree = renderModal();
+  const findDescription = () => tree.root.findAllByType("textarea").find((t) => t.props.placeholder?.startsWith("Describe the actual responsibilities"));
+  const pasted = "We're hiring a Senior Backend Engineer to own our payments platform.\n\nResponsibilities:\n- Design and scale our core ledger service\n- Mentor two mid-level engineers\n- Partner with Product on the Q3 roadmap\n\nThis role reports to the VP of Engineering and is based in Colombo.";
+  act(() => { findDescription().props.onChange({ target: { value: pasted } }); });
+  expect(findDescription().props.value).toBe(pasted);
+  tree.unmount();
+});
+
+it("a full multi-line skills list (one skill per line, Word/paste style) still parses into the same clean chips as a comma list", () => {
+  const tree = renderModal();
+  const pasted = "React\nTypeScript\nNode.js\nPostgreSQL\nDocker";
+  act(() => { requiredSkillsTextarea(tree).props.onChange({ target: { value: pasted } }); });
+  act(() => { vi.advanceTimersByTime(600); });
+  const rendered = text(tree.toJSON());
+  for (const skill of ["React", "TypeScript", "Node.js", "PostgreSQL", "Docker"]) expect(rendered).toContain(skill);
+  tree.unmount();
+});

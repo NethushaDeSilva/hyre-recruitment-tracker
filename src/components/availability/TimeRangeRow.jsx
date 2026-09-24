@@ -6,13 +6,17 @@
 import { Trash2, AlertCircle, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/Field";
 
-export default function TimeRangeRow({ row, onChange, onRemove, error, warning, removeLabel }) {
+export default function TimeRangeRow({ row, onChange, onRemove, error, warning, removeLabel, minTime }) {
   return (
     <div>
       <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2.5">
-        <Input type="time" step={900} value={row.start} onChange={(e) => onChange({ start: e.target.value })} className="!w-auto shrink-0" />
+        {/* `min` is a native convenience only — it is advisory, trivially
+            bypassed by typing, and goes stale as the clock moves. The real
+            check is validateWeekTiming() (re-run on a 30s tick and again at
+            save time against a fresh clock), mirrored in firestore.rules. */}
+        <Input type="time" step={900} min={minTime} value={row.start} onChange={(e) => onChange({ start: e.target.value })} className="!w-auto shrink-0" />
         <span className="shrink-0 text-xs text-muted-foreground">to</span>
-        <Input type="time" step={900} value={row.end} onChange={(e) => onChange({ end: e.target.value })} className="!w-auto shrink-0" />
+        <Input type="time" step={900} min={minTime} value={row.end} onChange={(e) => onChange({ end: e.target.value })} className="!w-auto shrink-0" />
         <button
           type="button"
           onClick={onRemove}

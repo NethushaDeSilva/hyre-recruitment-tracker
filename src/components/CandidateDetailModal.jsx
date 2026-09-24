@@ -8,6 +8,9 @@ import { Download, ExternalLink, FileText, Mail, Phone, MapPin, Linkedin, Rotate
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Textarea, Input } from "@/components/ui/Field";
+import RichCommentEditor from "@/components/ui/RichCommentEditor";
+import SafeHtml from "@/components/ui/SafeHtml";
+import { isSanitizedCommentEmpty } from "@/lib/sanitizeHtml";
 import { StageBadge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { useAuth } from "@/context/AuthContext";
@@ -133,7 +136,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
   };
 
   const postComment = async () => {
-    if ((commentRequired && !draft.trim()) || !scoreOk) return;
+    if ((commentRequired && isSanitizedCommentEmpty(draft)) || !scoreOk) return;
     setPosting(true);
     await addComment(c.id, {
       text: draft,
@@ -318,7 +321,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                       )}
                     </div>
                     {cm.text ? (
-                      <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground">{cm.text}</p>
+                      <SafeHtml html={cm.text} className="mt-1.5 text-sm text-foreground [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_p:last-child]:mb-0" />
                     ) : cm.score != null ? (
                       <p className="mt-1.5 text-sm italic text-muted-foreground">No comment left — score met the shortlist threshold.</p>
                     ) : null}
@@ -331,10 +334,9 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
           {/* one review per user per stage — hidden once you've left yours (delete it to redo) */}
           {canPost ? (
             <div className="mt-3 space-y-2">
-              <Textarea autoGrow
-                rows={2}
+              <RichCommentEditor
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={setDraft}
                 maxLength={1000}
                 placeholder={commentRequired ? "Add your comment on this candidate…" : "Add an optional comment on this candidate…"}
               />
@@ -361,7 +363,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                 </div>
               )}
               <div className="flex justify-end">
-                <Button onClick={postComment} disabled={(commentRequired && !draft.trim()) || !scoreOk || posting}>
+                <Button onClick={postComment} disabled={(commentRequired && isSanitizedCommentEmpty(draft)) || !scoreOk || posting}>
                   <Send size={14} /> {posting ? "Posting…" : "Post review"}
                 </Button>
               </div>
@@ -512,7 +514,7 @@ export default function CandidateDetailModal({ open, onClose, candidate, positio
                         {formatDate(e.at)}{e.by ? ` · ${e.by}${e.byRole ? ` (${e.byRole})` : ""}` : ""}
                       </div>
                       {e.score != null && <div className="mt-0.5 inline-flex items-center gap-1 text-xs font-bold text-[#A9781A]"><Star size={11} strokeWidth={2.5} /> Score {e.score}/100</div>}
-                      {e.comment && <div className="mt-0.5 text-xs italic text-muted-foreground">“{e.comment}”</div>}
+                      {e.comment && <SafeHtml html={e.comment} className="mt-0.5 text-xs italic text-muted-foreground [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-4 [&_ol]:pl-4 [&_p:last-child]:mb-0" />}
                     </div>
                   </li>
                 );

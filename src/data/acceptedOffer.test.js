@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+// (store.js's addComment now sanitizes via DOMPurify, which needs a DOM to
+// construct its purifier — this file imports store.js transitively.)
 import { expect, it, vi } from 'vitest';
 vi.mock('@/firebase/config',()=>({firebaseReady:false,db:null,auth:null,storage:null}));
 import {addComment,advanceStage,saveAcceptedOffer,getCandidatesFor} from './store';

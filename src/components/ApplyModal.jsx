@@ -205,10 +205,22 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     : null;
 
   // Submit is ready ONLY when: a freshly chosen file has actually PASSED its
-  // scan, OR there's no new file and a carried-over CV is in use. Idle,
-  // scanning, failed and errored all fall through to "not ready" — the
-  // default is blocked, never allowed.
-  const cvReady = cvFile ? scanState === "passed" : !!existingCv;
+  // scan AND its WS4 profile parse has settled, OR there's no new file and a
+  // carried-over CV is in use. Idle, scanning, failed and errored all fall
+  // through to "not ready" — the default is blocked, never allowed.
+  //
+  // parseState is part of this because the profile spread in submit() is
+  // guarded on `parsedProfile` being present. Validation passing and the
+  // profile parse finishing are TWO separate model calls, and the parse takes
+  // several seconds longer — so submitting in that window silently dropped
+  // the entire parsed profile AND the extracted CV text, writing an identity
+  // with no name/skills/education/text at all. That candidate still scores
+  // afterwards, as a clean 0/100 with every required skill "missing", so they
+  // read as unqualified rather than unprocessed. Found live 2026-09-24.
+  // A parse that genuinely FAILED must never block (that was always allowed
+  // by design — the candidate just gets an empty profile); only one still in
+  // flight does.
+  const cvReady = cvFile ? scanState === "passed" && parseState !== "parsing" : !!existingCv;
 
   // Returns { fieldErrors, cvMessage } — empty when the form is valid.
   const validate = () => {
@@ -228,7 +240,11 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
     if (nameOverride.trim() && looksLikeEmail(nameOverride.trim())) {
       fieldErrors.nameOverride = "That looks like an email address, not a name.";
     }
-    const cvMessage = cvReady ? "" : "Please attach a CV that passes the scan above before continuing.";
+    const cvMessage = cvReady
+      ? ""
+      : cvFile && scanState === "passed" && parseState === "parsing"
+      ? "We're still reading your CV — this takes a few seconds. Please try again in a moment."
+      : "Please attach a CV that passes the scan above before continuing.";
     return { fieldErrors, cvMessage };
   };
 
@@ -337,11 +353,17 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
               cvTruncation: { applied: !!scanResult.truncationApplied, strategy: scanResult.truncationStrategy || null },
             }
           : {}),
+        // The extracted CV text is kept whenever the scan produced any, even
+        // if the profile parse below didn't produce a profile. It's what WS5's
+        // verification layer grounds matched skills against, and what HR reads
+        // when a profile looks thin — it used to sit INSIDE the parsedProfile
+        // guard and was thrown away along with everything else whenever
+        // parsing didn't return one, leaving nothing to fall back on.
+        ...(cvFile && scanResult?.text ? { cvExtractedText: scanResult.text } : {}),
         ...(cvFile && parsedProfile
           ? {
               ...profileToCandidateFields(parsedProfile),
               name: nameOverride.trim(), // the one field the candidate could correct in the confirmation step
-              cvExtractedText: scanResult?.text || "",
               ...(emailMismatch ? { emailFromCv: parsedProfile.email, emailMismatch: true } : {}),
             }
           : {}),
@@ -375,7 +397,7 @@ export default function ApplyModal({ open, onClose, position, onApplied }) {
         <>
           <Button variant="ghost" onClick={close}>Cancel</Button>
           <Button onClick={submit} disabled={busy || !cvReady}>
-            {busy ? "Submitting…" : "Submit application"}
+            {busy ? "Submitting…" : cvFile && scanState === "passed" && parseState === "parsing" ? "Reading your CV…" : "Submit application"}
           </Button>
         </>
       }

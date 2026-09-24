@@ -23,18 +23,17 @@ import {
   emptyWeek, emptyDay, emptyAvailableRow,
   validateWeek, weekHasErrors, daySummaryChip,
   currentWeekDates, currentWeekByDayKey, formatShortDate, weekRangeLabel,
+  dayTimeState, colomboTodayIndex, colomboNowHHMM, validateWeekTiming, mergeValidation,
 } from "@/lib/weeklyAvailability";
 import { Button } from "@/components/ui/Button";
 import DayPanel from "@/components/availability/DayPanel";
 
-/** Ms until 5s after the next Sri-Lanka-time midnight — when "this week" rolls into the next one. */
-function msUntilNextColomboMidnight() {
-  const now = new Date();
-  // Asia/Colombo is a fixed UTC+05:30 offset (no DST) — safe to compute directly.
-  const colomboNow = new Date(now.getTime() + 5.5 * 3600 * 1000);
-  const nextMidnightColombo = Date.UTC(colomboNow.getUTCFullYear(), colomboNow.getUTCMonth(), colomboNow.getUTCDate() + 1, 0, 0, 5);
-  return nextMidnightColombo - 5.5 * 3600 * 1000 - now.getTime();
-}
+// How often the page re-reads the clock. This drives BOTH the Colombo-midnight
+// roll into the next week AND the per-minute gating of today's already-passed
+// times, so a page left open doesn't keep offering times that have since
+// gone by. (It replaced a single timer that only fired at midnight, which was
+// enough for the week window but not for a within-day time check.)
+const CLOCK_TICK_MS = 30_000;
 
 export default function Availability() {
   const { user } = useAuth();
@@ -42,20 +41,29 @@ export default function Availability() {
   const toast = useToast();
   const [saved, setSaved] = useState(emptyWeek());
   const [days, setDays] = useState(emptyWeek());
-  const [activeDay, setActiveDay] = useState("sun"); // Sunday is the first tab — the week starts there
+  // Opens on TODAY, not on Sunday: Sunday is the first tab, but by midweek it's
+  // a past day and therefore disabled — landing the user on a tab they can't
+  // edit would read as the page being broken.
+  const [activeDay, setActiveDay] = useState(() => DAY_KEYS[colomboTodayIndex()]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   // THIS calendar week — Sunday through Saturday, in Sri Lanka time
-  // (Asia/Colombo). Recomputed at Colombo midnight so a tab left open
-  // overnight rolls into the next week on its own.
+  // (Asia/Colombo), re-read on a tick so a tab left open rolls into the next
+  // week overnight and stops offering times that have since passed.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setTimeout(() => setNow(Date.now()), msUntilNextColomboMidnight());
-    return () => clearTimeout(t);
-  }, [now]);
+    const t = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
+    return () => clearInterval(t);
+  }, []);
   const weekDates = useMemo(() => currentWeekDates(now), [now]);
   const datesByDayKey = useMemo(() => currentWeekByDayKey(now), [now]);
+  // "past" | "today" | "future" per tab, recomputed on every tick.
+  const dayStates = useMemo(
+    () => Object.fromEntries(DAY_KEYS.map((k) => [k, dayTimeState(k, now)])),
+    [now]
+  );
+  const nowLabel = colomboNowHHMM(now);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -68,9 +76,23 @@ export default function Availability() {
     return () => { alive = false; };
   }, [user?.uid, weekDates[0].year, weekDates[0].month, weekDates[0].day]);
 
-  const validation = useMemo(() => validateWeek(days), [days]);
+  // Shape checks (bad/overlapping times) merged with clock checks (past day
+  // edited, past time on today). Both re-run on every tick, so a row that was
+  // fine when typed starts showing "This time has already passed" once it is.
+  const validation = useMemo(
+    () => mergeValidation(validateWeek(days), validateWeekTiming(days, saved, now)),
+    [days, saved, now]
+  );
   const dirty = useMemo(() => JSON.stringify(days) !== JSON.stringify(saved), [days, saved]);
   const hasErrors = weekHasErrors(validation);
+  const readOnlyDay = dayStates[activeDay] === "past";
+  const pastDays = DAY_KEYS.filter((k) => dayStates[k] === "past");
+
+  // Midnight rollover can turn the tab you're sitting on into a past day —
+  // move to today rather than leaving an editable panel open on it.
+  useEffect(() => {
+    if (dayStates[activeDay] === "past") setActiveDay(DAY_KEYS[colomboTodayIndex(now)]);
+  }, [dayStates, activeDay, now]);
 
   const patchDay = (key, patch) => setDays((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   const addRow = () => patchDay(activeDay, { available: [...days[activeDay].available, emptyAvailableRow()] });
@@ -126,18 +148,29 @@ export default function Availability() {
       <div className="mt-6 flex flex-wrap gap-1.5 border-b border-border">
         {DAY_KEYS.map((key) => {
           const active = key === activeDay;
+          const past = dayStates[key] === "past";
           return (
             <button
               key={key}
               type="button"
-              onClick={() => setActiveDay(key)}
+              // A day earlier than today this week can't be selected or edited
+              // at all — its saved slots stay readable via the panel below,
+              // but there is nothing left to decide about a day that's gone.
+              disabled={past}
+              aria-disabled={past}
+              title={past ? "This day has already passed." : undefined}
+              onClick={() => { if (!past) setActiveDay(key); }}
               className={`flex flex-col items-center gap-0.5 rounded-t-md border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
-                active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                past
+                  ? "cursor-not-allowed border-transparent text-muted-foreground/40"
+                  : active
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {DAY_LABELS[key]}
-              <span className={`text-[10px] font-medium ${active ? "text-primary/70" : "text-muted-foreground/70"}`}>
-                {formatShortDate(datesByDayKey[key])} · {daySummaryChip(days[key])}
+              <span className={`text-[10px] font-medium ${past ? "text-muted-foreground/40" : active ? "text-primary/70" : "text-muted-foreground/70"}`}>
+                {formatShortDate(datesByDayKey[key])} · {daySummaryChip(days[key])}{past ? " · passed" : ""}
               </span>
             </button>
           );
@@ -149,12 +182,46 @@ export default function Availability() {
           dayKey={activeDay}
           day={days[activeDay]}
           validation={validation[activeDay]}
+          readOnly={readOnlyDay}
+          // Today only: the native pickers refuse earlier values, and the
+          // authoritative check is validateWeekTiming() via `validation`.
+          minTime={dayStates[activeDay] === "today" ? nowLabel : undefined}
           onAddRow={addRow}
           onChangeRow={changeRow}
           onRemoveRow={removeRow}
           onRemoveDay={removeDay}
           onRestoreDay={restoreDay}
         />
+
+        {dayStates[activeDay] === "today" && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            It's {nowLabel} — times earlier than this today can't be added.
+          </p>
+        )}
+
+        {/* Past days are not selectable above, so this is where their saved
+            times stay readable — historical availability is never hidden,
+            just frozen. */}
+        {pastDays.length > 0 && (
+          <div className="mt-6 rounded-lg border border-border bg-secondary/30 p-4">
+            <h3 className="text-[13px] font-bold text-foreground">Earlier this week (read-only)</h3>
+            <ul className="mt-2 space-y-1.5">
+              {pastDays.map((key) => (
+                <li key={key} className="flex flex-wrap items-baseline gap-x-2 text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground/70">{DAY_LABELS[key]}</span>
+                  <span>{formatShortDate(datesByDayKey[key])}</span>
+                  <span>
+                    {saved[key]?.enabled === false
+                      ? "Not working"
+                      : (saved[key]?.available || []).length === 0
+                      ? "No available times"
+                      : (saved[key].available || []).map((r) => `${r.start}–${r.end}`).join(", ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-6 flex items-center gap-3">
           <Button onClick={save} disabled={!dirty || hasErrors || busy}>

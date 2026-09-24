@@ -241,7 +241,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
           </Field>
         </div>
         <Field label="Description">
-          <Textarea autoGrow value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={20000} placeholder="Describe the actual responsibilities, business domain and company-specific work..." />
+          <Textarea autoGrow className="min-h-[200px]" value={description} onChange={(e) => setDescription(e.target.value)} rows={8} maxLength={20000} placeholder="Describe the actual responsibilities, business domain and company-specific work..." />
         </Field>
 
         <Field label="Minimum qualification (optional)">
@@ -282,7 +282,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
               }}><Undo2 size={13} aria-hidden="true" />Undo organization</button>}
             </div>
             {organizeError && <p role="alert" className="text-sm text-red-600">{organizeError}</p>}
-            <Textarea id={`${departmentListId}-skills`} autoGrow rows={1} disabled={organizing}
+            <Textarea id={`${departmentListId}-skills`} autoGrow className="min-h-[110px]" rows={5} disabled={organizing}
               value={skillsPreview ? skillsPreview.required : requiredSkillsText}
               onChange={e => skillsPreview ? setSkillsPreview(p => ({ ...p, required: e.target.value })) : setRequiredSkillsText(e.target.value)}
               placeholder="e.g. React, TypeScript, Node.js"
@@ -292,7 +292,7 @@ export default function OpenPositionModal({ open, onClose, position = null }) {
           </div>
 
           <Field label="Nice-to-have skills (optional)">
-            <Textarea autoGrow rows={1} disabled={organizing} value={skillsPreview ? skillsPreview.nice : niceToHaveText} onChange={e => skillsPreview ? setSkillsPreview(p => ({ ...p, nice: e.target.value })) : setNiceToHaveText(e.target.value)} placeholder="e.g. GraphQL" />
+            <Textarea autoGrow className="min-h-[110px]" rows={5} disabled={organizing} value={skillsPreview ? skillsPreview.nice : niceToHaveText} onChange={e => skillsPreview ? setSkillsPreview(p => ({ ...p, nice: e.target.value })) : setNiceToHaveText(e.target.value)} placeholder="e.g. GraphQL" />
             {!skillsPreview && <ChipPreview chips={niceChipsPreview} />}
           </Field>
 

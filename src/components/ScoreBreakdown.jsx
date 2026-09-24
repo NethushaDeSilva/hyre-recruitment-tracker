@@ -47,7 +47,7 @@ function SkillsBlock({ title, block }) {
       <Bar score={block.score} max={block.max} />
       {block.capabilities?.map((g, i) => <div key={i} className="text-xs">
         <p>{g.label}: {Math.round(g.coverage * 100)}% coverage (weight {g.weight})</p>
-        <p className="text-muted-foreground">{g.alternatives.map(branch => branch.join(" + ")).join(" OR ")}</p>
+        <p className="text-muted-foreground">{g.alternatives.map(alt => alt.terms.join(" + ")).join(" OR ")}</p>
       </div>)}
       {block.matched?.length > 0 && <ul className="space-y-1 pt-1">{block.matched.map((m, i) => <SkillRow key={i} m={m} />)}</ul>}
       {block.missing?.length > 0 && (

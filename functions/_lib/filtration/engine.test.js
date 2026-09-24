@@ -220,6 +220,72 @@ describe("scoreApplication — WS6.4 scoring-stage stability", () => {
   });
 });
 
+describe("scoreApplication — Firestore write shape", () => {
+  // Regression test for the "Nested arrays are not supported" Firestore
+  // error on applicationScores/{id}: breakdown.coreSkills.capabilities used
+  // to carry `alternatives: [[...]]` (an array of arrays of strings) straight
+  // through to the write. This walks the ENTIRE result an applicationScores
+  // write is built from (scoring.js's `{ ...result, ... }` spread in
+  // store.js) and fails if any array anywhere contains another array as a
+  // direct element — the exact shape Firestore rejects, regardless of which
+  // field it shows up in next time.
+  function findNestedArray(value, path = "$") {
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) {
+        if (Array.isArray(value[i])) return `${path}[${i}]`;
+        const hit = findNestedArray(value[i], `${path}[${i}]`);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    if (value && typeof value === "object") {
+      for (const [k, v] of Object.entries(value)) {
+        const hit = findNestedArray(v, `${path}.${k}`);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  }
+
+  it("never produces an array-of-arrays anywhere in the scored result (default grouping)", async () => {
+    const embedTexts = async () => { throw new Error("should not be called"); };
+    const requirements = {
+      requiredQualification: { level: 6, field: "Computer Science" },
+      requiredSkills: ["React", "Node.js"],
+      minYearsExperience: 3,
+      niceToHave: ["GraphQL"],
+    };
+    const candidate = {
+      skills: ["React.js", "Node", "GraphQL"],
+      education: [{ degree: "BSc Computer Science" }],
+      totalYearsExperience: 5,
+      extractedText: "BSc Computer Science graduate, experienced in React.js, Node.js and GraphQL.",
+    };
+    const result = await scoreApplication(candidate, requirements, { embedTexts });
+    expect(findNestedArray(result)).toBeNull();
+  });
+
+  it("never produces an array-of-arrays with a multi-branch requirementPlan (the AI-grouped capability rubric path)", async () => {
+    // A missing required term still runs verifyTerm()'s embedding fallback
+    // (it can't literal-match, so it tries semantic grounding before giving
+    // up) — this test only cares about the OUTPUT SHAPE, so a constant stand-in
+    // vector is enough; the actual similarity value is irrelevant here.
+    const embedTexts = async (texts) => texts.map(() => [1, 0]);
+    const requirements = { requiredSkills: ["Java", "Spring Boot", "Node.js"], minYearsExperience: 0, niceToHave: [] };
+    const entries = [
+      { id: 0, name: "Java", alternatives: [["Java"]] },
+      { id: 1, name: "Spring Boot", alternatives: [["Spring Boot"]] },
+      { id: 2, name: "Node.js", alternatives: [["Node.js"]] },
+    ];
+    // Two OR-branches in one capability group — the exact shape that produced
+    // `alternatives: [[...],[...]]` before the fix.
+    const groups = [{ label: "Backend stack", weight: 2, alternatives: [[0, 1], [2]] }];
+    const candidate = { skills: ["Java", "Spring Boot"], education: [], totalYearsExperience: 0, extractedText: "5 years with Java and Spring Boot." };
+    const result = await scoreApplication(candidate, requirements, { embedTexts, requirementPlan: { entries, groups } });
+    expect(findNestedArray(result)).toBeNull();
+  });
+});
+
 describe("sortApplications", () => {
   it("orders by overallScore desc, then core-skills score desc, then candidateId ascending; unscored sorts last", () => {
     const make = (candidateId, overallScore, coreScore) => ({

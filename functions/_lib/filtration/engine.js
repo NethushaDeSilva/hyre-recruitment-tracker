@@ -75,8 +75,14 @@ async function scoreSkillList(entries, groups, candidateSkills, extractedText, w
     met: e.alternatives.some(branch => branch.every(term => records.find(r => r.required === term)?.status === "verified")) }));
   return { score, max: weight, matched: records.filter(r => r.status !== "unverifiable"),
     missing: records.filter(r => r.status === "unverifiable").map(r => r.required), verification: verified,
+    // `alternatives` as an array of { terms } objects, NOT an array of
+    // arrays — g.alternatives itself is legitimately [[id,id],[id]] (OR
+    // branches of AND-linked entry IDs) for the computation above, but
+    // Firestore rejects array-of-arrays anywhere in a written document, and
+    // this capabilities field is what actually gets persisted (see
+    // engine.test.js's "no array-of-arrays" assertion).
     capabilities: capabilities.map(g => ({ label: g.label, weight: g.weight, coverage: g.coverage,
-      alternatives: g.alternatives.map(branch => branch.map(id => entries[id].name)) })), mandatory };
+      alternatives: g.alternatives.map(branch => ({ terms: branch.map(id => entries[id].name) })) })), mandatory };
 }
 
 /**
